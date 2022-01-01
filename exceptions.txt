@@ -33,3 +33,7 @@ X0100964012528000
 ;Olympic Games Tokyo 2020 – The Official Video Game
 ;1.0.0 crash on boot
 010034B00E14C000
+
+;Plants vs Zombies Battle for Neighborville Complete Edition
+;1.0.0 - 1.0.3 crash on boot
+0100C56010FD8000
