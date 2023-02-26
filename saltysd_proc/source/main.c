@@ -460,7 +460,7 @@ Result handleServiceCmd(int cmd)
 			u64 magic;
 			u64 cmd_id;
 			u64 size;
-			u32 reserved[2];
+			u64 reserved;
 		} *resp = r.Raw;
 
 		u64 new_size = resp->size;
@@ -471,24 +471,25 @@ Result handleServiceCmd(int cmd)
 			u64 magic;
 			u64 result;
 			u64 offset;
+			u64 reserved;
 		} *raw;
 
 		raw = ipcPrepareHeader(&c, sizeof(*raw));
 
 		raw->magic = SFCO_MAGIC;
 		if (!new_size) {
+			SaltySD_printf("SaltySD: cmd 6 failed. Wrong size.");
 			raw->offset = 0;
-			raw->result = 0;
+			raw->result = 0xFFE;
 		}
 		else if (new_size < (_sharedMemory.size - reservedSharedMemory)) {
 			if (!shmemMap(&_sharedMemory)) {
-				if (!reservedSharedMemory)
+				if (!reservedSharedMemory) {
 					memset(shmemGetAddr(&_sharedMemory), 0, 0x1000);
-				uint16_t* block_size = (uint16_t*)shmemGetAddr(&_sharedMemory) + reservedSharedMemory;
-				*block_size = new_size;
-				raw->offset = reservedSharedMemory + 2;
+				}
 				raw->result = 0;
-				reservedSharedMemory += new_size + 2;
+				raw->offset = reservedSharedMemory;
+				reservedSharedMemory += new_size;
 				shmemUnmap(&_sharedMemory);
 			}
 			else {
