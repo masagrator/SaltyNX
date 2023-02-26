@@ -349,7 +349,7 @@ Result SaltySD_CheckIfSharedMemoryAvailable(ptrdiff_t *new_offset, u64 new_size)
 		u64 magic;
 		u64 cmd_id;
 		u64 size;
-		u32 reserved[2];
+		u64 reserved;
 	} *raw;
 
 	raw = ipcPrepareHeader(&c, sizeof(*raw));
@@ -368,6 +368,7 @@ Result SaltySD_CheckIfSharedMemoryAvailable(ptrdiff_t *new_offset, u64 new_size)
 			u64 magic;
 			u64 result;
 			u64 offset;
+			u64 reserved;
 		} *resp = r.Raw;
 
 		ret = resp->result;
@@ -376,6 +377,7 @@ Result SaltySD_CheckIfSharedMemoryAvailable(ptrdiff_t *new_offset, u64 new_size)
 		{
 			*new_offset = resp->offset;
 		}
+		else *new_offset = -1;
 	}
 	
 	return ret;
