@@ -32,9 +32,6 @@ Known issues:
 - 32 bit games are unsupported,
 - Cheats using directly heap addresses may not work properly while using plugins.
 
-For compiling it as advised to compile with **DevkitA64 r16.1**<br>
-After some update devkit compiles wrongly Core, causing heap issues with some games like Witcher 3.
-
 # How to download release:
 
 For Atmosphere >=0.10.1 just put folders from archive to root of your sdcard.
@@ -75,6 +72,7 @@ Remember to restart Switch
 | Stubbs the Zombie in Rebel Without a Pulse | all | heap related |
 | Tokyo Mirage Session #FE Encore | all | 32-bit game, not supported |
 | Valkyria Chronicles | all | 32-bit game, not supported |
+| Witcher 3 GOTY (version 3.2) | all | heap related |
 | World of Goo | all | 32-bit game, not supported |
 | YouTube | plugins | Unknown |
 
