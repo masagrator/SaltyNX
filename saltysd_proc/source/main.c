@@ -490,17 +490,20 @@ Result handleServiceCmd(int cmd)
 				raw->result = 0;
 				raw->offset = reservedSharedMemory;
 				reservedSharedMemory += new_size;
+				if (reservedSharedMemory % 4 != 0) {
+					reservedSharedMemory += (4 - (reservedSharedMemory % 4));
+				}
 				shmemUnmap(&_sharedMemory);
 			}
 			else {
 				SaltySD_printf("SaltySD: cmd 6 failed. shmemMap error.");
-				raw->offset = 0;
+				raw->offset = -1;
 				raw->result = 0xFFE;
 			}
 		}
 		else {
 			SaltySD_printf("SaltySD: cmd 6 failed. Not enough free space. Left: %d\n", (_sharedMemory.size - reservedSharedMemory));
-			raw->offset = 0;
+			raw->offset = -1;
 			raw->result = 0xFFE;
 		}
 
