@@ -19,7 +19,7 @@ extern Result SaltySD_GetSDCard(Handle *retrieve) LINKABLE;
 extern Result SaltySD_printf(const char* format, ...) LINKABLE;
 extern Result SaltySD_CheckIfSharedMemoryAvailable(ptrdiff_t *offset, u64 size) LINKABLE;
 extern Result SaltySD_GetSharedMemoryHandle(Handle *retrieve) LINKABLE;
-extern Result SaltySD_GetBID(u8* BID) LINKABLE;
+extern u64 SaltySD_GetBID() LINKABLE;
 extern Result SaltySD_Exception() LINKABLE;
 
 #ifdef __cplusplus

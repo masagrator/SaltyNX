@@ -456,7 +456,7 @@ Result SaltySD_printf(const char* format, ...)
 	return ret;
 }
 
-Result SaltySD_GetBID(u8* BID)
+u64 SaltySD_GetBID()
 {
 	Result ret;
 	IpcCommand c;
@@ -468,7 +468,7 @@ Result SaltySD_GetBID(u8* BID)
 	{
 		u64 magic;
 		u64 cmd_id;
-		u8 reserved[0x20];
+		u64 reserved;
 	} *raw;
 
 	raw = ipcPrepareHeader(&c, sizeof(*raw));
@@ -486,14 +486,17 @@ Result SaltySD_GetBID(u8* BID)
 		struct {
 			u64 magic;
 			u64 result;
-			u8 BID[0x20];
 		} *resp = r.Raw;
 
-		ret = resp->result;
-		if R_SUCCEEDED(ret) {
-			memcpy(BID, resp->BID, 0x20);
+		uint64_t rett = resp->result;
+		if (rett) {
+			SaltySDCore_printf("SaltySD Core: BID: %016lX\n", rett);
+			return rett;
+		}
+		else {
+			SaltySDCore_printf("SaltySD Core: getBID failed!\n");
+			return 0;
 		}
 	}
-
-	return ret;
+	return 0;
 }
