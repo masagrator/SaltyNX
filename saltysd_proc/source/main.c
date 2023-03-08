@@ -52,6 +52,7 @@ void __appExit(void)
 }
 
 u64 TIDnow;
+u64 PIDnow;
 
 void renametocheatstemp() {
 	char cheatspath[60];
@@ -516,45 +517,52 @@ Result handleServiceCmd(int cmd)
 		ipcSendHandleCopy(&c, _sharedMemory.handle);
 	}
 	else if (cmd == 8) { // Get BID
-		SaltySD_printf("SaltySD: cmd 8 handler\n");
 
 		IpcParsedCommand r = {0};
 		ipcParse(&r);
 
+		SaltySD_printf("SaltySD: cmd 8 handler\n");
+
+		u64 BID = 0;
+
+		ret = ldrDmntInitialize();
+		LoaderModuleInfo* module_infos = (LoaderModuleInfo*)malloc(sizeof(LoaderModuleInfo) * 16);
+		u32 module_infos_count = 0;
+		if (R_SUCCEEDED(ret)) {
+			ret = ldrDmntGetModuleInfos(PIDnow, module_infos, 16, &module_infos_count);
+			ldrDmntExit();
+		}
+		if (R_SUCCEEDED(ret)) for (int itr = 0; itr < module_infos_count; itr++) {
+			static u64 comp_address = 0;
+			ret = 0xFFDE;
+			if (!comp_address) {
+				comp_address = module_infos[itr].base_address;
+				continue;
+			}
+			if (module_infos[itr].base_address - comp_address == 0x4000) {
+				for (int itr2 = 0; itr2 < 8; itr2++) {
+					*(uint8_t*)((uint64_t)&BID+itr2) = module_infos[itr].build_id[itr2];
+				}
+				BID = __builtin_bswap64(BID);
+				SaltySD_printf("SaltySD: cmd 8 Main found. BID: %016lX\n", BID);
+				ret = 0;
+				itr = module_infos_count;
+			}
+			else comp_address = module_infos[itr].base_address;
+		}
+		free(module_infos);
+
 		struct {
 			u64 magic;
 			u64 result;
-			u8 BID[0x20];
 		} *raw;
 
 		raw = ipcPrepareHeader(&c, sizeof(*raw));
-
-		u64 PID = 0;
-		Result rc = pmdmntGetApplicationPid(&PID);
 		raw->magic = SFCO_MAGIC;
-
-		if (R_SUCCEEDED(rc)) {
-			ldrDmntInitialize();
-			LoaderModuleInfo* module_infos = (LoaderModuleInfo*)malloc(sizeof(LoaderModuleInfo) * 16);
-			u32 module_infos_count = 0;
-			ldrDmntGetModuleInfos(PID, module_infos, 10, &module_infos_count);
-			ldrDmntExit();
-			rc = 1;
-			for (int itr = 0; itr < module_infos_count; itr++) {
-				static u64 comp_address = 0;
-				if (!comp_address) {
-					comp_address = module_infos[itr].base_address;
-					continue;
-				}
-				if (module_infos[itr].base_address - comp_address == 0x4000) {
-					memcpy(&(raw->BID[0]), &module_infos[itr].build_id[0], 0x20);
-					rc = 0;
-					break;
-				}
-			}
-			free(module_infos);
+		if (!ret) {
+			raw->result = BID;
 		}
-		raw->result = rc;
+		else raw->result = 0;
 
 		return 0;
 	}
@@ -749,8 +757,6 @@ int main(int argc, char *argv[])
 
 	shmemCreate(&_sharedMemory, 0x1000, Perm_Rw, Perm_Rw);
 
-	pmdmntInitialize();
-
 	// Main service loop
 	u64* pids = malloc(0x200 * sizeof(u64));
 	u64 max = 0;
@@ -771,6 +777,7 @@ int main(int argc, char *argv[])
 		// Detected new PID
 		if (max != old_max && max > 0x80)
 		{
+			PIDnow = max;
 			hijack_pid(max);
 		}
 		
@@ -791,7 +798,6 @@ int main(int argc, char *argv[])
 	
 	fsdevUnmountAll();
 	fsExit();
-	pmdmntExit();
 	smExit();
 
 	return 0;
