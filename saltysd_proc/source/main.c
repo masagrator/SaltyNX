@@ -195,7 +195,11 @@ void hijack_pid(u64 pid)
 			if (!eventinfo.isA64)
 			{
 				SaltySD_printf("SaltySD: ARM32 applications plugins are not supported, aborting bootstrap...\n");
-				memset(shmemGetAddr(&_sharedMemory), 0, 0x1000);
+				if (!shmemMap(&_sharedMemory)) {
+					memset(shmemGetAddr(&_sharedMemory), 0, 0x1000);
+					shmemUnmap(&_sharedMemory);
+				}
+
 				goto abort_bootstrap;
 			}
 			char* hbloader = "hbloader";
@@ -214,13 +218,19 @@ void hijack_pid(u64 pid)
 					snprintf(exceptions, sizeof exceptions, "%s", line); 
 					if (!strncasecmp(exceptions, titleidnumF, 17)) {
 						SaltySD_printf("SaltySD: TID %016llx is forced in exceptions.txt, aborting bootstrap...\n", eventinfo.tid);
-						memset(shmemGetAddr(&_sharedMemory), 0, 0x1000);
+						if (!shmemMap(&_sharedMemory)) {
+							memset(shmemGetAddr(&_sharedMemory), 0, 0x1000);
+							shmemUnmap(&_sharedMemory);
+						}
 						fclose(except);
 						goto abort_bootstrap;
 					}
 					else if (!strncasecmp(exceptions, titleidnum, 16)) {
 						SaltySD_printf("SaltySD: TID %016llx is in exceptions.txt, aborting loading plugins...\n", eventinfo.tid);
-						memset(shmemGetAddr(&_sharedMemory), 0, 0x1000);
+						if (!shmemMap(&_sharedMemory)) {
+							memset(shmemGetAddr(&_sharedMemory), 0, 0x1000);
+							shmemUnmap(&_sharedMemory);
+						}
 						exception = 0x1;
 					}
 				}
