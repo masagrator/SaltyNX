@@ -20,7 +20,7 @@ u32 __nx_applet_type = AppletType_None;
 void serviceThread(void* buf);
 
 Handle saltyport, sdcard, injectserv;
-static char g_heap[0xB0000];
+static char g_heap[0x80000];
 bool should_terminate = false;
 bool already_hijacking = false;
 DebugEventInfo eventinfo;
