@@ -77,7 +77,7 @@ bool isModInstalled() {
 
 	DIR* dir = opendir(romfspath);
 	if (dir) {
-		if (readdir(dir) != NULL)
+		if (readdir(dir))
 			flag = true;
 		closedir(dir);
 	}
