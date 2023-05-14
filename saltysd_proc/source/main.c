@@ -234,14 +234,17 @@ void hijack_pid(u64 pid)
 						fclose(except);
 						goto abort_bootstrap;
 					}
-					else if (!strncasecmp(exceptions, titleidnumR, 17) && isModInstalled()) {
-						SaltySD_printf("SaltySD: TID %016lx has romfs mod folder, aborting bootstrap...\n", eventinfo.tid);
-						if (!shmemMap(&_sharedMemory)) {
-							memset(shmemGetAddr(&_sharedMemory), 0, 0x1000);
-							shmemUnmap(&_sharedMemory);
+					else if (!strncasecmp(exceptions, titleidnumR, 17)) {
+						if (isModInstalled()) {
+							SaltySD_printf("SaltySD: TID %016lx is in exceptions.txt as romfs excluded, aborting bootstrap...\n", eventinfo.tid);
+							if (!shmemMap(&_sharedMemory)) {
+								memset(shmemGetAddr(&_sharedMemory), 0, 0x1000);
+								shmemUnmap(&_sharedMemory);
+							}
+							fclose(except);
+							goto abort_bootstrap;
 						}
-						fclose(except);
-						goto abort_bootstrap;
+						else SaltySD_printf("SaltySD: TID %016lx is in exceptions.txt as romfs excluded, but no romfs mod was detected...\n", eventinfo.tid);
 					}
 					else if (!strncasecmp(exceptions, titleidnum, 16)) {
 						SaltySD_printf("SaltySD: TID %016lx is in exceptions.txt, aborting loading plugins...\n", eventinfo.tid);
