@@ -51,15 +51,16 @@ void __appExit(void)
 	smExit();
 }
 
+u64 TIDnow;
 u64 PIDnow;
 
-void renameCheatsFolder(bool Undo) {
+void renameCheatsFolder() {
 	char* cheatspath = (char*)malloc(0x40);
 	char* cheatspathtemp = (char*)malloc(0x40);
 
-	snprintf(cheatspath, 0x40, "sdmc:/atmosphere/contents/%016lx/cheats", eventinfo.tid);
+	snprintf(cheatspath, 0x40, "sdmc:/atmosphere/contents/%016lx/cheats", TIDnow);
 	snprintf(cheatspathtemp, 0x40, "%stemp", cheatspath);
-	if (!Undo) {
+	if (!check) {
 		rename(cheatspath, cheatspathtemp);
 		check = true;
 	}
@@ -171,10 +172,13 @@ void hijack_pid(u64 pid)
 	while (1)
 	{
 		ret = svcGetDebugEventInfo(&eventinfo, debug);
+
 		if (check == false) {
+			TIDnow = eventinfo.tid;
 			exception = 0;
-			renameCheatsFolder(false);
+			renameCheatsFolder();
 		}
+
 		if (ret)
 		{
 			SaltySD_printf("SaltySD: svcGetDebugEventInfo returned %x, breaking\n", ret);
@@ -278,7 +282,7 @@ void hijack_pid(u64 pid)
 		svcSleepThread(-1);
 	}
 	while (!threads);
-	renameCheatsFolder(true);
+	renameCheatsFolder();
 	
 	hijack_bootstrap(&debug, pid, tids[0]);
 	
@@ -288,7 +292,7 @@ void hijack_pid(u64 pid)
 abort_bootstrap:
 	disable = 0;
 	free(tids);
-	renameCheatsFolder(true);
+	renameCheatsFolder();
 				
 	already_hijacking = false;
 	svcCloseHandle(debug);
