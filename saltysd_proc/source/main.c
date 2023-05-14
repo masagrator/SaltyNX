@@ -61,11 +61,14 @@ void renameCheatsFolder(bool Undo) {
 	snprintf(cheatspathtemp, 0x40, "%stemp", cheatspath);
 	if (!Undo) {
 		rename(cheatspath, cheatspathtemp);
+		check = true;
 	}
-	else rename(cheatspathtemp, cheatspath);
+	else {
+		rename(cheatspathtemp, cheatspath);
+		check = false;
+	}
 	free(cheatspath);
 	free(cheatspathtemp);
-	check = true;
 	return;
 }
 
