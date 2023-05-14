@@ -78,6 +78,6 @@ Remember to restart Switch
 | World of Goo | all | 32-bit game, not supported |
 | YouTube | plugins | Unknown |
 
-Titles other than 32-bit are added to exceptions.txt which is treated as Black list, you can find it in root of repo. SaltyNX reads it from SaltySD folder. `X` at the beginning of titleid means that this game will not load any patches and plugins.
+Titles other than 32-bit are added to exceptions.txt which is treated as Black list, you can find it in root of repo. SaltyNX reads it from SaltySD folder. `X` at the beginning of titleid means that this game will not load any patches and plugins. `R` at the beginning of titleid means that this game will not load any patches and plugins if romfs mod for this game is installed.
 
 32-bit games are ignored by default for patches and plugins.
