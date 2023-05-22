@@ -70,6 +70,7 @@ Remember to restart Switch
 | Olympic Games Tokyo 2020 – The Official Video Game™ | plugins | Heap related |
 | Pikmin 3 Deluxe | all | 32-bit game, not supported |
 | Planescape: Torment and Icewind Dale | all | 32-bit game, not supported |
+| Radiant Silvergun | all | 32-bit game, not supported |
 | Sherlock Holmes and The Hound of The Baskervilles | all | 32-bit game, not supported |
 | Stubbs the Zombie in Rebel Without a Pulse | all | heap related |
 | Tokyo Mirage Session #FE Encore | all | 32-bit game, not supported |
