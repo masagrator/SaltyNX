@@ -74,6 +74,7 @@ Remember to restart Switch
 | Radiant Silvergun | all | 32-bit game, not supported |
 | Sherlock Holmes and The Hound of The Baskervilles | all | 32-bit game, not supported |
 | Stubbs the Zombie in Rebel Without a Pulse | all | heap related |
+| The Lara Croft Collection | plugins | heap related |
 | Tokyo Mirage Session #FE Encore | all | 32-bit game, not supported |
 | Valkyria Chronicles | all | 32-bit game, not supported |
 | Witcher 3 GOTY (version 3.2) | all | heap related |
