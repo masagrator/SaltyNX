@@ -37,3 +37,8 @@ X0100964012528000
 ;Mario Strikers: Battle League
 ;1.0.0 crash on boot
 010019401051C000
+
+;The Lara Croft Collection
+;1.0.0 - Games in collection are crashing on boot, only launcher doesn't
+010079C017F5E001
+010079C017F5E002
