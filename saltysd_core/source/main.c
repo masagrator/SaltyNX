@@ -1,5 +1,7 @@
 #include <switch_min.h>
 
+#include "NX-FPS.h"
+
 #include <dirent.h>
 #include <switch_min/kernel/ipc.h>
 #include <switch_min/runtime/threadvars.h>
@@ -14,7 +16,7 @@
 
 u32 __nx_applet_type = AppletType_None;
 
-static char g_heap[0x10000];
+static char g_heap[0x20000];
 
 extern void __nx_exit_clear(void* ctx, Handle thread, void* addr);
 extern void elf_trampoline(void* context, Handle thread, void* func);
@@ -50,6 +52,7 @@ void __libnx_init(void* ctx, Handle main_thread, void* saved_lr)
 	vars_mine.tls_tp = (void*)malloc(0x1000);
 	vars_orig = *getThreadVars();
 	*getThreadVars() = vars_mine;
+	virtmemSetup();
 }
 
 void __attribute__((weak)) __libnx_exit(int rc)
@@ -447,6 +450,8 @@ int main(int argc, char *argv[])
 
 	SaltySDCore_PatchSVCs();
 	SaltySDCore_LoadPatches(true);
+
+	NX_FPS();
 	
 	Result exc = SaltySD_Exception();
 	if (exc == 0x0) SaltySDCore_LoadPlugins();
