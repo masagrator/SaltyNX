@@ -15,6 +15,7 @@ extern "C" {
 	typedef u32 (*_ZN11NvSwapchain15QueuePresentKHREP9VkQueue_TPK16VkPresentInfoKHR_0)(void* VkQueue_T, void* VkPresentInfoKHR);
 	typedef u64 (*_ZN2nn2os17ConvertToTimeSpanENS0_4TickE_0)(u64 tick);
 	typedef u64 (*_ZN2nn2os13GetSystemTickEv_0)();
+	typedef void (*_ZN3nvn15nvnLoadCPPProcsEPNS_6DeviceEPFPFvvEPKS0_PKcE)(void* nvnDevice, void* GetProcAddress);
 }
 
 struct {
@@ -25,6 +26,7 @@ struct {
 	uintptr_t nvSwapchainQueuePresentKHR;
 	uintptr_t ConvertToTimeSpan;
 	uintptr_t GetSystemTick;
+	uintptr_t nvnLoadCPPProcs;
 } Address_weaks;
 
 SharedMemory _sharedmemory = {};
@@ -633,8 +635,8 @@ void* nvnAcquireTexture(void* nvnWindow, void* nvnSync, void* index) {
 	return ret;
 }
 
-uintptr_t nvnGetProcAddress (void* unk1, const char* nvnFunction) {
-	uintptr_t address = ((GetProcAddress)(Ptrs.nvnDeviceGetProcAddress))(unk1, nvnFunction);
+uintptr_t nvnGetProcAddress (void* nvnDevice, const char* nvnFunction) {
+	uintptr_t address = ((GetProcAddress)(Ptrs.nvnDeviceGetProcAddress))(nvnDevice, nvnFunction);
 	if (!strcmp("nvnDeviceGetProcAddress", nvnFunction))
 		return Address.nvnGetProcAddress;
 	else if (!strcmp("nvnQueuePresentTexture", nvnFunction)) {
@@ -666,6 +668,14 @@ uintptr_t nvnGetProcAddress (void* unk1, const char* nvnFunction) {
 		return Address.nvnSyncWait;
 	}
 	else return address;
+}
+
+void nvnLoadCPPProcs(void* nvnDevice, void* GetProcAddress) {
+	if (GetProcAddress) {
+		Ptrs.nvnDeviceGetProcAddress = (uintptr_t)&nvnGetProcAddress;
+		GetProcAddress = (void*)&nvnGetProcAddress;
+	}
+	return ((_ZN3nvn15nvnLoadCPPProcsEPNS_6DeviceEPFPFvvEPKS0_PKcE)(Address_weaks.nvnLoadCPPProcs))(nvnDevice, GetProcAddress);
 }
 
 uintptr_t nvnBootstrapLoader_1(const char* nvnName) {
@@ -709,11 +719,13 @@ extern "C" {
 				Address_weaks.nvSwapchainQueuePresentKHR = SaltySDCore_FindSymbolBuiltin("_ZN11NvSwapchain15QueuePresentKHREP9VkQueue_TPK16VkPresentInfoKHR");
 				Address_weaks.ConvertToTimeSpan = SaltySDCore_FindSymbolBuiltin("_ZN2nn2os17ConvertToTimeSpanENS0_4TickE");
 				Address_weaks.GetSystemTick = SaltySDCore_FindSymbolBuiltin("_ZN2nn2os13GetSystemTickEv");
+				Address_weaks.nvnLoadCPPProcs = SaltySDCore_FindSymbolBuiltin("_ZN3nvn15nvnLoadCPPProcsEPNS_6DeviceEPFPFvvEPKS0_PKcE");
 				SaltySDCore_ReplaceImport("nvnBootstrapLoader", (void*)nvnBootstrapLoader_1);
 				SaltySDCore_ReplaceImport("eglSwapBuffers", (void*)eglSwap);
 				SaltySDCore_ReplaceImport("eglSwapInterval", (void*)eglInterval);
 				SaltySDCore_ReplaceImport("vkQueuePresentKHR", (void*)vulkanSwap);
 				SaltySDCore_ReplaceImport("_ZN11NvSwapchain15QueuePresentKHREP9VkQueue_TPK16VkPresentInfoKHR", (void*)vulkanSwap2);
+				SaltySDCore_ReplaceImport("_ZN3nvn15nvnLoadCPPProcsEPNS_6DeviceEPFPFvvEPKS0_PKcE", (void*)nvnLoadCPPProcs);
 
 				Shared.FPSlocked = (uint8_t*)(base + 10);
 				Shared.FPSmode = (uint8_t*)(base + 11);
