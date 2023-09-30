@@ -451,6 +451,8 @@ int main(int argc, char *argv[])
 	SaltySDCore_PatchSVCs();
 	SaltySDCore_LoadPatches(true);
 
+	SaltySDCore_fillRoLoadModule();
+	SaltySDCore_ReplaceImport("_ZN2nn2ro10LoadModuleEPNS0_6ModuleEPKvPvmi", (void*)LoadModule);
 	NX_FPS();
 	
 	Result exc = SaltySD_Exception();

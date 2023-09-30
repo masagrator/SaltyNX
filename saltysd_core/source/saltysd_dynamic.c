@@ -24,6 +24,17 @@ struct mod0_header
 	uint32_t dynamic;
 };
 
+struct ReplacedSymbol
+{
+	void* address;
+	const char* name;
+};
+
+uint64_t roLoadModule = 0;
+
+struct ReplacedSymbol* replaced_symbols = NULL;
+uint32_t num_replaced_symbols = 0;
+
 uint64_t relasz1 = 0;
 const Elf64_Rela* rela1 = NULL;
 
@@ -109,7 +120,7 @@ void SaltySDCore_RegisterBuiltinModule(void* base)
 	builtin_elfs[num_builtin_elfs-1] = base;
 }
 
-void SaltySDCore_ReplaceModuleImport(void* base, char* name, void* newfunc)
+void SaltySDCore_ReplaceModuleImport(void* base, const char* name, void* newfunc, bool update)
 {
 	const Elf64_Dyn* dyn = NULL;
 	const Elf64_Rela* rela = NULL;
@@ -150,6 +161,20 @@ void SaltySDCore_ReplaceModuleImport(void* base, char* name, void* newfunc)
 	
 	uint64_t numsyms = ((void*)strtab - (void*)symtab) / sizeof(Elf64_Sym);
 
+	if (!update) {
+		bool detected = false;
+		for (int i = 0; i < num_replaced_symbols; i++) {
+			if (!strcmp(name, replaced_symbols[i].name)) {
+				detected = true;
+			}
+		}
+		if (!detected) {
+			replaced_symbols = realloc(replaced_symbols, ++num_replaced_symbols * sizeof(struct ReplacedSymbol));
+			replaced_symbols[num_replaced_symbols-1].address = newfunc;
+			replaced_symbols[num_replaced_symbols-1].name = name;
+		}
+	}
+
 	int rela_idx = 0;
 	for (; relasz--; rela++, rela_idx++)
 	{
@@ -162,11 +187,16 @@ void SaltySDCore_ReplaceModuleImport(void* base, char* name, void* newfunc)
 		if (strcmp(name, rel_name)) continue;
 		
 		SaltySDCore_printf("SaltySD Core: %x %s to %p, %llx %p\n", rela_idx, rel_name, newfunc, rela->r_offset, base + rela->r_offset);
+		
+		if (!update) {
+			Elf64_Rela replacement = *rela;
+			replacement.r_addend = rela->r_addend + (uint64_t)newfunc - SaltySDCore_FindSymbolBuiltin(rel_name);
 
-		Elf64_Rela replacement = *rela;
-		replacement.r_addend = rela->r_addend + (uint64_t)newfunc - SaltySDCore_FindSymbolBuiltin(rel_name);
-
-		SaltySD_Memcpy((u64)rela, (u64)&replacement, sizeof(Elf64_Rela));
+			SaltySD_Memcpy((u64)rela, (u64)&replacement, sizeof(Elf64_Rela));
+		}
+		else {
+			*(void**)(base + rela->r_offset) = newfunc;
+		}
 	}
 }
 
@@ -176,7 +206,7 @@ void SaltySDCore_ReplaceImport(char* name, void* newfunc)
 
 	for (int i = 0; i < num_builtin_elfs; i++)
 	{
-		SaltySDCore_ReplaceModuleImport(builtin_elfs[i], name, newfunc);
+		SaltySDCore_ReplaceModuleImport(builtin_elfs[i], name, newfunc, false);
 	}
 }
 
@@ -249,4 +279,36 @@ void SaltySDCore_DynamicLinkModule(void* base)
 			}
 		}
 	}
+}
+
+struct Object {
+	void* next;
+	void* prev;
+	void* rela_or_rel_plt;
+	void* rela_or_rel;
+	void* module_base;
+};
+
+struct Module {
+	struct Object* ModuleObject;
+};
+
+void SaltySDCore_fillRoLoadModule() {
+	roLoadModule = SaltySDCore_FindSymbolBuiltin("_ZN2nn2ro10LoadModuleEPNS0_6ModuleEPKvPvmi");
+	return;
+}
+
+typedef Result (*_ZN2nn2ro10LoadModuleEPNS0_6ModuleEPKvPvmi)(struct Module* pOutModule, const void* pImage, void* buffer, size_t bufferSize, int flag);
+Result LoadModule(struct Module* pOutModule, const void* pImage, void* buffer, size_t bufferSize, int flag) {
+	static void* lastModule = 0;
+	if (flag)
+		flag = 0;
+	Result ret = ((_ZN2nn2ro10LoadModuleEPNS0_6ModuleEPKvPvmi)(roLoadModule))(pOutModule, pImage, buffer, bufferSize, flag);
+	if (R_SUCCEEDED(ret) && lastModule != pOutModule) {
+		lastModule = pOutModule;
+		for (int x = 0; x < num_replaced_symbols; x++) {
+			SaltySDCore_ReplaceModuleImport(pOutModule->ModuleObject->module_base, replaced_symbols[x].name, replaced_symbols[x].address, true);
+		}
+	}
+	return ret;
 }
