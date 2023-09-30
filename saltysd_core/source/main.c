@@ -1,6 +1,7 @@
 #include <switch_min.h>
 
 #include "NX-FPS.h"
+#include "ReverseNX.h"
 
 #include <dirent.h>
 #include <switch_min/kernel/ipc.h>
@@ -453,11 +454,29 @@ int main(int argc, char *argv[])
 
 	SaltySDCore_fillRoLoadModule();
 	SaltySDCore_ReplaceImport("_ZN2nn2ro10LoadModuleEPNS0_6ModuleEPKvPvmi", (void*)LoadModule);
-	NX_FPS();
 	
 	Result exc = SaltySD_Exception();
 	if (exc == 0x0) SaltySDCore_LoadPlugins();
 	else SaltySDCore_printf("SaltySD Core: Detected exception title, aborting loading plugins...\n");
+
+	ptrdiff_t SMO = -1;
+	ret = SaltySD_CheckIfSharedMemoryAvailable(&SMO, 1);
+	SaltySDCore_printf("SaltySD_CheckIfSharedMemoryAvailable ret: 0x%X\n", ret);
+	if (R_SUCCEEDED(ret)) {
+		SharedMemory _sharedmemory = {};
+		Handle remoteSharedMemory = 0;
+		Result shmemMapRc = -1;
+		SaltySD_GetSharedMemoryHandle(&remoteSharedMemory);
+		shmemLoadRemote(&_sharedmemory, remoteSharedMemory, 0x1000, Perm_Rw);
+		shmemMapRc = shmemMap(&_sharedmemory);
+		if (R_SUCCEEDED(shmemMapRc)) {
+			NX_FPS(&_sharedmemory);
+			ReverseNX(&_sharedmemory);
+		}
+		else {
+			SaltySDCore_printf("shmemMap failed: 0x%X\n", shmemMapRc);
+		}
+	}
 
 	ret = SaltySD_Deinit();
 	if (ret) goto fail;

@@ -1,1 +1,1 @@
-void NX_FPS();
+void NX_FPS(SharedMemory* _sharedmemory);

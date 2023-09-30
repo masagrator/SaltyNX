@@ -38,7 +38,7 @@ uint32_t num_replaced_symbols = 0;
 uint64_t relasz1 = 0;
 const Elf64_Rela* rela1 = NULL;
 
-uint64_t SaltySDCore_GetSymbolAddr(void* base, char* name)
+uint64_t SaltySDCore_GetSymbolAddr(void* base, const char* name)
 {
 	const Elf64_Dyn* dyn = NULL;
 	const Elf64_Sym* symtab = NULL;
@@ -82,7 +82,7 @@ uint64_t SaltySDCore_GetSymbolAddr(void* base, char* name)
 	return 0;
 }
 
-uint64_t SaltySDCore_FindSymbol(char* name)
+uint64_t SaltySDCore_FindSymbol(const char* name)
 {
 	if (!elfs) return 0;
 
@@ -95,7 +95,7 @@ uint64_t SaltySDCore_FindSymbol(char* name)
 	return 0;
 }
 
-uint64_t SaltySDCore_FindSymbolBuiltin(char* name)
+uint64_t SaltySDCore_FindSymbolBuiltin(const char* name)
 {
 	if (!builtin_elfs) return 0;
 
@@ -200,7 +200,7 @@ void SaltySDCore_ReplaceModuleImport(void* base, const char* name, void* newfunc
 	}
 }
 
-void SaltySDCore_ReplaceImport(char* name, void* newfunc)
+void SaltySDCore_ReplaceImport(const char* name, void* newfunc)
 {
 	if (!builtin_elfs) return;
 

@@ -15,7 +15,6 @@ extern "C" {
 	typedef u32 (*_ZN11NvSwapchain15QueuePresentKHREP9VkQueue_TPK16VkPresentInfoKHR_0)(void* VkQueue_T, void* VkPresentInfoKHR);
 	typedef u64 (*_ZN2nn2os17ConvertToTimeSpanENS0_4TickE_0)(u64 tick);
 	typedef u64 (*_ZN2nn2os13GetSystemTickEv_0)();
-	typedef void (*_ZN3nvn15nvnLoadCPPProcsEPNS_6DeviceEPFPFvvEPKS0_PKcE)(void* nvnDevice, void* GetProcAddress);
 }
 
 struct {
@@ -26,11 +25,8 @@ struct {
 	uintptr_t nvSwapchainQueuePresentKHR;
 	uintptr_t ConvertToTimeSpan;
 	uintptr_t GetSystemTick;
-	uintptr_t nvnLoadCPPProcs;
 } Address_weaks;
 
-SharedMemory _sharedmemory = {};
-Handle remoteSharedMemory = 0;
 ptrdiff_t SharedMemoryOffset = 1234;
 uint8_t* configBuffer = 0;
 size_t configSize = 0;
@@ -670,14 +666,6 @@ uintptr_t nvnGetProcAddress (void* nvnDevice, const char* nvnFunction) {
 	else return address;
 }
 
-void nvnLoadCPPProcs(void* nvnDevice, void* GetProcAddress) {
-	if (GetProcAddress) {
-		Ptrs.nvnDeviceGetProcAddress = (uintptr_t)&nvnGetProcAddress;
-		GetProcAddress = (void*)&nvnGetProcAddress;
-	}
-	return ((_ZN3nvn15nvnLoadCPPProcsEPNS_6DeviceEPFPFvvEPKS0_PKcE)(Address_weaks.nvnLoadCPPProcs))(nvnDevice, GetProcAddress);
-}
-
 uintptr_t nvnBootstrapLoader_1(const char* nvnName) {
 	if (strcmp(nvnName, "nvnDeviceGetProcAddress") == 0) {
 		*(Shared.API) = 1;
@@ -690,7 +678,7 @@ uintptr_t nvnBootstrapLoader_1(const char* nvnName) {
 
 extern "C" {
 
-	void NX_FPS() {
+	void NX_FPS(SharedMemory* _sharedmemory) {
 		SaltySDCore_printf("NX-FPS: alive\n");
 		LOCK::mappings.main_start = getMainAddress();
 		SaltySDCore_printf("NX-FPS: found main at: 0x%lX\n", LOCK::mappings.main_start);
@@ -698,92 +686,83 @@ extern "C" {
 		SaltySDCore_printf("NX-FPS: ret: 0x%X\n", ret);
 		if (!ret) {
 			SaltySDCore_printf("NX-FPS: MemoryOffset: %d\n", SharedMemoryOffset);
-			SaltySD_GetSharedMemoryHandle(&remoteSharedMemory);
-			shmemLoadRemote(&_sharedmemory, remoteSharedMemory, 0x1000, Perm_Rw);
-			ret = shmemMap(&_sharedmemory);
-			if (R_SUCCEEDED(ret)) {
-				uintptr_t base = (uintptr_t)shmemGetAddr(&_sharedmemory) + SharedMemoryOffset;
-				uint32_t* MAGIC = (uint32_t*)base;
-				*MAGIC = 0x465053;
-				Shared.FPS = (uint8_t*)(base + 4);
-				Shared.FPSavg = (float*)(base + 5);
-				Shared.pluginActive = (bool*)(base + 9);
-				
-				Address.nvnGetProcAddress = (uint64_t)&nvnGetProcAddress;
-				Address.nvnQueuePresentTexture = (uint64_t)&nvnPresentTexture;
-				Address.nvnWindowAcquireTexture = (uint64_t)&nvnAcquireTexture;
-				Address_weaks.nvnBootstrapLoader = SaltySDCore_FindSymbolBuiltin("nvnBootstrapLoader");
-				Address_weaks.eglSwapBuffers = SaltySDCore_FindSymbolBuiltin("eglSwapBuffers");
-				Address_weaks.eglSwapInterval = SaltySDCore_FindSymbolBuiltin("eglSwapInterval");
-				Address_weaks.vkQueuePresentKHR = SaltySDCore_FindSymbolBuiltin("vkQueuePresentKHR");
-				Address_weaks.nvSwapchainQueuePresentKHR = SaltySDCore_FindSymbolBuiltin("_ZN11NvSwapchain15QueuePresentKHREP9VkQueue_TPK16VkPresentInfoKHR");
-				Address_weaks.ConvertToTimeSpan = SaltySDCore_FindSymbolBuiltin("_ZN2nn2os17ConvertToTimeSpanENS0_4TickE");
-				Address_weaks.GetSystemTick = SaltySDCore_FindSymbolBuiltin("_ZN2nn2os13GetSystemTickEv");
-				Address_weaks.nvnLoadCPPProcs = SaltySDCore_FindSymbolBuiltin("_ZN3nvn15nvnLoadCPPProcsEPNS_6DeviceEPFPFvvEPKS0_PKcE");
-				SaltySDCore_ReplaceImport("nvnBootstrapLoader", (void*)nvnBootstrapLoader_1);
-				SaltySDCore_ReplaceImport("eglSwapBuffers", (void*)eglSwap);
-				SaltySDCore_ReplaceImport("eglSwapInterval", (void*)eglInterval);
-				SaltySDCore_ReplaceImport("vkQueuePresentKHR", (void*)vulkanSwap);
-				SaltySDCore_ReplaceImport("_ZN11NvSwapchain15QueuePresentKHREP9VkQueue_TPK16VkPresentInfoKHR", (void*)vulkanSwap2);
-				SaltySDCore_ReplaceImport("_ZN3nvn15nvnLoadCPPProcsEPNS_6DeviceEPFPFvvEPKS0_PKcE", (void*)nvnLoadCPPProcs);
 
-				Shared.FPSlocked = (uint8_t*)(base + 10);
-				Shared.FPSmode = (uint8_t*)(base + 11);
-				Shared.ZeroSync = (uint8_t*)(base + 12);
-				Shared.patchApplied = (uint8_t*)(base + 13);
-				Shared.API = (uint8_t*)(base + 14);
-				Shared.FPSticks = (uint32_t*)(base + 15);
-				Shared.Buffers = (uint8_t*)(base + 55);
-				Shared.SetBuffers = (uint8_t*)(base + 56);
-				Shared.ActiveBuffers = (uint8_t*)(base + 57);
-				Shared.SetActiveBuffers = (uint8_t*)(base + 58);
-				Address.nvnWindowSetPresentInterval = (uint64_t)&nvnSetPresentInterval;
-				Address.nvnSyncWait = (uint64_t)&nvnSyncWait0;
-				Address.nvnWindowBuilderSetTextures = (uint64_t)&nvnWindowBuilderSetTextures;
-				Address.nvnWindowSetNumActiveTextures = (uint64_t)&nvnWindowSetNumActiveTextures;
+			uintptr_t base = (uintptr_t)shmemGetAddr(_sharedmemory) + SharedMemoryOffset;
+			uint32_t* MAGIC = (uint32_t*)base;
+			*MAGIC = 0x465053;
+			Shared.FPS = (uint8_t*)(base + 4);
+			Shared.FPSavg = (float*)(base + 5);
+			Shared.pluginActive = (bool*)(base + 9);
+			
+			Address.nvnGetProcAddress = (uint64_t)&nvnGetProcAddress;
+			Address.nvnQueuePresentTexture = (uint64_t)&nvnPresentTexture;
+			Address.nvnWindowAcquireTexture = (uint64_t)&nvnAcquireTexture;
+			Address_weaks.nvnBootstrapLoader = SaltySDCore_FindSymbolBuiltin("nvnBootstrapLoader");
+			Address_weaks.eglSwapBuffers = SaltySDCore_FindSymbolBuiltin("eglSwapBuffers");
+			Address_weaks.eglSwapInterval = SaltySDCore_FindSymbolBuiltin("eglSwapInterval");
+			Address_weaks.vkQueuePresentKHR = SaltySDCore_FindSymbolBuiltin("vkQueuePresentKHR");
+			Address_weaks.nvSwapchainQueuePresentKHR = SaltySDCore_FindSymbolBuiltin("_ZN11NvSwapchain15QueuePresentKHREP9VkQueue_TPK16VkPresentInfoKHR");
+			Address_weaks.ConvertToTimeSpan = SaltySDCore_FindSymbolBuiltin("_ZN2nn2os17ConvertToTimeSpanENS0_4TickE");
+			Address_weaks.GetSystemTick = SaltySDCore_FindSymbolBuiltin("_ZN2nn2os13GetSystemTickEv");
+			SaltySDCore_ReplaceImport("nvnBootstrapLoader", (void*)nvnBootstrapLoader_1);
+			SaltySDCore_ReplaceImport("eglSwapBuffers", (void*)eglSwap);
+			SaltySDCore_ReplaceImport("eglSwapInterval", (void*)eglInterval);
+			SaltySDCore_ReplaceImport("vkQueuePresentKHR", (void*)vulkanSwap);
+			SaltySDCore_ReplaceImport("_ZN11NvSwapchain15QueuePresentKHREP9VkQueue_TPK16VkPresentInfoKHR", (void*)vulkanSwap2);
 
-				char titleid[17];
-				CheckTitleID(&titleid[0]);
-				char path[128];
-				strcpy(&path[0], "sdmc:/SaltySD/plugins/FPSLocker/0");
-				strcat(&path[0], &titleid[0]);
-				strcat(&path[0], ".dat");
-				FILE* file_dat = SaltySDCore_fopen(path, "rb");
-				if (file_dat) {
-					uint8_t temp = 0;
-					SaltySDCore_fread(&temp, 1, 1, file_dat);
-					*(Shared.FPSlocked) = temp;
-					SaltySDCore_fread(&temp, 1, 1, file_dat);
-					*(Shared.ZeroSync) = temp;
-					if (SaltySDCore_fread(&temp, 1, 1, file_dat))
-						*(Shared.SetBuffers) = temp;
-					SaltySDCore_fclose(file_dat);
-				}
+			Shared.FPSlocked = (uint8_t*)(base + 10);
+			Shared.FPSmode = (uint8_t*)(base + 11);
+			Shared.ZeroSync = (uint8_t*)(base + 12);
+			Shared.patchApplied = (uint8_t*)(base + 13);
+			Shared.API = (uint8_t*)(base + 14);
+			Shared.FPSticks = (uint32_t*)(base + 15);
+			Shared.Buffers = (uint8_t*)(base + 55);
+			Shared.SetBuffers = (uint8_t*)(base + 56);
+			Shared.ActiveBuffers = (uint8_t*)(base + 57);
+			Shared.SetActiveBuffers = (uint8_t*)(base + 58);
+			Address.nvnWindowSetPresentInterval = (uint64_t)&nvnSetPresentInterval;
+			Address.nvnSyncWait = (uint64_t)&nvnSyncWait0;
+			Address.nvnWindowBuilderSetTextures = (uint64_t)&nvnWindowBuilderSetTextures;
+			Address.nvnWindowSetNumActiveTextures = (uint64_t)&nvnWindowSetNumActiveTextures;
 
-				u64 buildid = SaltySD_GetBID();
-				if (!buildid) {
-					SaltySDCore_printf("NX-FPS: getBID failed! Err: 0x%x\n", ret);
-				}
-				else {
-					SaltySDCore_printf("NX-FPS: BID: %016lX\n", buildid);
-					createBuildidPath(buildid, &titleid[0], &path[0]);
-					FILE* patch_file = SaltySDCore_fopen(path, "rb");
-					if (patch_file) {
-						SaltySDCore_fclose(patch_file);
-						SaltySDCore_printf("NX-FPS: FPSLocker: successfully opened: %s\n", path);
-						configRC = readConfig(path, &configBuffer);
-						if (LOCK::MasterWriteApplied) {
-							*(Shared.patchApplied) = 2;
-						}
-						SaltySDCore_printf("NX-FPS: FPSLocker: readConfig rc: 0x%x\n", configRC);
-						svcGetInfo(&LOCK::mappings.alias_start, InfoType_AliasRegionAddress, CUR_PROCESS_HANDLE, 0);
-						svcGetInfo(&LOCK::mappings.heap_start, InfoType_HeapRegionAddress, CUR_PROCESS_HANDLE, 0);
-					}
-					else SaltySDCore_printf("NX-FPS: FPSLocker: File not found: %s\n", path);
-				}
+			char titleid[17];
+			CheckTitleID(&titleid[0]);
+			char path[128];
+			strcpy(&path[0], "sdmc:/SaltySD/plugins/FPSLocker/0");
+			strcat(&path[0], &titleid[0]);
+			strcat(&path[0], ".dat");
+			FILE* file_dat = SaltySDCore_fopen(path, "rb");
+			if (file_dat) {
+				uint8_t temp = 0;
+				SaltySDCore_fread(&temp, 1, 1, file_dat);
+				*(Shared.FPSlocked) = temp;
+				SaltySDCore_fread(&temp, 1, 1, file_dat);
+				*(Shared.ZeroSync) = temp;
+				if (SaltySDCore_fread(&temp, 1, 1, file_dat))
+					*(Shared.SetBuffers) = temp;
+				SaltySDCore_fclose(file_dat);
+			}
+
+			u64 buildid = SaltySD_GetBID();
+			if (!buildid) {
+				SaltySDCore_printf("NX-FPS: getBID failed! Err: 0x%x\n", ret);
 			}
 			else {
-				SaltySDCore_printf("NX-FPS: shmemMap failed! Err: 0x%x\n", ret);
+				SaltySDCore_printf("NX-FPS: BID: %016lX\n", buildid);
+				createBuildidPath(buildid, &titleid[0], &path[0]);
+				FILE* patch_file = SaltySDCore_fopen(path, "rb");
+				if (patch_file) {
+					SaltySDCore_fclose(patch_file);
+					SaltySDCore_printf("NX-FPS: FPSLocker: successfully opened: %s\n", path);
+					configRC = readConfig(path, &configBuffer);
+					if (LOCK::MasterWriteApplied) {
+						*(Shared.patchApplied) = 2;
+					}
+					SaltySDCore_printf("NX-FPS: FPSLocker: readConfig rc: 0x%x\n", configRC);
+					svcGetInfo(&LOCK::mappings.alias_start, InfoType_AliasRegionAddress, CUR_PROCESS_HANDLE, 0);
+					svcGetInfo(&LOCK::mappings.heap_start, InfoType_HeapRegionAddress, CUR_PROCESS_HANDLE, 0);
+				}
+				else SaltySDCore_printf("NX-FPS: FPSLocker: File not found: %s\n", path);
 			}
 		}
 		SaltySDCore_printf("NX-FPS: injection finished\n");
