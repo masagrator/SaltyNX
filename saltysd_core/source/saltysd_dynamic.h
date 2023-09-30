@@ -12,15 +12,6 @@ extern "C" {
 
 struct Module {
 	void* ModuleObject;
-	u32 State;
-	void* NroPtr;
-	void* BssPtr;
-	void* _x20;
-	void* SourceBuffer;
-	char Name[256]; /* Created by retype action */
-	u8 _x130;
-	u8 _x131;
-	bool isLoaded;  // bool
 };
 
 extern void SaltySDCore_fillRoLoadModule() LINKABLE;
