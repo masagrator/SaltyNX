@@ -6,10 +6,6 @@
 ;1.0.0-1.4.0 crash
 0100DCA0064A6000
 
-;Tesla Menu
-;Just in case (old titleid, new one is blacklisted by internal titleid validating)
-X010000000007E51A
-
 ;YouTube
 ;Stucks in infinite loop
 X01003A400C3DA000
@@ -46,3 +42,7 @@ X0100964012528000
 ;Plants vs. Zombies: Battle for Neighborville
 ;1.0.3 crash on boot
 0100C56010FD8000
+
+;EA SPORTS FC 24
+;1.0.0 - v1.53.dd6d crash
+0100BDB01A0E6000
