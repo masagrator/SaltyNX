@@ -33,7 +33,7 @@ struct ReplacedSymbol
 uint64_t roLoadModule = 0;
 
 struct ReplacedSymbol* replaced_symbols = NULL;
-uint32_t num_replaced_symbols = 0;
+int32_t num_replaced_symbols = 0;
 
 uint64_t relasz1 = 0;
 const Elf64_Rela* rela1 = NULL;
@@ -172,6 +172,9 @@ void SaltySDCore_ReplaceModuleImport(void* base, const char* name, void* newfunc
 			replaced_symbols = realloc(replaced_symbols, ++num_replaced_symbols * sizeof(struct ReplacedSymbol));
 			replaced_symbols[num_replaced_symbols-1].address = newfunc;
 			replaced_symbols[num_replaced_symbols-1].name = name;
+		}
+		else {
+			newfunc = replaced_symbols[num_replaced_symbols-1].address;
 		}
 	}
 
