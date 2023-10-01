@@ -54,6 +54,7 @@ Remember to restart Switch
 | CelDamage HD | all | 32-bit game, not supported |
 | DEADLY PREMONITION Origins | all | 32-bit game, not supported |
 | Dies irae Amantes amentes For Nintendo Switch | all | 32-bit game, not supported |
+| EA SPORTS FC 24 | plugins | heap related |
 | Goat Simulator | all | 32-bit game, not supported |
 | Grandia Collection | all | Only launcher is 64-bit, games are 32-bit |
 | Grid: Autosport | plugins | Heap related |
