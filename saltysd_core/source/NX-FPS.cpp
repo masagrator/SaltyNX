@@ -9,10 +9,10 @@
 
 extern "C" {
 	typedef u64 (*nvnBootstrapLoader_0)(const char * nvnName);
-	typedef int (*eglSwapBuffers_0)(void* EGLDisplay, void* EGLSurface);
-	typedef int (*eglSwapInterval_0)(void* EGLDisplay, int interval);
-	typedef u32 (*vkQueuePresentKHR_0)(void* vkQueue, void* VkPresentInfoKHR);
-	typedef u32 (*_ZN11NvSwapchain15QueuePresentKHREP9VkQueue_TPK16VkPresentInfoKHR_0)(void* VkQueue_T, void* VkPresentInfoKHR);
+	typedef int (*eglSwapBuffers_0)(const void* EGLDisplay, const void* EGLSurface);
+	typedef int (*eglSwapInterval_0)(const void* EGLDisplay, int interval);
+	typedef u32 (*vkQueuePresentKHR_0)(const void* vkQueue, const void* VkPresentInfoKHR);
+	typedef u32 (*_ZN11NvSwapchain15QueuePresentKHREP9VkQueue_TPK16VkPresentInfoKHR_0)(const void* VkQueue_T, const void* VkPresentInfoKHR);
 	typedef u64 (*_ZN2nn2os17ConvertToTimeSpanENS0_4TickE_0)(u64 tick);
 	typedef u64 (*_ZN2nn2os13GetSystemTickEv_0)();
 }
@@ -26,6 +26,11 @@ struct {
 	uintptr_t ConvertToTimeSpan;
 	uintptr_t GetSystemTick;
 } Address_weaks;
+
+struct nvnWindowBuilder {
+	const char reserved[16];
+	uint8_t numBufferedFrames;
+};
 
 ptrdiff_t SharedMemoryOffset = 1234;
 uint8_t* configBuffer = 0;
@@ -88,6 +93,7 @@ struct {
 	uintptr_t nvnSyncWait;
 
 	uintptr_t nvnWindowSetNumActiveTextures;
+	uintptr_t nvnWindowInitialize;
 } Ptrs;
 
 struct {
@@ -99,6 +105,7 @@ struct {
 	uintptr_t nvnSyncWait;
 	uintptr_t nvnGetProcAddress;
 	uintptr_t nvnWindowSetNumActiveTextures;
+	uintptr_t nvnWindowInitialize;
 } Address;
 
 struct {
@@ -108,17 +115,18 @@ struct {
 } Stats;
 
 static uint32_t systemtickfrequency = 19200000;
-typedef void (*nvnQueuePresentTexture_0)(void* _this, void* unk2_1, void* unk3_1);
-typedef uintptr_t (*GetProcAddress)(void* unk1_a, const char * nvnFunction_a);
+typedef void (*nvnQueuePresentTexture_0)(const void* _this, const void* unk2_1, const void* unk3_1);
+typedef uintptr_t (*GetProcAddress)(const void* unk1_a, const char * nvnFunction_a);
 
 bool changeFPS = false;
 bool changedFPS = false;
-typedef void (*nvnBuilderSetTextures_0)(void* nvnWindowBuilder, int buffers, void* texturesBuffer);
-typedef void (*nvnWindowSetNumActiveTextures_0)(void* nvnWindow, int buffers);
-typedef void* (*nvnWindowAcquireTexture_0)(void* nvnWindow, void* nvnSync, void* index);
-typedef void (*nvnSetPresentInterval_0)(void* nvnWindow, int mode);
-typedef int (*nvnGetPresentInterval_0)(void* nvnWindow);
-typedef void* (*nvnSyncWait_0)(void* _this, uint64_t timeout_ns);
+typedef void (*nvnBuilderSetTextures_0)(const void* nvnWindowBuilder, int buffers, const void* texturesBuffer);
+typedef void (*nvnWindowSetNumActiveTextures_0)(const void* nvnWindow, int buffers);
+typedef bool (*nvnWindowInitialize_0)(const void* nvnWindow, struct nvnWindowBuilder* windowBuilder);
+typedef void* (*nvnWindowAcquireTexture_0)(const void* nvnWindow, const void* nvnSync, const void* index);
+typedef void (*nvnSetPresentInterval_0)(const void* nvnWindow, int mode);
+typedef int (*nvnGetPresentInterval_0)(const void* nvnWindow);
+typedef void* (*nvnSyncWait_0)(const void* _this, uint64_t timeout_ns);
 void* WindowSync = 0;
 uint64_t startFrameTick = 0;
 
@@ -128,7 +136,7 @@ enum {
 	ZeroSyncType_Semi
 };
 
-inline void createBuildidPath(uint64_t buildid, char* titleid, char* buffer) {
+inline void createBuildidPath(const uint64_t buildid, char* titleid, char* buffer) {
 	strcpy(buffer, "sdmc:/SaltySD/plugins/FPSLocker/patches/0");
 	strcat(buffer, &titleid[0]);
 	strcat(buffer, "/");
@@ -163,7 +171,7 @@ inline uint64_t getMainAddress() {
 	return 0;
 }
 
-uint32_t vulkanSwap2 (void* VkQueue_T, void* VkPresentInfoKHR) {
+uint32_t vulkanSwap2 (const void* VkQueue_T, const void* VkPresentInfoKHR) {
 	static uint8_t FPS_temp = 0;
 	static uint64_t starttick = 0;
 	static uint64_t endtick = 0;
@@ -245,7 +253,7 @@ uint32_t vulkanSwap2 (void* VkQueue_T, void* VkPresentInfoKHR) {
 	return vulkanResult;
 }
 
-uint32_t vulkanSwap (void* VkQueue, void* VkPresentInfoKHR) {
+uint32_t vulkanSwap (const void* VkQueue, const void* VkPresentInfoKHR) {
 	static uint8_t FPS_temp = 0;
 	static uint64_t starttick = 0;
 	static uint64_t endtick = 0;
@@ -327,7 +335,7 @@ uint32_t vulkanSwap (void* VkQueue, void* VkPresentInfoKHR) {
 	return vulkanResult;
 }
 
-int eglInterval(void* EGLDisplay, int interval) {
+int eglInterval(const void* EGLDisplay, int interval) {
 	int result = false;
 	if (!changeFPS) {
 		result = ((eglSwapInterval_0)(Address_weaks.eglSwapInterval))(EGLDisplay, interval);
@@ -345,7 +353,7 @@ int eglInterval(void* EGLDisplay, int interval) {
 	return result;
 }
 
-int eglSwap (void* EGLDisplay, void* EGLSurface) {
+int eglSwap (const void* EGLDisplay, const void* EGLSurface) {
 	static uint8_t FPS_temp = 0;
 	static uint64_t starttick = 0;
 	static uint64_t endtick = 0;
@@ -446,7 +454,18 @@ int eglSwap (void* EGLDisplay, void* EGLSurface) {
 	return result;
 }
 
-void nvnWindowBuilderSetTextures(void* nvnWindowBuilder, int numBufferedFrames, void* nvnTextures) {
+bool nvnWindowInitialize(const void* nvnWindow, struct nvnWindowBuilder* windowBuilder) {
+	if (!*(Shared.Buffers)) {
+		*(Shared.Buffers) = windowBuilder -> numBufferedFrames;
+		if (*(Shared.SetBuffers) >= 2 && *(Shared.SetBuffers) <= windowBuilder -> numBufferedFrames) {
+			windowBuilder -> numBufferedFrames = *(Shared.SetBuffers);
+		}
+		*(Shared.ActiveBuffers) = windowBuilder -> numBufferedFrames;	
+	}
+	return ((nvnWindowInitialize_0)(Ptrs.nvnWindowInitialize))(nvnWindow, windowBuilder);
+}
+
+void nvnWindowBuilderSetTextures(const void* nvnWindowBuilder, int numBufferedFrames, const void* nvnTextures) {
 	*(Shared.Buffers) = numBufferedFrames;
 	if (*(Shared.SetBuffers) >= 2 && *(Shared.SetBuffers) <= numBufferedFrames) {
 		numBufferedFrames = *(Shared.SetBuffers);
@@ -455,7 +474,7 @@ void nvnWindowBuilderSetTextures(void* nvnWindowBuilder, int numBufferedFrames, 
 	return ((nvnBuilderSetTextures_0)(Ptrs.nvnWindowBuilderSetTextures))(nvnWindowBuilder, numBufferedFrames, nvnTextures);
 }
 
-void nvnWindowSetNumActiveTextures(void* nvnWindow, int numBufferedFrames) {
+void nvnWindowSetNumActiveTextures(const void* nvnWindow, int numBufferedFrames) {
 	*(Shared.SetActiveBuffers) = numBufferedFrames;
 	if (*(Shared.SetBuffers) >= 2 && *(Shared.SetBuffers) <= *(Shared.Buffers)) {
 		numBufferedFrames = *(Shared.SetBuffers);
@@ -464,7 +483,7 @@ void nvnWindowSetNumActiveTextures(void* nvnWindow, int numBufferedFrames) {
 	return ((nvnWindowSetNumActiveTextures_0)(Ptrs.nvnWindowSetNumActiveTextures))(nvnWindow, numBufferedFrames);
 }
 
-void nvnSetPresentInterval(void* nvnWindow, int mode) {
+void nvnSetPresentInterval(const void* nvnWindow, int mode) {
 	if (!changeFPS) {
 		((nvnSetPresentInterval_0)(Ptrs.nvnWindowSetPresentInterval))(nvnWindow, mode);
 		changedFPS = false;
@@ -481,7 +500,7 @@ void nvnSetPresentInterval(void* nvnWindow, int mode) {
 	return;
 }
 
-void* nvnSyncWait0(void* _this, uint64_t timeout_ns) {
+void* nvnSyncWait0(const void* _this, uint64_t timeout_ns) {
 	uint64_t endFrameTick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
 	if (_this == WindowSync) {
 		if (*(Shared.ZeroSync) == ZeroSyncType_Semi) {
@@ -501,7 +520,7 @@ void* nvnSyncWait0(void* _this, uint64_t timeout_ns) {
 	return ((nvnSyncWait_0)(Ptrs.nvnSyncWait))(_this, timeout_ns);
 }
 
-void nvnPresentTexture(void* _this, void* nvnWindow, void* unk3) {
+void nvnPresentTexture(const void* _this, const void* nvnWindow, const void* unk3) {
 	static uint8_t FPS_temp = 0;
 	static uint64_t starttick = 0;
 	static uint64_t endtick = 0;
@@ -622,16 +641,16 @@ void nvnPresentTexture(void* _this, void* nvnWindow, void* unk3) {
 	return;
 }
 
-void* nvnAcquireTexture(void* nvnWindow, void* nvnSync, void* index) {
+void* nvnAcquireTexture(const void* nvnWindow, const void* nvnSync, const void* index) {
 	if (WindowSync != nvnSync) {
-		WindowSync = nvnSync;
+		WindowSync = (void*)nvnSync;
 	}
 	void* ret = ((nvnWindowAcquireTexture_0)(Ptrs.nvnWindowAcquireTexture))(nvnWindow, nvnSync, index);
 	startFrameTick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
 	return ret;
 }
 
-uintptr_t nvnGetProcAddress (void* nvnDevice, const char* nvnFunction) {
+uintptr_t nvnGetProcAddress (const void* nvnDevice, const char* nvnFunction) {
 	uintptr_t address = ((GetProcAddress)(Ptrs.nvnDeviceGetProcAddress))(nvnDevice, nvnFunction);
 	if (!strcmp("nvnDeviceGetProcAddress", nvnFunction))
 		return Address.nvnGetProcAddress;
@@ -658,6 +677,10 @@ uintptr_t nvnGetProcAddress (void* nvnDevice, const char* nvnFunction) {
 	else if (!strcmp("nvnWindowBuilderSetTextures", nvnFunction)) {
 		Ptrs.nvnWindowBuilderSetTextures = address;
 		return Address.nvnWindowBuilderSetTextures;
+	}
+	else if (!strcmp("nvnWindowInitialize", nvnFunction)) {
+		Ptrs.nvnWindowInitialize = address;
+		return Address.nvnWindowInitialize;
 	}
 	else if (!strcmp("nvnSyncWait", nvnFunction)) {
 		Ptrs.nvnSyncWait = address;
@@ -697,6 +720,7 @@ extern "C" {
 			Address.nvnGetProcAddress = (uint64_t)&nvnGetProcAddress;
 			Address.nvnQueuePresentTexture = (uint64_t)&nvnPresentTexture;
 			Address.nvnWindowAcquireTexture = (uint64_t)&nvnAcquireTexture;
+			Address.nvnWindowInitialize = (uint64_t)&nvnWindowInitialize;
 			Address_weaks.nvnBootstrapLoader = SaltySDCore_FindSymbolBuiltin("nvnBootstrapLoader");
 			Address_weaks.eglSwapBuffers = SaltySDCore_FindSymbolBuiltin("eglSwapBuffers");
 			Address_weaks.eglSwapInterval = SaltySDCore_FindSymbolBuiltin("eglSwapInterval");

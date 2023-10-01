@@ -163,9 +163,11 @@ void SaltySDCore_ReplaceModuleImport(void* base, const char* name, void* newfunc
 
 	if (!update) {
 		bool detected = false;
+		int detecteditr = 0;
 		for (int i = 0; i < num_replaced_symbols; i++) {
 			if (!strcmp(name, replaced_symbols[i].name)) {
 				detected = true;
+				detecteditr = i;
 			}
 		}
 		if (!detected) {
@@ -174,7 +176,7 @@ void SaltySDCore_ReplaceModuleImport(void* base, const char* name, void* newfunc
 			replaced_symbols[num_replaced_symbols-1].name = name;
 		}
 		else {
-			newfunc = replaced_symbols[num_replaced_symbols-1].address;
+			newfunc = replaced_symbols[detecteditr].address;
 		}
 	}
 
@@ -303,12 +305,10 @@ void SaltySDCore_fillRoLoadModule() {
 
 typedef Result (*_ZN2nn2ro10LoadModuleEPNS0_6ModuleEPKvPvmi)(struct Module* pOutModule, const void* pImage, void* buffer, size_t bufferSize, int flag);
 Result LoadModule(struct Module* pOutModule, const void* pImage, void* buffer, size_t bufferSize, int flag) {
-	static void* lastModule = 0;
 	if (flag)
 		flag = 0;
 	Result ret = ((_ZN2nn2ro10LoadModuleEPNS0_6ModuleEPKvPvmi)(roLoadModule))(pOutModule, pImage, buffer, bufferSize, flag);
-	if (R_SUCCEEDED(ret) && lastModule != pOutModule) {
-		lastModule = pOutModule;
+	if (R_SUCCEEDED(ret)) {
 		for (int x = 0; x < num_replaced_symbols; x++) {
 			SaltySDCore_ReplaceModuleImport(pOutModule->ModuleObject->module_base, replaced_symbols[x].name, replaced_symbols[x].address, true);
 		}
