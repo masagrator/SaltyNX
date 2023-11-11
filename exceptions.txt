@@ -47,6 +47,6 @@ X0100964012528000
 ;1.0.0 - v1.53.dd6d crash
 0100BDB01A0E6000
 
-;Company of heroes
-;1.5_66915
+;Company of Heroes Collection
+;1.5_66915 crashes
 0100ABD0156F8000
