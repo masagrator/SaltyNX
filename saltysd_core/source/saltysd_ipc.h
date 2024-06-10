@@ -21,6 +21,7 @@ extern Result SaltySD_CheckIfSharedMemoryAvailable(ptrdiff_t *offset, u64 size) 
 extern Result SaltySD_GetSharedMemoryHandle(Handle *retrieve) LINKABLE;
 extern u64 SaltySD_GetBID() LINKABLE;
 extern Result SaltySD_Exception() LINKABLE;
+extern Result SaltySD_SetDisplayRefreshRate(uint8_t refreshRate) LINKABLE;
 
 #ifdef __cplusplus
 }
