@@ -166,7 +166,15 @@
 			"type":	"debug_flags",
 			"value":	{
 				"allow_debug":	true,
-				"force_debug":	true
+				"force_debug":	false
+			}
+		}, 	{
+			"type": "map",
+			"value": {
+				"address": "0x60006000",
+				"size": "0x1000",
+				"is_ro": false,
+				"is_io": true
 			}
 	}]
 }

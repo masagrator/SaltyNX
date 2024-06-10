@@ -28,6 +28,9 @@ bool check = false;
 u64 exception = 0x0;
 SharedMemory _sharedMemory = {};
 size_t reservedSharedMemory = 0;
+uint64_t clkVirtAddr = 0;
+bool displaySync = false;
+s64 lastAppPID = -1;
 
 void __libnx_initheap(void)
 {
@@ -53,6 +56,18 @@ void __appExit(void)
 
 u64 TIDnow;
 u64 PIDnow;
+
+//Writing only one byte to 0xD1 results in breaking all 4 bytes from 0xD0 to 0xD3. 
+void SetDisplayRefreshRate(uint32_t refreshRate) {
+	if (!clkVirtAddr)
+		return;
+	if (refreshRate > 79 || refreshRate < 31)
+		return;
+	uint32_t value = *(uint32_t*)(clkVirtAddr + 0xD0) & 0xFFFF00FF;
+	refreshRate <<= 5;
+	refreshRate /= 10;
+	*(uint32_t*)(clkVirtAddr + 0xD0) = value | (refreshRate << 8);
+}
 
 void renameCheatsFolder() {
 	char* cheatspath = (char*)malloc(0x40);
@@ -277,6 +292,8 @@ void hijack_pid(u64 pid)
 	renameCheatsFolder();
 	
 	hijack_bootstrap(&debug, pid, tids[0]);
+	if (displaySync)
+		lastAppPID = pid;
 	
 	free(tids);
 	return;
@@ -617,6 +634,90 @@ Result handleServiceCmd(int cmd)
 
 		return 0;
 	}
+	else if (cmd == 10) // GetDisplayRefreshRate
+	{
+		IpcParsedCommand r = {0};
+		ipcParse(&r);
+
+		SaltySD_printf("SaltySD: cmd 10 handler\n");
+		
+		// Ship off results
+		struct {
+			u64 magic;
+			u64 result;
+			u64 refreshRate;
+			u64 reserved[2];
+		} *raw;
+
+		raw = ipcPrepareHeader(&c, sizeof(*raw));
+
+		raw->magic = SFCO_MAGIC;
+		raw->refreshRate = 0;
+		if (clkVirtAddr) {
+			uint16_t basic_value = *(uint8_t*)(clkVirtAddr + 0xD1);
+			raw->refreshRate = (basic_value * 10) / 32;
+			raw->result = 0;
+		}
+		else raw->result = 1;
+
+		return 0;
+	}
+	else if (cmd == 11) // SetDisplayRefreshRate
+	{
+		IpcParsedCommand r = {0};
+		ipcParse(&r);
+
+		struct {
+			u64 magic;
+			u64 cmd_id;
+			u64 refreshRate;
+			u64 reserved;
+		} *resp = r.Raw;
+
+		u64 refreshRate = resp -> refreshRate;
+
+		if (refreshRate > 79) {
+			SaltySD_printf("SaltySD: cmd 11 handler -> %d, invalid value. Setting 79...\n", refreshRate);
+			refreshRate = 79;
+		}
+		else if (refreshRate && refreshRate < 31) {
+			SaltySD_printf("SaltySD: cmd 11 handler -> %d, invalid value. Setting 31...\n", refreshRate);
+			refreshRate = 31;
+		}
+		else {
+			SaltySD_printf("SaltySD: cmd 11 handler -> %d\n", refreshRate);
+		}
+		if (refreshRate && clkVirtAddr) {	
+			SetDisplayRefreshRate(refreshRate);
+			ret = 0;
+		}
+		else ret = 0x1234;
+	}
+	else if (cmd == 12) // SetDisplaySync
+	{
+		IpcParsedCommand r = {0};
+		ipcParse(&r);
+
+		struct {
+			u64 magic;
+			u64 cmd_id;
+			u64 value;
+			u64 reserved;
+		} *resp = r.Raw;
+
+		displaySync = (bool)(resp -> value);
+		if (displaySync) {
+			FILE* file = fopen("sdmc:/SaltySD/flags/displaysync.flag", "wb");
+			fclose(file);
+		}
+		else {
+			remove("sdmc:/SaltySD/flags/displaysync.flag");
+		}
+
+		SaltySD_printf("SaltySD: cmd 12 handler -> %d\n", displaySync);
+
+		ret = 0;
+	}
 	else
 	{
 		ret = 0xEE01;
@@ -787,14 +888,23 @@ int main(int argc, char *argv[])
 	sdcardfs.s.handle = sdcard;
 	fsdevMountDevice("sdmc", sdcardfs);
 	SaltySD_printf("SaltySD: got SD card.\n");
-
+	FILE* file = fopen("sdmc:/SaltySD/flags/displaysync.flag", "rb");
+	if (file) {
+		fclose(file);
+		displaySync = true;
+	}
 	// Start our port
 	// For some reason, we only have one session maximum (0 reslimit handle related?)	
 	svcManageNamedPort(&saltyport, "SaltySD", 1);
 	svcManageNamedPort(&injectserv, "InjectServ", 1);
 
+	uint64_t dummy = 0;
+	Result rc = svcQueryMemoryMapping(&clkVirtAddr, &dummy, 0x60006000, 0x1000);
+	if (R_FAILED(rc)) {
+		SaltySD_printf("SaltySD: Retrieving virtual address for 0x60006000 failed. RC: 0x%x.\n", rc);
+		clkVirtAddr = 0;
+	}
 	shmemCreate(&_sharedMemory, 0x1000, Perm_Rw, Perm_Rw);
-
 	// Main service loop
 	u64* pids = malloc(0x200 * sizeof(u64));
 	u64 max = 0;
@@ -809,6 +919,23 @@ int main(int argc, char *argv[])
 			if (pids[i] > max)
 			{
 				max = pids[i];
+			}
+		}
+		
+		if (lastAppPID != -1) {
+			bool found = false;
+			for (int i = num - 1; pids[i] > 100; i--)
+			{
+				if (pids[i] == lastAppPID)
+				{	
+					found = true;
+					break;
+				}
+			}
+			if (!found) {
+				lastAppPID = -1;
+				if (displaySync)
+					SetDisplayRefreshRate(60);
 			}
 		}
 
