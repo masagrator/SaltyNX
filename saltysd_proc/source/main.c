@@ -677,13 +677,9 @@ Result handleServiceCmd(int cmd)
 
 		u64 refreshRate = resp -> refreshRate;
 
-		if (refreshRate > 75) {
-			SaltySD_printf("SaltySD: cmd 11 handler -> %d, invalid value. Setting 75...\n", refreshRate);
-			refreshRate = 75;
-		}
-		else if (refreshRate && refreshRate < 40) {
-			SaltySD_printf("SaltySD: cmd 11 handler -> %d, invalid value. Setting 40...\n", refreshRate);
-			refreshRate = 40;
+		if (refreshRate > 79 || refreshRate < 31) {
+			SaltySD_printf("SaltySD: cmd 11 handler -> %d, invalid value. Setting 60...\n", refreshRate);
+			refreshRate = 60;
 		}
 		else {
 			SaltySD_printf("SaltySD: cmd 11 handler -> %d\n", refreshRate);
@@ -897,7 +893,7 @@ int main(int argc, char *argv[])
 	SetSysProductModel model;
 	if (R_SUCCEEDED(setsysGetProductModel(&model))) {
 		if (model == SetSysProductModel_Aula) {
-			SaltySD_printf("SaltySD: Detected OLED model. Display Sync is not available.\n", rc);
+			SaltySD_printf("SaltySD: Detected OLED model. Display Sync is not available.\n");
 			isOLED = true;
 			remove("sdmc:/SaltySD/flags/displaysync.flag");
 		}
