@@ -935,7 +935,7 @@ int main(int argc, char *argv[])
 		
 		if (!isOLED && lastAppPID != -1) {
 			bool found = false;
-			for (int i = num - 1; lastAppPID < pids[i]; i--)
+			for (int i = num - 1; lastAppPID <= pids[i]; i--)
 			{
 				if (pids[i] == lastAppPID)
 				{	
