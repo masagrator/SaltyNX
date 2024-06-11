@@ -19,6 +19,17 @@ typedef enum {
     ColorSetId_Dark=1
 } ColorSetId;
 
+/// Console Product Models
+typedef enum {
+    SetSysProductModel_Invalid = 0, ///< Invalid Model
+    SetSysProductModel_Nx      = 1, ///< Erista Model
+    SetSysProductModel_Copper  = 2, ///< Erista "Simulation" Model
+    SetSysProductModel_Iowa    = 3, ///< Mariko Model
+    SetSysProductModel_Hoag    = 4, ///< Mariko Lite Model
+    SetSysProductModel_Calcio  = 5, ///< Mariko "Simulation" Model
+    SetSysProductModel_Aula    = 6, ///< Mariko OLED Model
+} SetSysProductModel;
+
 /// IDs for Language.
 typedef enum
 {
@@ -102,6 +113,8 @@ Result setGetSystemLanguage(u64 *LanguageCode);
 
 /// Gets the current LanguageCode, \ref setGetSystemLanguage should be used instead normally.
 Result setGetLanguageCode(u64 *LanguageCode);
+
+Result setsysGetProductModel(SetSysProductModel *out);
 
 /// Gets available LanguageCodes.
 /// On system-version <4.0.0, max_entries is set to the output from \ref setGetAvailableLanguageCodeCount if max_entries is larger than that.
