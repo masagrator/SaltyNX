@@ -293,8 +293,7 @@ void hijack_pid(u64 pid)
 	renameCheatsFolder();
 	
 	hijack_bootstrap(&debug, pid, tids[0]);
-	if (displaySync)
-		lastAppPID = pid;
+	lastAppPID = pid;
 	
 	free(tids);
 	return;
@@ -933,7 +932,7 @@ int main(int argc, char *argv[])
 			}
 		}
 		
-		if (!isOLED && lastAppPID != -1) {
+		if (lastAppPID != -1) {
 			bool found = false;
 			for (int i = num - 1; lastAppPID <= pids[i]; i--)
 			{
@@ -945,7 +944,7 @@ int main(int argc, char *argv[])
 			}
 			if (!found) {
 				lastAppPID = -1;
-				if (displaySync)
+				if (displaySync && !isOLED)
 					SetDisplayRefreshRate(60);
 			}
 		}
