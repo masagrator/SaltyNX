@@ -355,6 +355,40 @@ Result setsysGetColorSetId(ColorSetId *out)
     return rc;
 }
 
+Result setsysGetProductModel(SetSysProductModel *out)
+{
+    IpcCommand c;
+    ipcInitialize(&c);
+
+    struct {
+        u64 magic;
+        u64 cmd_id;
+    } *raw;
+
+    raw = ipcPrepareHeader(&c, sizeof(*raw));
+
+    raw->magic = SFCI_MAGIC;
+    raw->cmd_id = 79;
+
+    Result rc = serviceIpcDispatch(&g_setsysSrv);
+
+    if (R_SUCCEEDED(rc)) {
+        IpcParsedCommand r;
+        ipcParse(&r);
+
+        struct {
+            u64 magic;
+            u64 result;
+            u32 model;
+        } *resp = r.Raw;
+
+        *out = resp->model;
+        rc = resp->result;
+    }
+
+    return rc;
+}
+
 Result setsysSetColorSetId(ColorSetId id)
 {
     IpcCommand c;
