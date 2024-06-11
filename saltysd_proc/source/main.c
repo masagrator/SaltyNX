@@ -31,6 +31,7 @@ size_t reservedSharedMemory = 0;
 uint64_t clkVirtAddr = 0;
 bool displaySync = false;
 s64 lastAppPID = -1;
+bool isOLED = false;
 
 void __libnx_initheap(void)
 {
@@ -676,13 +677,13 @@ Result handleServiceCmd(int cmd)
 
 		u64 refreshRate = resp -> refreshRate;
 
-		if (refreshRate > 79) {
-			SaltySD_printf("SaltySD: cmd 11 handler -> %d, invalid value. Setting 79...\n", refreshRate);
-			refreshRate = 79;
+		if (refreshRate > 75) {
+			SaltySD_printf("SaltySD: cmd 11 handler -> %d, invalid value. Setting 75...\n", refreshRate);
+			refreshRate = 75;
 		}
-		else if (refreshRate && refreshRate < 31) {
-			SaltySD_printf("SaltySD: cmd 11 handler -> %d, invalid value. Setting 31...\n", refreshRate);
-			refreshRate = 31;
+		else if (refreshRate && refreshRate < 40) {
+			SaltySD_printf("SaltySD: cmd 11 handler -> %d, invalid value. Setting 40...\n", refreshRate);
+			refreshRate = 40;
 		}
 		else {
 			SaltySD_printf("SaltySD: cmd 11 handler -> %d\n", refreshRate);
@@ -706,15 +707,18 @@ Result handleServiceCmd(int cmd)
 		} *resp = r.Raw;
 
 		displaySync = (bool)(resp -> value);
-		if (displaySync) {
+		if (!isOLED && displaySync) {
 			FILE* file = fopen("sdmc:/SaltySD/flags/displaysync.flag", "wb");
 			fclose(file);
+			SaltySD_printf("SaltySD: cmd 12 handler -> %d\n", displaySync);
+		}
+		else if (isOLED) {
+			SaltySD_printf("SaltySD: cmd 12 handler -> %d. Detected OLED model, ignoring...\n", displaySync);
+			remove("sdmc:/SaltySD/flags/displaysync.flag");
 		}
 		else {
 			remove("sdmc:/SaltySD/flags/displaysync.flag");
 		}
-
-		SaltySD_printf("SaltySD: cmd 12 handler -> %d\n", displaySync);
 
 		ret = 0;
 	}
@@ -888,6 +892,17 @@ int main(int argc, char *argv[])
 	sdcardfs.s.handle = sdcard;
 	fsdevMountDevice("sdmc", sdcardfs);
 	SaltySD_printf("SaltySD: got SD card.\n");
+
+	setsysInitialize();
+	SetSysProductModel model;
+	if (R_SUCCEEDED(setsysGetProductModel(&model))) {
+		if (model == SetSysProductModel_Aula) {
+			SaltySD_printf("SaltySD: Detected OLED model. Display Sync is not available.\n", rc);
+			isOLED = true;
+			remove("sdmc:/SaltySD/flags/displaysync.flag");
+		}
+	}
+	setsysExit();
 	FILE* file = fopen("sdmc:/SaltySD/flags/displaysync.flag", "rb");
 	if (file) {
 		fclose(file);
@@ -922,9 +937,9 @@ int main(int argc, char *argv[])
 			}
 		}
 		
-		if (lastAppPID != -1) {
+		if (!isOLED && lastAppPID != -1) {
 			bool found = false;
-			for (int i = num - 1; pids[i] > 100; i--)
+			for (int i = num - 1; lastAppPID >= pids[i]; i--)
 			{
 				if (pids[i] == lastAppPID)
 				{	
