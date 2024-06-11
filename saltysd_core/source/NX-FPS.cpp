@@ -806,7 +806,7 @@ extern "C" {
 				uint8_t temp = 0;
 				SaltySDCore_fread(&temp, 1, 1, file_dat);
 				*(Shared.FPSlocked) = temp;
-				if (temp > 30 && temp < 80) {
+				if (temp >= 40 && temp <= 75) {
 					FILE* sync_file = SaltySDCore_fopen("sdmc:/SaltySD/flags/displaysync.flag", "rb");
 					if  (sync_file) {
 						SaltySDCore_fclose(sync_file);
