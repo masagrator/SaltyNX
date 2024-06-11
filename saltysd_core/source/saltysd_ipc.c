@@ -523,8 +523,6 @@ Result SaltySD_SetDisplayRefreshRate(uint8_t refreshRate)
 	raw->cmd_id = 11;
 	raw->refreshRate = refreshRate;
 
-	SaltySDCore_printf("SaltySD Core: SetDisplayRefreshRate: %d\n", refreshRate);
-
 	ret = ipcDispatch(saltysd);
 
 	if (R_SUCCEEDED(ret)) {
