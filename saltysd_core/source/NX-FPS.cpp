@@ -8,7 +8,11 @@
 #include "lock.hpp"
 
 struct NVNTexture {
-	char reserved[0xC0];
+	char reserved[0x80];
+};
+
+struct NVNTextureView {
+	char reserved[0x40];
 };
 
 struct NVNTextureBuilder {
@@ -30,6 +34,14 @@ typedef int NVNmemoryPoolFlags;
 
 NVNWindow* m_nvnWindow = 0;
 NVNDevice* m_nvnDevice = 0;
+NVNTexture* framebufferTextures[4];
+
+struct NVNViewport {
+	float x;
+	float y;
+	float width;
+	float height;
+};
 
 extern "C" {
 	typedef u64 (*nvnBootstrapLoader_0)(const char * nvnName);
@@ -41,6 +53,14 @@ extern "C" {
 	typedef u64 (*_ZN2nn2os13GetSystemTickEv_0)();
 	typedef u64 (*eglGetProcAddress_0)(const char* eglName);
 	typedef u8 (*_ZN2nn2oe16GetOperationModeEv)();
+	typedef void* (*nvnCommandBufferSetRenderTargets_0)(void* cmdBuf, int numTextures, NVNTexture** texture, NVNTextureView** textureView, NVNTexture* depth, NVNTextureView* depthView);
+	typedef void* (*nvnCommandBufferSetViewport_0)(void* cmdBuf, int x, int y, int width, int height);
+	typedef void* (*nvnCommandBufferSetViewports_0)(void* cmdBuf, int start, int count, NVNViewport* viewports);
+	typedef void* (*nvnCommandBufferSetDepthRange_0)(void* cmdBuf, float s0, float s1);
+	typedef u16 (*nvnTextureGetWidth_0)(NVNTexture* texture);
+	typedef u16 (*nvnTextureGetHeight_0)(NVNTexture* texture);
+	typedef u32 (*nvnTextureGetFormat_0)(NVNTexture* texture);
+	typedef void (*_ZN2nn4util11ReferSymbolEPKv_0)(const char* symbol);
 }
 
 struct {
@@ -53,6 +73,7 @@ struct {
 	uintptr_t GetSystemTick;
 	uintptr_t eglGetProcAddress;
 	uintptr_t GetOperationMode;
+	uintptr_t ReferSymbol;
 } Address_weaks;
 
 struct nvnWindowBuilder {
@@ -97,6 +118,14 @@ Result readConfig(const char* path, uint8_t** output_buffer) {
 	return 0;
 }
 
+struct resolutionCalls {
+	uint16_t width;
+	uint16_t height;
+	uint16_t calls;
+};
+
+bool resolutionLookup = false;
+
 struct {
 	uint8_t* FPS = 0;
 	float* FPSavg = 0;
@@ -112,6 +141,8 @@ struct {
 	uint8_t* ActiveBuffers = 0;
 	uint8_t* SetActiveBuffers = 0;
 	uint8_t* displaySync = 0;
+	resolutionCalls* renderCalls = 0;
+	resolutionCalls* viewportCalls = 0;
 } Shared;
 
 struct {
@@ -126,6 +157,13 @@ struct {
 
 	uintptr_t nvnWindowSetNumActiveTextures;
 	uintptr_t nvnWindowInitialize;
+	uintptr_t nvnTextureGetWidth;
+	uintptr_t nvnTextureGetHeight;
+	uintptr_t nvnTextureGetFormat;
+	uintptr_t nvnCommandBufferSetRenderTargets;
+	uintptr_t nvnCommandBufferSetViewport;
+	uintptr_t nvnCommandBufferSetViewports;
+	uintptr_t nvnCommandBufferSetDepthRange;
 } Ptrs;
 
 struct {
@@ -141,6 +179,10 @@ struct {
 	uintptr_t eglGetProcAddress;
 	uintptr_t eglSwapBuffers;
 	uintptr_t eglSwapInterval;
+	uintptr_t nvnCommandBufferSetRenderTargets;
+	uintptr_t nvnCommandBufferSetViewport;
+	uintptr_t nvnCommandBufferSetViewports;
+	uintptr_t nvnCommandBufferSetDepthRange;
 } Address;
 
 struct {
@@ -591,6 +633,9 @@ bool nvnWindowInitialize(const NVNWindow* nvnWindow, struct nvnWindowBuilder* wi
 
 void nvnWindowBuilderSetTextures(const nvnWindowBuilder* nvnWindowBuilder, int numBufferedFrames, NVNTexture** nvnTextures) {
 	*(Shared.Buffers) = numBufferedFrames;
+	for (int i = 0; i < numBufferedFrames; i++) {
+		framebufferTextures[i] = nvnTextures[i];
+	}
 	if (*(Shared.SetBuffers) >= 2 && *(Shared.SetBuffers) <= numBufferedFrames) {
 		numBufferedFrames = *(Shared.SetBuffers);
 	}
@@ -643,6 +688,8 @@ void* nvnSyncWait0(const void* _this, uint64_t timeout_ns) {
 	}
 	return ((nvnSyncWait_0)(Ptrs.nvnSyncWait))(_this, timeout_ns);
 }
+
+bool nvnPresentedTexture = false;
 
 void nvnPresentTexture(const void* _this, const NVNWindow* nvnWindow, const void* unk3) {
 	static uint8_t FPS_temp = 0;
@@ -700,6 +747,7 @@ void nvnPresentTexture(const void* _this, const NVNWindow* nvnWindow, const void
 	}
 	
 	((nvnQueuePresentTexture_0)(Ptrs.nvnQueuePresentTexture))(_this, nvnWindow, unk3);
+	nvnPresentedTexture = true;
 	endtick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
 	framedelta = endtick - frameend;
 
@@ -803,6 +851,102 @@ void* nvnAcquireTexture(const NVNWindow* nvnWindow, const void* nvnSync, const v
 	return ret;
 }
 
+struct nvnCommandBuffer {
+	char reserved[0x80];
+};
+
+resolutionCalls m_resolutionRenderCalls[8] = {0};
+resolutionCalls m_resolutionViewportCalls[8] = {0};
+
+void* nvnCommandBufferSetViewports(nvnCommandBuffer* cmdBuf, int start, int count, NVNViewport* viewports) {
+	if (resolutionLookup) for (int i = start; i < count; i++) {
+		if (viewports[i].height > 1.f && viewports[i].width > 1.f && viewports[i].x == 0.f && viewports[i].y == 0.f) {
+			uint16_t width = (uint16_t)(viewports[i].width);
+			uint16_t height = (uint16_t)(viewports[i].height);
+			int ratio = (width * 10) / height;
+			if (ratio >= 17 && ratio <= 18) {
+				//Dynamic Resolution is always the second value passed
+				for (size_t i = 0; i < 8; i++) {
+					if (width == m_resolutionViewportCalls[i].width) {
+						m_resolutionViewportCalls[i].calls++;
+						break;
+					}
+					if (m_resolutionViewportCalls[i].width == 0) {
+						m_resolutionViewportCalls[i].width = width;
+						m_resolutionViewportCalls[i].height = height;
+						m_resolutionViewportCalls[i].calls = 1;
+						break;
+					}
+				}			
+			}
+		}
+	}
+	return ((nvnCommandBufferSetViewports_0)(Ptrs.nvnCommandBufferSetViewports))(cmdBuf, start, count, viewports);
+}
+
+void* nvnCommandBufferSetViewport(nvnCommandBuffer* cmdBuf, int x, int y, int width, int height) {
+	if (resolutionLookup && height > 1 && width > 1 && !x && !y) {
+		int ratio = (width * 10) / height;
+		if (ratio >= 17 && ratio <= 18) {
+			//Dynamic Resolution is always the second value passed
+			for (size_t i = 0; i < 8; i++) {
+				if (width == m_resolutionViewportCalls[i].width) {
+					m_resolutionViewportCalls[i].calls++;
+					break;
+				}
+				if (m_resolutionViewportCalls[i].width == 0) {
+					m_resolutionViewportCalls[i].width = width;
+					m_resolutionViewportCalls[i].height = height;
+					m_resolutionViewportCalls[i].calls = 1;
+					break;
+				}
+			}			
+		}
+	}
+	return ((nvnCommandBufferSetViewport_0)(Ptrs.nvnCommandBufferSetViewport))(cmdBuf, x, y, width, height);
+}
+
+void* nvnCommandBufferSetRenderTargets(nvnCommandBuffer* cmdBuf, int numTextures, NVNTexture** texture, NVNTextureView** textureView, NVNTexture* depthTexture, NVNTextureView* depthView) {
+	if (!resolutionLookup && Shared.renderCalls[0].calls == 0xFFFF) {
+		resolutionLookup = true;
+		Shared.renderCalls[0].calls = 0;
+	}
+	if (resolutionLookup && depthTexture != NULL && texture != NULL) {
+		uint16_t depth_width = ((nvnTextureGetWidth_0)(Ptrs.nvnTextureGetWidth))(depthTexture);
+		uint16_t depth_height = ((nvnTextureGetHeight_0)(Ptrs.nvnTextureGetHeight))(depthTexture);
+		int depth_format = ((nvnTextureGetFormat_0)(Ptrs.nvnTextureGetFormat))(depthTexture);
+		if (depth_width > 1 && depth_height > 1 && (depth_format >= 51 && depth_format <= 54)) {
+			if (nvnPresentedTexture) {
+				memcpy(Shared.renderCalls, m_resolutionRenderCalls, sizeof(m_resolutionRenderCalls));
+				memcpy(Shared.viewportCalls, m_resolutionViewportCalls, sizeof(m_resolutionViewportCalls));
+				memset(&m_resolutionRenderCalls, 0, sizeof(m_resolutionRenderCalls));
+				memset(&m_resolutionViewportCalls, 0, sizeof(m_resolutionViewportCalls));
+				nvnPresentedTexture = false;
+			}
+			bool found = false;
+			int ratio = ((depth_width * 10) / (depth_height));
+			if (ratio < 17 || ratio > 18) {
+				found = true;
+			}
+			if (!found) {
+				for (size_t i = 0; i < 8; i++) {
+					if (depth_width == m_resolutionRenderCalls[i].width) {
+						m_resolutionRenderCalls[i].calls++;
+						break;
+					}
+					if (m_resolutionRenderCalls[i].width == 0) {
+						m_resolutionRenderCalls[i].width = depth_width;
+						m_resolutionRenderCalls[i].height = depth_height;
+						m_resolutionRenderCalls[i].calls = 1;
+						break;
+					}
+				}
+			}
+		}
+	}
+	return ((nvnCommandBufferSetRenderTargets_0)(Ptrs.nvnCommandBufferSetRenderTargets))(cmdBuf, numTextures, texture, textureView, depthTexture, depthView);
+}
+
 uintptr_t nvnGetProcAddress (NVNDevice* nvnDevice, const char* nvnFunction) {
 	uintptr_t address = ((GetProcAddress)(Ptrs.nvnDeviceGetProcAddress))(nvnDevice, nvnFunction);
 	m_nvnDevice = nvnDevice;
@@ -840,6 +984,27 @@ uintptr_t nvnGetProcAddress (NVNDevice* nvnDevice, const char* nvnFunction) {
 		Ptrs.nvnSyncWait = address;
 		return Address.nvnSyncWait;
 	}
+	else if (!strcmp("nvnCommandBufferSetRenderTargets", nvnFunction)) {
+		Ptrs.nvnCommandBufferSetRenderTargets = address;
+		return Address.nvnCommandBufferSetRenderTargets;
+	}
+	else if (!strcmp("nvnCommandBufferSetViewport", nvnFunction)) {
+		Ptrs.nvnCommandBufferSetViewport = address;
+		return Address.nvnCommandBufferSetViewport;
+	}
+	else if (!strcmp("nvnCommandBufferSetViewports", nvnFunction)) {
+		Ptrs.nvnCommandBufferSetViewports = address;
+		return Address.nvnCommandBufferSetViewports;
+	}
+	else if (!strcmp("nvnTextureGetWidth", nvnFunction)) {
+		Ptrs.nvnTextureGetWidth = address;
+	}
+	else if (!strcmp("nvnTextureGetHeight", nvnFunction)) {
+		Ptrs.nvnTextureGetHeight = address;
+	}
+	else if (!strcmp("nvnTextureGetFormat", nvnFunction)) {
+		Ptrs.nvnTextureGetFormat = address;
+	}
 	return address;
 }
 
@@ -859,7 +1024,7 @@ extern "C" {
 		SaltySDCore_printf("NX-FPS: alive\n");
 		LOCK::mappings.main_start = getMainAddress();
 		SaltySDCore_printf("NX-FPS: found main at: 0x%lX\n", LOCK::mappings.main_start);
-		Result ret = SaltySD_CheckIfSharedMemoryAvailable(&SharedMemoryOffset, 60);
+		Result ret = SaltySD_CheckIfSharedMemoryAvailable(&SharedMemoryOffset, 60 + sizeof(m_resolutionRenderCalls) + sizeof(m_resolutionViewportCalls));
 		SaltySDCore_printf("NX-FPS: ret: 0x%X\n", ret);
 		if (!ret) {
 			SaltySDCore_printf("NX-FPS: MemoryOffset: %d\n", SharedMemoryOffset);
@@ -890,7 +1055,6 @@ extern "C" {
 			SaltySDCore_ReplaceImport("vkQueuePresentKHR", (void*)vulkanSwap);
 			SaltySDCore_ReplaceImport("_ZN11NvSwapchain15QueuePresentKHREP9VkQueue_TPK16VkPresentInfoKHR", (void*)vulkanSwap2);
 			SaltySDCore_ReplaceImport("eglGetProcAddress", (void*)eglGetProc);
-
 			Shared.FPSlocked = (uint8_t*)(base + 10);
 			Shared.FPSmode = (uint8_t*)(base + 11);
 			Shared.ZeroSync = (uint8_t*)(base + 12);
@@ -902,6 +1066,8 @@ extern "C" {
 			Shared.ActiveBuffers = (uint8_t*)(base + 57);
 			Shared.SetActiveBuffers = (uint8_t*)(base + 58);
 			Shared.displaySync = (uint8_t*)(base + 59);
+			Shared.renderCalls = (resolutionCalls*)(base + 60);
+			Shared.viewportCalls = (resolutionCalls*)(base + 60 + sizeof(m_resolutionRenderCalls));
 			Address.nvnWindowSetPresentInterval = (uint64_t)&nvnSetPresentInterval;
 			Address.nvnSyncWait = (uint64_t)&nvnSyncWait0;
 			Address.nvnWindowBuilderSetTextures = (uint64_t)&nvnWindowBuilderSetTextures;
@@ -909,6 +1075,9 @@ extern "C" {
 			Address.eglGetProcAddress = (uint64_t)&eglGetProc;
 			Address.eglSwapBuffers = (uint64_t)&eglSwap;
 			Address.eglSwapInterval = (uint64_t)&eglInterval;
+			Address.nvnCommandBufferSetRenderTargets = (uint64_t)&nvnCommandBufferSetRenderTargets;
+			Address.nvnCommandBufferSetViewport = (uint64_t)&nvnCommandBufferSetViewport;
+			Address.nvnCommandBufferSetViewports = (uint64_t)&nvnCommandBufferSetViewports;
 
 			char titleid[17];
 			CheckTitleID(&titleid[0]);
