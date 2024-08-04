@@ -60,7 +60,8 @@ extern "C" {
 	typedef u16 (*nvnTextureGetWidth_0)(NVNTexture* texture);
 	typedef u16 (*nvnTextureGetHeight_0)(NVNTexture* texture);
 	typedef u32 (*nvnTextureGetFormat_0)(NVNTexture* texture);
-	typedef void (*_ZN2nn4util11ReferSymbolEPKv_0)(const char* symbol);
+	typedef void* (*_vkGetInstanceProcAddr_0)(void* instance, const char* vkFunction);
+	typedef void* (*vkGetDeviceProcAddr_0)(void* device, const char* vkFunction);
 }
 
 struct {
@@ -74,6 +75,7 @@ struct {
 	uintptr_t eglGetProcAddress;
 	uintptr_t GetOperationMode;
 	uintptr_t ReferSymbol;
+	uintptr_t vkGetInstanceProcAddr;
 } Address_weaks;
 
 struct nvnWindowBuilder {
@@ -164,6 +166,7 @@ struct {
 	uintptr_t nvnCommandBufferSetViewport;
 	uintptr_t nvnCommandBufferSetViewports;
 	uintptr_t nvnCommandBufferSetDepthRange;
+	uintptr_t vkGetDeviceProcAddr;
 } Ptrs;
 
 struct {
@@ -459,6 +462,30 @@ uint32_t vulkanSwap (const void* VkQueue, const void* VkPresentInfoKHR) {
 	}
 	
 	return vulkanResult;
+}
+
+void* vkGetDeviceProcAddr(void* device, const char* vkFunction) {
+	if (!strcmp("vkQueuePresentKHR", vkFunction)) {
+		Address_weaks.vkQueuePresentKHR = (uintptr_t)((vkGetDeviceProcAddr_0)(Ptrs.vkGetDeviceProcAddr))(device, vkFunction);
+		return (void*)&vulkanSwap;
+	}
+	if (!strcmp("vkGetDeviceProcAddr", vkFunction)) {
+		Ptrs.vkGetDeviceProcAddr = (uintptr_t)((vkGetDeviceProcAddr_0)(Ptrs.vkGetDeviceProcAddr))(device, vkFunction);
+		return (void*)&vkGetDeviceProcAddr;
+	}
+	return ((vkGetDeviceProcAddr_0)(Ptrs.vkGetDeviceProcAddr))(device, vkFunction);
+}
+
+void* vkGetInstanceProcAddr(void* instance, const char* vkFunction) {
+	if (!strcmp("vkQueuePresentKHR", vkFunction)) {
+		Address_weaks.vkQueuePresentKHR = (uintptr_t)((_vkGetInstanceProcAddr_0)(Address_weaks.vkGetInstanceProcAddr))(instance, vkFunction);
+		return (void*)&vulkanSwap;
+	}
+	if (!strcmp("vkGetDeviceProcAddr", vkFunction)) {
+		Ptrs.vkGetDeviceProcAddr = (uintptr_t)((_vkGetInstanceProcAddr_0)(Address_weaks.vkGetInstanceProcAddr))(instance, vkFunction);
+		return (void*)&vkGetDeviceProcAddr;
+	}
+	return ((_vkGetInstanceProcAddr_0)(Address_weaks.vkGetInstanceProcAddr))(instance, vkFunction);
 }
 
 int eglInterval(const void* EGLDisplay, int interval) {
@@ -1049,12 +1076,14 @@ extern "C" {
 			Address_weaks.GetSystemTick = SaltySDCore_FindSymbolBuiltin("_ZN2nn2os13GetSystemTickEv");
 			Address_weaks.eglGetProcAddress = SaltySDCore_FindSymbolBuiltin("eglGetProcAddress");
 			Address_weaks.GetOperationMode = SaltySDCore_FindSymbolBuiltin("_ZN2nn2oe16GetOperationModeEv");
+			Address_weaks.vkGetInstanceProcAddr = SaltySDCore_FindSymbolBuiltin("vkGetInstanceProcAddr");
 			SaltySDCore_ReplaceImport("nvnBootstrapLoader", (void*)nvnBootstrapLoader_1);
 			SaltySDCore_ReplaceImport("eglSwapBuffers", (void*)eglSwap);
 			SaltySDCore_ReplaceImport("eglSwapInterval", (void*)eglInterval);
 			SaltySDCore_ReplaceImport("vkQueuePresentKHR", (void*)vulkanSwap);
 			SaltySDCore_ReplaceImport("_ZN11NvSwapchain15QueuePresentKHREP9VkQueue_TPK16VkPresentInfoKHR", (void*)vulkanSwap2);
 			SaltySDCore_ReplaceImport("eglGetProcAddress", (void*)eglGetProc);
+			SaltySDCore_ReplaceImport("vkGetInstanceProcAddr", (void*)vkGetInstanceProcAddr);
 			Shared.FPSlocked = (uint8_t*)(base + 10);
 			Shared.FPSmode = (uint8_t*)(base + 11);
 			Shared.ZeroSync = (uint8_t*)(base + 12);
