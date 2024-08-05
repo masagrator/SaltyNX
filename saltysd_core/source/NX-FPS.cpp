@@ -952,7 +952,7 @@ void* nvnCommandBufferSetRenderTargets(nvnCommandBuffer* cmdBuf, int numTextures
 			}
 			bool found = false;
 			int ratio = ((depth_width * 10) / (depth_height));
-			if (ratio < 17 || ratio > 18) {
+			if (ratio < 13 || ratio > 18) {
 				found = true;
 			}
 			if (!found) {
