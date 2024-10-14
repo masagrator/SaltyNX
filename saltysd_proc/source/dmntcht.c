@@ -39,41 +39,6 @@ void dmntchtExit(void) {
     }
 }
 
-Result dmntchtHasCheatProcess(bool* out) {
-    IpcCommand c;
-    ipcInitialize(&c);
-
-    struct {
-        u64 magic;
-        u64 cmd_id;
-    } *raw;
-
-    raw = serviceIpcPrepareHeader(&g_dmntchtSrv, &c, sizeof(*raw));
-
-    raw->magic = SFCI_MAGIC;
-    raw->cmd_id = 65000;
-
-    Result rc = serviceIpcDispatch(&g_dmntchtSrv);
-
-    if (R_SUCCEEDED(rc)) {
-        IpcParsedCommand r;
-
-        struct {
-            u64 magic;
-            u64 result;
-            bool out;
-        } *resp;
-
-        serviceIpcParse(&g_dmntchtSrv, &r, sizeof(*resp));
-        resp = r.Raw;
-
-        rc = resp->result;
-        *out = resp->out & 1;
-    }
-
-    return rc;
-}
-
 Result dmntchtForceOpenCheatProcess(void) {
     IpcCommand c;
     ipcInitialize(&c);
