@@ -187,3 +187,80 @@ Result smGetServiceOriginal(Handle* handle_out, u64 name)
 
     return rc;
 }
+
+Result smRegisterService(Handle* handle_out, const char* name, bool is_light, int max_sessions) {
+    IpcCommand c;
+    ipcInitialize(&c);
+
+    struct {
+        u64 magic;
+        u64 cmd_id;
+        u64 service_name;
+        u32 is_light;
+        u32 max_sessions;
+    } *raw;
+
+    raw = serviceIpcPrepareHeader(&g_smSrv, &c, sizeof(*raw));
+
+    raw->magic = SFCI_MAGIC;
+    raw->cmd_id = 2;
+    raw->service_name = smEncodeName(name);
+    raw->is_light = !!is_light;
+    raw->max_sessions = max_sessions;
+
+    Result rc = serviceIpcDispatch(&g_smSrv);
+
+    if (R_SUCCEEDED(rc)) {
+        IpcParsedCommand r;
+
+        struct {
+            u64 magic;
+            u64 result;
+        } *resp;
+        serviceIpcParse(&g_smSrv, &r, sizeof(*resp));
+
+        resp = r.Raw;
+        rc = resp->result;
+
+        if (R_SUCCEEDED(rc)) {
+            *handle_out = r.Handles[0];
+        }
+    }
+
+    return rc;
+}
+
+Result smUnregisterService(const char* name) {
+    IpcCommand c;
+    ipcInitialize(&c);
+
+    struct {
+        u64 magic;
+        u64 cmd_id;
+        u64 service_name;
+        u64 reserved;
+    } *raw;
+
+    raw = serviceIpcPrepareHeader(&g_smSrv, &c, sizeof(*raw));
+
+    raw->magic = SFCI_MAGIC;
+    raw->cmd_id = 3;
+    raw->service_name = smEncodeName(name);
+
+    Result rc = serviceIpcDispatch(&g_smSrv);
+
+    if (R_SUCCEEDED(rc)) {
+        IpcParsedCommand r;
+
+        struct {
+            u64 magic;
+            u64 result;
+        } *resp;
+        serviceIpcParse(&g_smSrv, &r, sizeof(*resp));
+
+        resp = r.Raw;
+        rc = resp->result;
+    }
+
+    return rc;
+}
