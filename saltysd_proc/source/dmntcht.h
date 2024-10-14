@@ -24,9 +24,7 @@ extern "C" {
 Result dmntchtInitialize(void);
 void dmntchtExit(void);
 
-Result dmntchtHasCheatProcess(bool *out);
 Result dmntchtForceOpenCheatProcess(void);
-Result dmntchtForceCloseCheatProcess(void);
 
 #ifdef __cplusplus
 }
