@@ -12,6 +12,7 @@
 
 #include "loadelf.h"
 #include "useful.h"
+#include "dmntcht.h"
 
 #define MODULE_SALTYSD 420
 
@@ -34,6 +35,7 @@ uint8_t refreshRate = 0;
 s64 lastAppPID = -1;
 bool isOLED = false;
 bool isErista = false;
+bool cheatCheck = false;
 
 void __libnx_initheap(void)
 {
@@ -129,6 +131,33 @@ bool GetDisplayRefreshRate(uint32_t* refreshRate) {
     return true;
 }
 
+bool isServiceRunning(const char *serviceName) {	
+	Handle handle;	
+	if (R_FAILED(smRegisterService(&handle, serviceName, false, 1))) 
+		return true;
+	else {
+		svcCloseHandle(handle);	
+		smUnregisterService(serviceName);
+		return false;
+	}
+}
+
+bool isCheatsFolderInstalled() {
+    char romfspath[0x40] = "";
+    bool flag = false;
+
+    snprintf(romfspath, 0x40, "sdmc:/atmosphere/contents/%016lx/cheats", TIDnow);
+
+    DIR* dir = opendir(romfspath);
+    if (dir) {
+        if (readdir(dir))
+            flag = true;
+        closedir(dir);
+    }
+
+    return flag;
+}
+
 void renameCheatsFolder() {
     char cheatspath[0x40] = "";
     char cheatspathtemp[0x40] = "";
@@ -150,7 +179,7 @@ bool isModInstalled() {
     char romfspath[0x40] = "";
     bool flag = false;
 
-    snprintf(romfspath, 0x40, "sdmc:/atmosphere/contents/%016lx/romfs", eventinfo.tid);
+    snprintf(romfspath, 0x40, "sdmc:/atmosphere/contents/%016lx/romfs", TIDnow);
 
     DIR* dir = opendir(romfspath);
     if (dir) {
@@ -352,6 +381,7 @@ void hijack_pid(u64 pid)
     lastAppPID = pid;
     
     free(tids);
+
     return;
 
 abort_bootstrap:
@@ -836,12 +866,7 @@ void serviceThread(void* buf)
             
             svcCloseHandle(session);
         }
-        else if (R_SUCCEEDED(pmdmntInitialize())) {
-            u64 dummy = 0;
-            if (R_FAILED(pmdmntGetApplicationPid(&dummy)))
-                should_terminate = true;
-            pmdmntExit();
-        }
+        else should_terminate = true;
 
         if (should_terminate) break;
         
@@ -933,8 +958,6 @@ int main(int argc, char *argv[])
     fsp_init(toget);
     fsp_getSdCard(toget, &sdcard);
     SaltySD_printf("SaltySD: got SD card dev.\n");
-    smExit();
-    smInitialize();
     FsFileSystem sdcardfs;
     sdcardfs.s.handle = sdcard;
     fsdevMountDevice("sdmc", sdcardfs);
@@ -988,6 +1011,26 @@ int main(int argc, char *argv[])
         }
         
         if (lastAppPID != -1) {
+            if (!cheatCheck) {
+                if (!isCheatsFolderInstalled() || !isServiceRunning("dmnt:cht"))
+                    cheatCheck = true;
+                else {
+                    Handle debug_handle;
+                    if (R_SUCCEEDED(svcDebugActiveProcess(&debug_handle, lastAppPID))) {
+                        u32 thread_count;
+                        u64 threads[2];
+                        svcGetThreadList(&thread_count, threads, 2, debug_handle);
+                        svcCloseHandle(debug_handle);
+                        if (thread_count > 1) {
+                            cheatCheck = true;
+                            dmntchtInitialize();
+                            dmntchtForceOpenCheatProcess();
+                            dmntchtExit();
+                        }
+                    }
+                    else cheatCheck = true;
+                }
+            }
             bool found = false;
             for (int i = num - 1; lastAppPID <= pids[i]; i--)
             {
@@ -999,6 +1042,7 @@ int main(int argc, char *argv[])
             }
             if (!found) {
                 lastAppPID = -1;
+                cheatCheck = false;
                 if (displaySync && !isOLED) {
                     uint32_t temp_refreshRate = 0;
                     if (GetDisplayRefreshRate(&temp_refreshRate) && temp_refreshRate != 60)
@@ -1034,10 +1078,6 @@ int main(int argc, char *argv[])
         svcSleepThread(10*1000*1000);
     }
     free(pids);
-    
-    fsdevUnmountAll();
-    fsExit();
-    smExit();
 
     return 0;
 }
