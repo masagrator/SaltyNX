@@ -20,7 +20,7 @@ u32 __nx_applet_type = AppletType_None;
 void serviceThread(void* buf);
 
 Handle saltyport, sdcard, injectserv;
-static char g_heap[0x80000];
+static char g_heap[0x70000];
 bool should_terminate = false;
 bool already_hijacking = false;
 DebugEventInfo eventinfo;
@@ -158,10 +158,10 @@ bool isCheatsFolderInstalled() {
 }
 
 void renameCheatsFolder() {
-    char cheatspath[0x40] = "";
+    char cheatspath[0x3C] = "";
     char cheatspathtemp[0x40] = "";
 
-    snprintf(cheatspath, 0x40, "sdmc:/atmosphere/contents/%016lx/cheats", TIDnow);
+    snprintf(cheatspath, 0x3C, "sdmc:/atmosphere/contents/%016lx/cheats", TIDnow);
     snprintf(cheatspathtemp, 0x40, "%stemp", cheatspath);
     if (!check) {
         rename(cheatspath, cheatspathtemp);
