@@ -6,7 +6,6 @@
 #include <dirent.h>
 #include <switch_min/kernel/svc_extra.h>
 #include <switch_min/kernel/ipc.h>
-#include "saltysd_bootstrap_elf.h"
 
 #include "spawner_ipc.h"
 
@@ -21,7 +20,7 @@ u32 __nx_applet_type = AppletType_None;
 void serviceThread(void* buf);
 
 Handle saltyport, sdcard, injectserv;
-static char g_heap[0xA0000];
+static char g_heap[0x80000];
 bool should_terminate = false;
 bool already_hijacking = false;
 DebugEventInfo eventinfo;
@@ -209,8 +208,18 @@ void hijack_bootstrap(Handle* debug, u64 pid, u64 tid)
     
     // Load in the ELF
     //svcReadDebugProcessMemory(backup, debug, context.pc.x, 0x1000);
+    FILE* file = fopen("sdmc:/SaltySD/saltysd_bootstrap.elf", "rb");
+    if (!file) {
+        SaltySD_printf("SaltySD: SaltySD/saltysd_bootstrap.elf not found, aborting...\n", ret);
+        svcCloseHandle(*debug);
+        return;
+    }
+    fseek(file, 0, 2);
+    size_t saltysd_bootstrap_elf_size = ftell(file);
+    fseek(file, 0, 0);
     u8* elf = malloc(saltysd_bootstrap_elf_size);
-    memcpy(elf, saltysd_bootstrap_elf, saltysd_bootstrap_elf_size);
+    fread(elf, saltysd_bootstrap_elf_size, 1, file);
+    fclose(file);
     
     uint64_t new_start;
     load_elf_debug(*debug, &new_start, elf, saltysd_bootstrap_elf_size);
