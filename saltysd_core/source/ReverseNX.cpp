@@ -17,6 +17,7 @@ extern "C" {
 	typedef void (*_ZN2nn2oe27GetDefaultDisplayResolutionEPiS1_)(int* width, int* height);
 	typedef void (*_ZN2nn2oe38GetDefaultDisplayResolutionChangeEventEPNS_2os11SystemEventE)(SystemEvent* systemEvent);
 	typedef bool (*nnosTryWaitSystemEvent)(SystemEvent* systemEvent);
+	typedef void (*nnosWaitSystemEvent)(SystemEvent* systemEvent);
 	typedef SystemEvent* (*_ZN2nn2oe27GetNotificationMessageEventEv)();
 	typedef void (*nnosInitializeMultiWaitHolderForSystemEvent)(void* MultiWaitHolderType, SystemEvent* systemEvent);
 	typedef void (*nnosLinkMultiWaitHolder)(void* MultiWaitType, void* MultiWaitHolderType);
@@ -32,6 +33,7 @@ struct {
 	uintptr_t GetDefaultDisplayResolution;
 	uintptr_t GetDefaultDisplayResolutionChangeEvent;
 	uintptr_t TryWaitSystemEvent;
+	uintptr_t WaitSystemEvent;
 	uintptr_t GetNotificationMessageEvent;
 	uintptr_t InitializeMultiWaitHolderForSystemEvent;
 	uintptr_t LinkMultiWaitHolder;
@@ -175,6 +177,19 @@ bool TryWaitSystemEvent(SystemEvent* systemEvent) {
 	return ((nnosTryWaitSystemEvent)(Address_weaks.TryWaitSystemEvent))(systemEvent);
 }
 
+void WaitSystemEvent(SystemEvent* systemEvent) {
+	if (systemEvent == defaultDisplayResolutionChangeEventCopy) {
+		*pluginActive_shared = true;
+		while(true) {
+			bool return_now = TryWaitSystemEvent(systemEvent);
+			if (return_now)
+				return;
+			svcSleepThread(1'000'000);
+		}
+	}
+	return ((nnosWaitSystemEvent)(Address_weaks.WaitSystemEvent))(systemEvent);
+}
+
 /* 
 	Used by Monster Hunter Rise.
 
@@ -234,6 +249,7 @@ extern "C" {
 			Address_weaks.GetDefaultDisplayResolution = SaltySDCore_FindSymbolBuiltin("_ZN2nn2oe27GetDefaultDisplayResolutionEPiS1_");
 			Address_weaks.GetDefaultDisplayResolutionChangeEvent = SaltySDCore_FindSymbolBuiltin("_ZN2nn2oe38GetDefaultDisplayResolutionChangeEventEPNS_2os11SystemEventE");
 			Address_weaks.TryWaitSystemEvent = SaltySDCore_FindSymbolBuiltin("_ZN2nn2os18TryWaitSystemEventEPNS0_15SystemEventTypeE");
+			Address_weaks.WaitSystemEvent = SaltySDCore_FindSymbolBuiltin("_ZN2nn2os15WaitSystemEventEPNS0_15SystemEventTypeE");
 			Address_weaks.GetNotificationMessageEvent = SaltySDCore_FindSymbolBuiltin("_ZN2nn2oe27GetNotificationMessageEventEv");
 			Address_weaks.InitializeMultiWaitHolderForSystemEvent = SaltySDCore_FindSymbolBuiltin("_ZN2nn2os25InitializeMultiWaitHolderEPNS0_19MultiWaitHolderTypeEPNS0_15SystemEventTypeE");
 			Address_weaks.LinkMultiWaitHolder = SaltySDCore_FindSymbolBuiltin("_ZN2nn2os19LinkMultiWaitHolderEPNS0_13MultiWaitTypeEPNS0_19MultiWaitHolderTypeE");
@@ -246,6 +262,7 @@ extern "C" {
 			SaltySDCore_ReplaceImport("_ZN2nn2oe27GetDefaultDisplayResolutionEPiS1_", (void*)GetDefaultDisplayResolution);
 			SaltySDCore_ReplaceImport("_ZN2nn2oe38GetDefaultDisplayResolutionChangeEventEPNS_2os11SystemEventE", (void*)GetDefaultDisplayResolutionChangeEvent);
 			SaltySDCore_ReplaceImport("_ZN2nn2os18TryWaitSystemEventEPNS0_15SystemEventTypeE", (void*)TryWaitSystemEvent);
+			SaltySDCore_ReplaceImport("_ZN2nn2os15WaitSystemEventEPNS0_15SystemEventTypeE", (void*)WaitSystemEvent);
 			SaltySDCore_ReplaceImport("_ZN2nn2oe27GetNotificationMessageEventEv", (void*)GetNotificationMessageEvent);
 			SaltySDCore_ReplaceImport("_ZN2nn2os25InitializeMultiWaitHolderEPNS0_19MultiWaitHolderTypeEPNS0_15SystemEventTypeE", (void*)InitializeMultiWaitHolder);
 			SaltySDCore_ReplaceImport("_ZN2nn2os19LinkMultiWaitHolderEPNS0_13MultiWaitTypeEPNS0_19MultiWaitHolderTypeE", (void*)LinkMultiWaitHolder);
