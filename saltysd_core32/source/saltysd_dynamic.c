@@ -201,17 +201,13 @@ void SaltySDCore_ReplaceModuleImport(void* base, const char* name, void* newfunc
 		char* rel_name = strtab + symtab[sym_idx].st_name;
 		if (strcmp(name, rel_name)) continue;
 		
-		SaltySDCore_printf("SaltySD Core: %x %s to %p, %llx %p\n", rela_idx, rel_name, newfunc, rela->r_offset, base + rela->r_offset);
-		
-		if (!update) {
-			Elf32_Rel replacement = *rela;
-			//replacement.r_addend = rela->r_addend + (uint64_t)newfunc - SaltySDCore_FindSymbolBuiltin(rel_name);
-
-			SaltySD_Memcpy((u64)rela, (u64)&replacement, sizeof(Elf64_Rela));
-		}
-		else {
-			*(void**)(base + rela->r_offset) = newfunc;
-		}
+		SaltySDCore_printf("SaltySD Core: %x %x %x %s to %p, %p + %x = %p\n", symtab[sym_idx].st_value, (uint32_t)rela - (uint32_t)base, rela_idx, rel_name, newfunc, base, rela->r_offset, base + rela->r_offset);
+			
+		Elf32_Rel replacement;
+		replacement.r_offset = rela->r_offset;
+		replacement.r_info = 0x17;
+		SaltySD_Memcpy((u32)rela, (u32)&replacement, sizeof(Elf32_Rel));
+		*(void**)(base + rela->r_offset) = newfunc;
 	}
 }
 
@@ -317,10 +313,6 @@ struct Module {
 void SaltySDCore_fillRoLoadModule() {
 	roLoadModule = SaltySDCore_FindSymbolBuiltin("_ZN2nn2ro10LoadModuleEPNS0_6ModuleEPKvPvmi");
 	return;
-}
-
-bool SaltySDCore_isRelrAvailable() {
-	return relr_available;
 }
 
 void SaltySDCore_getDataForUpdate(uint32_t* num_builtin_elfs_ptr, int32_t* num_replaced_symbols_ptr, struct ReplacedSymbol** replaced_symbols_ptr, void*** builtin_elfs_ptr) {

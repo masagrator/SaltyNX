@@ -3,7 +3,7 @@
 __nx_exit_clear:
     // restore stack pointer
     ldr  r8, =__stack_top
-    mov  sp, r8
+    ldr  sp, [r8]
     
     mov lr, r2
     

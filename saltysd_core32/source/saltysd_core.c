@@ -17,7 +17,7 @@ u32 SaltySDCore_getCodeStart()
 		u32 pageinfo;
 		Result ret = svcQueryMemory(&info, &pageinfo, addr);
 		
-		if (info.addr != (u64)_start && info.perm == Perm_Rx)
+		if (info.addr != (u32)_start && info.perm == Perm_Rx)
 		{
 			addr = info.addr;
 			break;

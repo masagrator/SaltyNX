@@ -221,42 +221,6 @@ void SaltySDCore_LoadPatches (bool Aarch64) {
 	return;
 }
 
-void setupELFHeap(void)
-{
-	void* addr = NULL;
-	Result rc = 0;
-
-	rc = svcSetHeapSize(&addr, ((elf_area_size+0x200000) & 0xffe00000));
-
-	if (rc || addr == NULL)
-	{
-		debug_log("SaltySD Bootstrap: svcSetHeapSize failed with err %lx\n", rc);
-	}
-
-	g_heapAddr = (u64)addr;
-	g_heapSize = ((elf_area_size+0x200000) & 0xffe00000);
-}
-
-u64 find_next_elf_heap()
-{
-	u64 addr = g_heapAddr;
-	while (1)
-	{
-		MemoryInfo info;
-		u32 pageinfo;
-		Result ret = svcQueryMemory(&info, &pageinfo, addr);
-		
-		if (info.perm == Perm_Rw)
-			return info.addr;
-
-		addr = info.addr + info.size;
-		
-		if (!addr || ret) break;
-	}
-	
-	return 0;
-}
-
 extern void _start();
 
 void SaltySDCore_RegisterExistingModules()
@@ -270,13 +234,13 @@ void SaltySDCore_RegisterExistingModules()
 		
 		if (info.perm == Perm_Rx)
 		{
-			SaltySDCore_RegisterModule((void*)info.addr);
-			u32 compaddr = info.addr;
+			SaltySDCore_RegisterModule((void*)((u32)(info.addr)));
+			u32 compaddr = ((u32)(info.addr));
 			if ((u32*)compaddr != (u32*)_start)
-				SaltySDCore_RegisterBuiltinModule((void*)info.addr);
+				SaltySDCore_RegisterBuiltinModule((void*)((u32)(info.addr)));
 		}
 
-		addr = info.addr + info.size;
+		addr = (u32)(info.addr) + (u32)(info.size);
 		
 		if (!addr || ret) break;
 	}
@@ -284,7 +248,7 @@ void SaltySDCore_RegisterExistingModules()
 	return;
 }
 
-Result svcSetHeapSizeIntercept(u64 *out, u64 size)
+Result svcSetHeapSizeIntercept(u32 *out, u64 size)
 {
 	static bool Initialized = false;
 	Result ret = 1;
@@ -303,8 +267,9 @@ Result svcSetHeapSizeIntercept(u64 *out, u64 size)
 	return ret;
 }
 
-Result svcGetInfoIntercept (u64 *out, u64 id0, Handle handle, u64 id1)	
+Result svcGetInfoIntercept (u64 *out, u32 id0, Handle handle, u64 id1)	
 {	
+
 	Result ret = svcGetInfo(out, id0, handle, id1);	
 
 	//SaltySDCore_printf("SaltySD Core: svcGetInfo intercept %p (%llx) %llx %x %llx ret %x\n", out, *out, id0, handle, id1, ret);	
@@ -320,12 +285,12 @@ Result svcGetInfoIntercept (u64 *out, u64 id0, Handle handle, u64 id1)
 void SaltySDCore_PatchSVCs()
 {
 	Result ret;
-	static u8 orig_1[0x8] = {0xE0, 0x0F, 0x1F, 0xF8, 0x21, 0x00, 0x00, 0xD4}; //STR [sp, #-0x10]!; SVC #0x1
-	static u8 orig_2[0x8] = {0xE0, 0x0F, 0x1F, 0xF8, 0x21, 0x05, 0x00, 0xD4}; //STR [sp, #-0x10]!; SVC #0x29
-	const u8 nop[0x4] = {0x1F, 0x20, 0x03, 0xD5}; // NOP
-	static u8 patch[0x10] = {0x44, 0x00, 0x00, 0x58, 0x80, 0x00, 0x1F, 0xD6, 0x0F, 0xF0, 0x0F, 0xF0, 0x0F, 0xF0, 0x0F, 0xF0}; // LDR X4 #8; BR X4; ADRP X15, #0x1FE03000; ADRP X15, #0x1FE03000
+	static u8 orig_1[0x8] = {0x04, 0x00, 0x2D, 0xE5, 0x01, 0x00, 0x00, 0xEF}; //PUSH {r0}; SVC #0x1
+	static u8 orig_2[0x10] = {0x04, 0x00, 0x2D, 0xE5, 0x04, 0x00, 0x9D, 0xE5, 0x08, 0x30, 0x9D, 0xE5, 0x29, 0x00, 0x00, 0xEF}; //PUSH {R0}; LDR r0, [sp, #4]; LDR r3, [sp, #8]; SVC 0x29
+	const u8 nop[0x4] = {0x00, 0xF0, 0x20, 0xE3}; // NOP
+	static u8 patch[0x8] = {0x04, 0xF0, 0x1F, 0xE5, 0xDE, 0xAD, 0xBE, 0xEF}; // LDR pc, [pc, #-4]; 0xDEADBEEF
 	u64 dst_1 = SaltySDCore_findCode(orig_1, 8);
-	u64 dst_2 = SaltySDCore_findCode(orig_2, 8);
+	u64 dst_2 = SaltySDCore_findCode(orig_2, 16);
 	
 	if (!dst_1 || !dst_2)
 	{
@@ -333,7 +298,7 @@ void SaltySDCore_PatchSVCs()
 		return;
 	}
 
-	*(u64*)&patch[8] = (u64)svcSetHeapSizeIntercept;
+	*(u32*)&patch[4] = (u32)svcSetHeapSizeIntercept;
 	if (dst_1 & 4)
 	{
 		ret = SaltySD_Memcpy(dst_1, (u64)nop, 0x4);
@@ -343,16 +308,16 @@ void SaltySDCore_PatchSVCs()
 		}
 		else
 		{
-			ret = SaltySD_Memcpy(dst_1+4, (u64)patch, 0x10);
+			ret = SaltySD_Memcpy(dst_1+4, (u64)patch, 8);
 		}
 	}
 	else
 	{
-		ret = SaltySD_Memcpy(dst_1, (u64)patch, 0x10);
+		ret = SaltySD_Memcpy(dst_1, (u64)patch, 8);
 	}
 	if (ret) debug_log("svcSetHeapSize memcpy failed!\n");
 	
-	*(u64*)&patch[8] = (u64)svcGetInfoIntercept;	
+	*(u32*)&patch[4] = (u32)svcGetInfoIntercept;	
 	if (dst_2 & 4)	
 	{	
 		ret = SaltySD_Memcpy(dst_2, (u64)nop, 0x4);	
@@ -362,12 +327,12 @@ void SaltySDCore_PatchSVCs()
 		}	
 		else	
 		{	
-			ret = SaltySD_Memcpy(dst_2+4, (u64)patch, 0x10);	
+			ret = SaltySD_Memcpy(dst_2+4, (u64)patch, 8);	
 		}	
 	}	
 	else	
 	{	
-		ret = SaltySD_Memcpy(dst_2, (u64)patch, 0x10);	
+		ret = SaltySD_Memcpy(dst_2, (u64)patch, 8);	
 	}	
 	if (ret) debug_log("svcSetHeapSize memcpy failed!\n");
 }
@@ -400,20 +365,19 @@ int main(int argc, char *argv[])
 {
 	Result ret;
 
-	debug_log("SaltySD Core: waddup\n");
 	SaltySDCore_RegisterExistingModules();
 	
 	SaltySD_Init();
 
-	SaltySDCore_printf("SaltySD Core: restoring code...\n");
 	ret = SaltySD_Restore();
 	if (ret) goto fail;
 	
+
 	ret = SaltySD_GetSDCard(&sdcard);
 	if (ret) goto fail;
 
 	SaltySDCore_PatchSVCs();
-	SaltySDCore_LoadPatches(true);
+	SaltySDCore_LoadPatches(false);
 
 	SaltySDCore_fillRoLoadModule();
 	SaltySDCore_ReplaceImport("_ZN2nn2ro10LoadModuleEPNS0_6ModuleEPKvPvmi", (void*)LoadModule);
@@ -435,17 +399,7 @@ int main(int argc, char *argv[])
 
 			uint64_t titid = 0;
 			svcGetInfo(&titid, 18, CUR_PROCESS_HANDLE, 0);
-
-			if (tid == 0x01008CF01BAAC000) {
-				SaltySDCore_printf("SaltySD Core: Detected \"The Legend of Zelda: Echoes of Wisdom\", disabling ReverseNX-RT...\n", ret);
-			}
-			else ReverseNX(&_sharedmemory);
-
-			if (SaltySDCore_isRelrAvailable()) {
-				SaltySDCore_printf("SaltySD Core: Game is using RELR. Applying hacky solution.\n", ret);
-				Address_weak_QueryMemoryInfo = SaltySDCore_FindSymbolBuiltin("_ZN2nn2os15QueryMemoryInfoEPNS0_10MemoryInfoE");
-				SaltySDCore_ReplaceImport("_ZN2nn2os15QueryMemoryInfoEPNS0_10MemoryInfoE", (void*)QueryMemoryInfo);
-			}
+			ReverseNX(&_sharedmemory);
 		}
 		else {
 			SaltySDCore_printf("SaltySD Core: shmemMap failed: 0x%lX\n", shmemMapRc);
@@ -454,6 +408,12 @@ int main(int argc, char *argv[])
 
 	ret = SaltySD_Deinit();
 	if (ret) goto fail;
+
+	/*
+	for (size_t i = INT32_MAX; i > 0; i--) {
+		svcSleepThread(i);
+	}
+	*/
 
 	__libnx_exit(0);
 

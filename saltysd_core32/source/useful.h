@@ -23,9 +23,7 @@ void SaltySDCore_printf(const char* format, ...)
 	vsnprintf(buffer, 256, format, args);
 	va_end(args);
 	
-	svcOutputDebugString(buffer, strlen(buffer));
-	
-	FILE* f = fopen("sdmc:/SaltySD/saltysd_core.log", "ab");
+	FILE* f = fopen("sdmc:/SaltySD/saltysd_core32.log", "ab");
 	if (f)
 	{
 		fwrite(buffer, strlen(buffer), 1, f);

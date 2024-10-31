@@ -39,20 +39,22 @@ EXEFS_SRC	:=	exefs_src
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
-ARCH	:=	-march=armv8-a -mtune=cortex-a57 -mtp=soft -fPIE -fno-plt -s
+ARCH_DEBUG		:=	-march=armv8-a -mtune=cortex-a57 -mtp=soft -fPIE -fno-plt
+ARCH			:=	-march=armv8-a -mtune=cortex-a57 -mtp=soft -fPIE -fno-plt -s
 
-CFLAGS	:=	-Wall -Wno-pointer-to-int-cast -O2 \
-			-ffast-math \
-			$(ARCH) $(DEFINES)
+CFLAGS			:=	-Wall -Wno-pointer-to-int-cast -O2 \
+					-ffast-math \
+					$(ARCH) $(DEFINES)
 
-CFLAGS	+=	$(INCLUDE) -DSWITCH
+CFLAGS			+=	$(INCLUDE) -DSWITCH
 
-CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++23
+CXXFLAGS		:= $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++23
 
-ASFLAGS	:=	-g $(ARCH)
-LDFLAGS	=	-specs=$(CURDIR)/../libnx32_min/nx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
+ASFLAGS			:=	-g $(ARCH)
+LDFLAGS_DEBUG	=	-specs=$(CURDIR)/../libnx32_min/nx/switch.specs -g $(ARCH_DEBUG) -Wl,-Map,$(notdir $*.map)
+LDFLAGS			=	-specs=$(CURDIR)/../libnx32_min/nx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
 
-LIBS	:= -lnx_min
+LIBS			:= -lnx_min
 
 #---------------------------------Wpointer-to-int-cast-------------------------------------------------
 # list of directories containing libraries, this must be the top level containing
@@ -142,13 +144,14 @@ $(BUILD):
 	@[ -d $@ ] || mkdir -p $@
 	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
 	@echo linking $(notdir $@)
-	@$(LD) $(LDFLAGS) $(OFILES2) $(LIBPATHS) $(LIBS) -o saltysd_core32.elf
+	@$(LD) $(LDFLAGS) $(OFILES2) $(LIBPATHS) $(LIBS) -o $(TARGET).elf
+	@$(LD) $(LDFLAGS_DEBUG) $(OFILES2) $(LIBPATHS) $(LIBS) -o $(TARGET)-debug.elf
 	@$(NM) -CSn $@ > $(notdir $*.lst)
 
 #---------------------------------------------------------------------------------
 clean:
 	@echo clean ...
-	@rm -fr $(BUILD) $(TARGET).pfs0 $(TARGET).nso $(TARGET).nro $(TARGET).nsp $(TARGET).nacp $(TARGET).elf
+	@rm -fr $(BUILD) $(TARGET).pfs0 $(TARGET).nso $(TARGET).nro $(TARGET).nsp $(TARGET).nacp $(TARGET).elf $(TARGET)-debug.elf .lst .map
 
 
 #---------------------------------------------------------------------------------

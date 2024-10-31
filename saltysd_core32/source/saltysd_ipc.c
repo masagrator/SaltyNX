@@ -236,7 +236,6 @@ Result SaltySD_GetSDCard(Handle *retrieve)
 		
 		if (!ret)
 		{
-			SaltySDCore_printf("SaltySD Core: got SD card handle %x\n", r.Handles[0]);
 			*retrieve = r.Handles[0];
 			
 			// Init fs stuff
@@ -244,6 +243,7 @@ Result SaltySD_GetSDCard(Handle *retrieve)
 			sdcardfs.s.handle = *retrieve;
 			int dev = fsdevMountDevice("sdmc", sdcardfs);
 			setDefaultDevice(dev);
+			SaltySDCore_printf("SaltySD Core: got SD card handle %x\n", r.Handles[0]);
 		}
 	}
 	
@@ -289,7 +289,7 @@ Result SaltySD_print(char* out)
 	return ret;
 }
 
-Result SaltySD_CheckIfSharedMemoryAvailable(ptrdiff_t *new_offset, u64 new_size)
+Result SaltySD_CheckIfSharedMemoryAvailable(ptrdiff_t *new_offset, u32 new_size)
 {
 	Result ret = 0;
 
@@ -443,7 +443,7 @@ u64 SaltySD_GetBID()
 
 		uint64_t rett = resp->result;
 		if (rett) {
-			SaltySDCore_printf("SaltySD Core: BID: %016lX\n", rett);
+			SaltySDCore_printf("SaltySD Core: BID: %016llX\n", rett);
 			return rett;
 		}
 		else {
