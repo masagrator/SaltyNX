@@ -156,7 +156,7 @@ $(BUILD):
 #---------------------------------------------------------------------------------
 clean:
 	@echo clean ...
-	@rm -fr $(BUILD) $(TARGET).pfs0 $(TARGET).nso $(TARGET).nro $(TARGET).nsp $(TARGET).nacp $(TARGET).elf $(TARGET)-debug.elf .lst .map
+	@rm -fr $(BUILD) $(TARGET).pfs0 $(TARGET).nso $(TARGET).nro $(TARGET).nsp $(TARGET).nacp $(TARGET)_3k.elf $(TARGET)_5k.elf $(TARGET)_3k-debug.elf $(TARGET)_5k-debug.elf .lst .map
 
 
 #---------------------------------------------------------------------------------
