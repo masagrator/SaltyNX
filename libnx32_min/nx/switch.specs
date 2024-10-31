@@ -1,7 +1,7 @@
 %rename link                old_link
 
 *link:
-%(old_link) -T ./switch.ld -pie --gc-sections -z notext -z nodynamic-undefined-weak --build-id=sha1
+%(old_link) -T ./switch.ld -pie --gc-sections -z notext --build-id=sha1
 
 *startfile:
 crti%O%s crtbegin%O%s
