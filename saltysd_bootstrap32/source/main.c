@@ -95,8 +95,8 @@ Result saltySDLoadELF(Handle salt, u32 heap, u32* elf_addr, u32* elf_size, char*
 	return ret;
 }
 
-u32 g_heapAddr;
-size_t g_heapSize;
+u32 g_heapAddr = 0;
+size_t g_heapSize = 0;
 
 void setupAppHeap(void)
 {
@@ -105,8 +105,10 @@ void setupAppHeap(void)
 
 	rc = svcSetHeapSize(&addr, 0x200000);
 
-	g_heapAddr = (u32)addr;
-	g_heapSize = 0x200000;
+	if (R_SUCCEEDED(rc)) {
+		g_heapAddr = (u32)addr;
+		g_heapSize = 0x200000;
+	}
 }
 
 Result rc_check = 0;

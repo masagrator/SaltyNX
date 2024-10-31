@@ -51,12 +51,6 @@ SECTIONS
 	.gcc_except_table : ONLY_IF_RO { *(.gcc_except_table .gcc_except_table.*) } :code
 	.gnu_extab        : ONLY_IF_RO { *(.gnu_extab*) } : rodata
 
-	.dynamic		   : { *(.dynamic) } :dyn
-	.dynsym			: { *(.dynsym) } :dyn
-	.dynstr			: { *(.dynstr) } :dyn
-	.rela.dyn		  : { *(.rela.*) } :dyn
-	.interp			: { *(.interp) } :dyn
-	.hash			  : { *(.hash) } :dyn
 	.gnu.hash		  : { *(.gnu.hash) } :dyn
 	.gnu.version	   : { *(.gnu.version) } :dyn
 	.gnu.version_d	 : { *(.gnu.version_d) } :dyn

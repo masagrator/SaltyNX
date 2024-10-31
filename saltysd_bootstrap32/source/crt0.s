@@ -36,9 +36,8 @@ bss_loop:
     bne  bss_loop
 
     // store stack pointer
-    mov  r1, sp
     ldr  r0, =__stack_top
-    str  r1, [r0]
+	str  sp, [r0]
 
     // initialize system
     mov  r0, r10
@@ -58,9 +57,8 @@ bss_loop:
 .type   __nx_exit, %function
 __nx_exit:
     // restore stack pointer
-    ldr r8, =__stack_top
-    ldr  r8, [r8]
-    mov  sp, r8
+    ldr  r8, =__stack_top
+	ldr  sp, [r8]
 
     // jump back to loader
     bx   r2
