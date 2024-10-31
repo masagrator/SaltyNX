@@ -43,7 +43,8 @@ sdcard_out/atmosphere/contents/0000000000534C56/exefs.nsp: saltysd_core/saltysd_
 	@cp saltysd_core32/saltysd_core32.elf sdcard_out/SaltySD/saltysd_core32.elf
 	@cp saltysd_core/saltysd_core.elf sdcard_out/SaltySD/saltysd_core.elf
 	@cp saltysd_bootstrap/saltysd_bootstrap.elf sdcard_out/SaltySD/saltysd_bootstrap.elf
-	@cp saltysd_bootstrap32/saltysd_bootstrap32.elf sdcard_out/SaltySD/saltysd_bootstrap32.elf
+	@cp saltysd_bootstrap32/saltysd_bootstrap32_3k.elf sdcard_out/SaltySD/saltysd_bootstrap32_3k.elf
+	@cp saltysd_bootstrap32/saltysd_bootstrap32_5k.elf sdcard_out/SaltySD/saltysd_bootstrap32_5k.elf
 	@cp saltysd_proc/saltysd_proc.nsp sdcard_out/atmosphere/contents/0000000000534C56/exefs.nsp
 
 clean:
