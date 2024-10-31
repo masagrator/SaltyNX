@@ -147,6 +147,7 @@ $(BUILD):
 	@$(LD) $(LDFLAGS) $(OFILES2) $(LIBPATHS) $(LIBS) -o $(TARGET).elf
 	@$(LD) $(LDFLAGS_DEBUG) $(OFILES2) $(LIBPATHS) $(LIBS) -o $(TARGET)-debug.elf
 	@$(NM) -CSn $@ > $(notdir $*.lst)
+	@echo As long as elf was generated, ignore all errors above :)
 
 #---------------------------------------------------------------------------------
 clean:
