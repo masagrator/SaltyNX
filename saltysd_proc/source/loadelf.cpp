@@ -228,9 +228,6 @@ Result load_elf32_proc(Handle proc, uint64_t pid, uint32_t heap, uint32_t* start
 	ret = svcDebugActiveProcess(&debug, pid);
 	if (ret) return ret;
 
-	MemoryInfo memory_info = {0};
-	u32 pageinfo;
-
 	for (auto seg : elf.get_segments())
 	{
 		ret = svcWriteDebugProcessMemory(debug, seg.data, heap + seg.phdr->p_vaddr, seg.phdr->p_filesz);
