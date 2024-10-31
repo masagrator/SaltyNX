@@ -208,27 +208,25 @@ bool hijack_bootstrap(Handle* debug, u64 pid, u64 tid, bool isA64)
     
     // Load in the ELF
     //svcReadDebugProcessMemory(backup, debug, context.pc.x, 0x1000);
-    FILE* file = 0;
-    if (isA64)
-        file = fopen("sdmc:/SaltySD/saltysd_bootstrap.elf", "rb");
-    else file = fopen("sdmc:/SaltySD/saltysd_bootstrap32.elf", "rb");
-    if (!file) {
-        if (isA64) SaltySD_printf("SaltySD: SaltySD/saltysd_bootstrap.elf not found, aborting...\n", ret);
-        else SaltySD_printf("SaltySD: SaltySD/saltysd_bootstrap32.elf not found, aborting...\n", ret);
-        svcCloseHandle(*debug);
-        return false;
-    }
-    fseek(file, 0, 2);
-    size_t saltysd_bootstrap_elf_size = ftell(file);
-    fseek(file, 0, 0);
-    u8* elf = malloc(saltysd_bootstrap_elf_size);
-    fread(elf, saltysd_bootstrap_elf_size, 1, file);
-    fclose(file);
-    
     uint64_t new_start;
-    if (isA64) load_elf_debug(*debug, &new_start, elf, saltysd_bootstrap_elf_size);
-    else load_elf32_debug(*debug, &new_start, elf, saltysd_bootstrap_elf_size);
-    free(elf);
+    if (isA64) {
+        FILE* file = 0;
+        file = fopen("sdmc:/SaltySD/saltysd_bootstrap.elf", "rb");
+        if (!file) {
+            SaltySD_printf("SaltySD: SaltySD/saltysd_bootstrap.elf not found, aborting...\n", ret);
+            svcCloseHandle(*debug);
+            return false;
+        }
+        fseek(file, 0, 2);
+        size_t saltysd_bootstrap_elf_size = ftell(file);
+        fseek(file, 0, 0);
+        u8* elf = malloc(saltysd_bootstrap_elf_size);
+        fread(elf, saltysd_bootstrap_elf_size, 1, file);
+        fclose(file);
+        load_elf_debug(*debug, &new_start, elf, saltysd_bootstrap_elf_size);
+        free(elf);
+    }
+    else load_elf32_debug(*debug, &new_start);
 
     // Set new PC
     context.pc.x = new_start;

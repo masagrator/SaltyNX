@@ -66,9 +66,49 @@ Result load_elf_debug(Handle debug, uint64_t* start, uint8_t* elf_data, u32 elf_
 	return ret;
 }
 
-Result load_elf32_debug(Handle debug, uint64_t* start, uint8_t* elf_data, u32 elf_size)
+Result load_elf32_debug(Handle debug, uint64_t* start)
 {
 	Result ret = 0;
+	text_addr = find_memory(debug, 0, 1000, Perm_Rx);
+	data_addr = find_memory(debug, text_addr, 1000, Perm_Rw);
+	ptrdiff_t offset = data_addr - text_addr;
+
+	FILE* file = 0;
+	uint8_t* elf_data = 0;
+	u32 elf_size = 0;
+	
+	switch(offset) {
+		case 0x3000: {
+			file = fopen("sdmc:/SaltySD/saltysd_bootstrap32_3k.elf", "rb");
+			if (!file) {
+				SaltySD_printf("SaltySD: SaltySD/saltysd_bootstrap32_3k.elf not found, aborting...\n", ret);
+				svcCloseHandle(debug);
+				return false;
+			}
+			break;
+		}
+		case 0x5000: {
+			file = fopen("sdmc:/SaltySD/saltysd_bootstrap32_5k.elf", "rb");
+			if (!file) {
+				SaltySD_printf("SaltySD: SaltySD/saltysd_bootstrap32_5k.elf not found, aborting...\n", ret);
+				svcCloseHandle(debug);
+				return false;
+			}
+			break;
+		}
+		default: {
+				SaltySD_printf("SaltySD: Detected rtld text-data offset 0x%lx, not supported...\n", offset);
+				svcCloseHandle(debug);
+				return false;			
+		}
+	}
+
+	fseek(file, 0, 2);
+	elf_size = ftell(file);
+	fseek(file, 0, 0);
+	elf_data = (uint8_t*)malloc(elf_size);
+	fread(elf_data, elf_size, 1, file);
+	fclose(file);
 
 	elf32_parser::Elf32_parser elf(elf_data);
 
@@ -95,6 +135,8 @@ Result load_elf32_debug(Handle debug, uint64_t* start, uint8_t* elf_data, u32 el
 	ret = svcWriteDebugProcessMemory(debug, text_seg.data, text_addr, text_fsize);
 	ret = svcWriteDebugProcessMemory(debug, data_seg.data, data_addr, data_fsize);
 	
+	free(elf_data);
+
 	return ret;
 }
 
