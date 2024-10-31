@@ -1,7 +1,4 @@
-# Nintendo Switch AArch64-only userland library.
-Based on libctru.
+# Nintendo Switch AArch32-only userland library.
+Based on libnx and libctru.
 
-[![Build status](https://doozer.io/badge/switchbrew/libnx/buildstatus/master)](https://doozer.io/switchbrew/libnx)
-
-# Install instructions
-See [Switchbrew](https://switchbrew.org/wiki/Setting_up_Development_Environment).
+Don't use it outside of SaltyNX, internal relocations are broken
