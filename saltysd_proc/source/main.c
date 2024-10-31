@@ -190,7 +190,7 @@ bool isModInstalled() {
     return flag;
 }
 
-void hijack_bootstrap(Handle* debug, u64 pid, u64 tid, bool isA64)
+bool hijack_bootstrap(Handle* debug, u64 pid, u64 tid, bool isA64)
 {
     ThreadContext context;
     Result ret;
@@ -203,7 +203,7 @@ void hijack_bootstrap(Handle* debug, u64 pid, u64 tid, bool isA64)
         SaltySD_printf("SaltySD: svcGetDebugThreadContext returned %x, aborting...\n", ret);
         
         svcCloseHandle(*debug);
-        return;
+        return false;
     }
     
     // Load in the ELF
@@ -216,7 +216,7 @@ void hijack_bootstrap(Handle* debug, u64 pid, u64 tid, bool isA64)
         if (isA64) SaltySD_printf("SaltySD: SaltySD/saltysd_bootstrap.elf not found, aborting...\n", ret);
         else SaltySD_printf("SaltySD: SaltySD/saltysd_bootstrap32.elf not found, aborting...\n", ret);
         svcCloseHandle(*debug);
-        return;
+        return false;
     }
     fseek(file, 0, 2);
     size_t saltysd_bootstrap_elf_size = ftell(file);
@@ -239,6 +239,8 @@ void hijack_bootstrap(Handle* debug, u64 pid, u64 tid, bool isA64)
     }
      
     svcCloseHandle(*debug);
+    if (ret) return false;
+    else return true;
 }
 
 void hijack_pid(u64 pid)
@@ -387,8 +389,13 @@ void hijack_pid(u64 pid)
     while (!threads);
     renameCheatsFolder();
     
-    hijack_bootstrap(&debug, pid, tids[0], isA64);
-    lastAppPID = pid;
+    if (hijack_bootstrap(&debug, pid, tids[0], isA64)) {
+        lastAppPID = pid;
+    }
+    else {
+        already_hijacking = false;
+        disable = 0;
+    }
     
     free(tids);
 
@@ -477,7 +484,8 @@ Result handleServiceCmd(int cmd)
         if (elf_data && elf_size) {
             if (!arm32)
                 ret = load_elf_proc(proc, r.Pid, heap, &new_start, &new_size, elf_data, elf_size);
-            else ret = load_elf32_proc(proc, r.Pid, heap, (u32*)&new_start, (u32*)&new_size, elf_data, elf_size);
+            else ret = load_elf32_proc(proc, r.Pid, (u32)heap, (u32*)&new_start, (u32*)&new_size, elf_data, elf_size);
+            if (ret) SaltySD_printf("Load_elf arm32: %d, ret: 0x%x\n", arm32, ret);
         }
         else
             ret = MAKERESULT(MODULE_SALTYSD, 1);
@@ -545,8 +553,6 @@ Result handleServiceCmd(int cmd)
         to = resp->to;
         from = resp->from;
         size = resp->size;
-
-        SaltySD_printf("SaltySD: cmd 3 handler, memcpy(%llx, %llx, %llx)\n", to, from, size);
         
         Handle debug;
         ret = svcDebugActiveProcess(&debug, r.Pid);
@@ -575,17 +581,20 @@ Result handleServiceCmd(int cmd)
         raw->magic = SFCO_MAGIC;
         raw->result = ret;
 
+        SaltySD_printf("SaltySD: cmd 3 handler, memcpy(%llx, %llx, %llx)\n", to, from, size);
+
         return 0;
     }
     else if (cmd == 4) // GetSDCard
     {		
-        SaltySD_printf("SaltySD: cmd 4 handler\n");
-
         ipcSendHandleCopy(&c, sdcard);
+
+        SaltySD_printf("SaltySD: cmd 4 handler\n"); 
     }
     else if (cmd == 5) // Log
     {
         SaltySD_printf("SaltySD: cmd 5 handler\n");
+
         IpcParsedCommand r = {0};
         ipcParse(&r);
 

@@ -177,7 +177,7 @@ class Elf32_parser {
 		std::vector<relocation_t> get_relocations();
 		uint8_t *get_memory_map();
 		
-		void relocate(uint32_t text_addr, uint32_t data_addr);
+		void relocate(uint32_t text_addr, uint32_t data_addr, uint32_t read_addr);
 		
 	private:
 		void load_memory_map();

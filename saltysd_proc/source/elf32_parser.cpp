@@ -105,7 +105,6 @@ std::vector<symbol_t> Elf32_parser::get_symbols() {
 			if(sec.section_type == "SHT_DYNSYM")
 				symbol.symbol_name = std::string(sh_dynstr_p + syms_data[i].st_name);
 			
-			SaltySD_printf("32bit symbol %lli: name: %s,\n", i, symbol.symbol_name.c_str());
 			symbols.push_back(symbol);
 		}
 	}
@@ -246,18 +245,24 @@ std::string Elf32_parser::get_segment_flags(uint32_t &seg_flags) {
 
 #define PG(x) (x & ~0xFFF)
 
-void Elf32_parser::relocate(uint32_t text_addr, uint32_t data_addr)
+void Elf32_parser::relocate(uint32_t text_addr, uint32_t data_addr, uint32_t read_addr)
 {
 	auto segs = get_segments();
 	uint8_t* RX_segment = 0;
 	uint8_t* RW_segment = 0;
+	uint8_t* RO_segment = 0;
 	uint32_t data_offset = 0;
+	uint32_t read_offset = 0;
 	for (auto seg: segs) {
 		SaltySD_printf("Segment %s, flags: %s, addr: %p, vaddr: %x\n", seg.segment_type.c_str(), seg.segment_flags.c_str(), seg.data, seg.phdr -> p_vaddr);
 		if (!RX_segment && seg.segment_flags == "RE") {
 			RX_segment = seg.data;
 		}
-		if (!RW_segment && seg.segment_flags == "RW") {
+		else if (!RO_segment && seg.segment_flags == "R") {
+			RO_segment = seg.data;
+			read_offset = seg.phdr -> p_vaddr;
+		}
+		else if (!RW_segment && seg.segment_flags == "RW") {
 			RW_segment = seg.data;
 			data_offset = seg.phdr -> p_vaddr;
 			break;
@@ -265,7 +270,9 @@ void Elf32_parser::relocate(uint32_t text_addr, uint32_t data_addr)
 	}
 
 	ptrdiff_t data_physical_offset = RW_segment - RX_segment;
-	ptrdiff_t virt_phys_diff = data_offset - data_physical_offset;
+	ptrdiff_t read_physical_offset = RO_segment - RX_segment;
+	ptrdiff_t data_virt_phys_diff = data_offset - data_physical_offset;
+	ptrdiff_t read_virt_phys_diff = read_offset - read_physical_offset;
 
 	for (auto rel : get_relocations())
 	{
@@ -279,14 +286,13 @@ void Elf32_parser::relocate(uint32_t text_addr, uint32_t data_addr)
 		}
 		else if (type == R_ARM_RELATIVE) {
 			if (rel.rel->r_offset >= data_offset) {
-				SaltySD_printf("32bit ARM_REL data_addr: %x, text_addr: %x, value: %x\n", data_addr, text_addr, *(uint32_t*)(RX_segment + rel.rel->r_offset - virt_phys_diff));
-				*(uint32_t*)(RX_segment + rel.rel->r_offset - virt_phys_diff) += text_addr;
-				SaltySD_printf("32bit ARM_REL after value: %x\n", *(uint32_t*)(RX_segment + rel.rel->r_offset - virt_phys_diff));
+				*(uint32_t*)(RX_segment + rel.rel->r_offset - data_virt_phys_diff) += text_addr;
+			}
+			else if (read_addr && rel.rel->r_offset >= read_offset) {
+				*(uint32_t*)(RX_segment + rel.rel->r_offset - read_virt_phys_diff) += text_addr;
 			}
 			else {
-				SaltySD_printf("32bit ARM_REL data_addr: %x, text_addr: %x, value: %x\n", data_addr, text_addr, *(uint32_t*)(RX_segment + rel.rel->r_offset));
 				*(uint32_t*)(RX_segment + rel.rel->r_offset) += text_addr;
-				SaltySD_printf("32bit ARM_REL after value: %x\n", *(uint32_t*)(RX_segment + rel.rel->r_offset));
 			}
 		}
 		else SaltySD_printf("32bit UNK_REL: 0x%x\n", type);

@@ -82,7 +82,7 @@ Result load_elf32_debug(Handle debug, uint64_t* start, uint8_t* elf_data, u32 el
 	data_msize = data_seg.phdr->p_memsz;
 	SaltySD_printf("32bit .text to %llx, .data to %llx\n", text_addr, data_addr);
 	
-	elf.relocate(text_addr, data_addr);
+	elf.relocate(text_addr, data_addr, 0);
 	
 	*start = text_addr;
 	
@@ -228,6 +228,9 @@ Result load_elf32_proc(Handle proc, uint64_t pid, uint32_t heap, uint32_t* start
 	ret = svcDebugActiveProcess(&debug, pid);
 	if (ret) return ret;
 
+	MemoryInfo memory_info = {0};
+	u32 pageinfo;
+
 	for (auto seg : elf.get_segments())
 	{
 		ret = svcWriteDebugProcessMemory(debug, seg.data, heap + seg.phdr->p_vaddr, seg.phdr->p_filesz);
@@ -242,9 +245,9 @@ Result load_elf32_proc(Handle proc, uint64_t pid, uint32_t heap, uint32_t* start
 	u32 load_addr;
 	SaltySD_printf("SaltySD: Search for size %llx\n", (max_vaddr - min_vaddr));
 	do
-	{
+	{	
 		randomGet(&load_addr, 4);
-		load_addr &= 0xFFFFF000ull;
+		load_addr &= 0xFFFF000ul;
 		ret = svcMapProcessCodeMemory(proc, load_addr, heap, (max_vaddr - min_vaddr));
 	}
 	while (ret == 0xDC01 || ret == 0xD401);
@@ -252,6 +255,8 @@ Result load_elf32_proc(Handle proc, uint64_t pid, uint32_t heap, uint32_t* start
 	
 	SaltySD_printf("SaltySD: Found free address space at %llx, size %llx\n", load_addr, (max_vaddr - min_vaddr));
 	
+	uint32_t data_addr = 0;
+	uint32_t read_addr = 0;
 	// Adjust permissions and then return
 	for (auto seg : elf.get_segments())
 	{
@@ -272,9 +277,27 @@ Result load_elf32_proc(Handle proc, uint64_t pid, uint32_t heap, uint32_t* start
 			}
 		}
 
+		if (perms == Perm_Rw && !data_addr) {
+			data_addr = load_addr + seg.phdr->p_vaddr;
+		}
+		else if (perms == Perm_R && !read_addr) {
+			read_addr = load_addr + seg.phdr->p_vaddr;
+		}
 		svcSetProcessMemoryPermission(proc, load_addr + seg.phdr->p_vaddr, (seg.phdr->p_memsz + 0xFFF) & ~0xFFF, perms);
 	}
-	
+
+	elf.relocate(load_addr, data_addr, read_addr);
+
+	ret = svcDebugActiveProcess(&debug, pid);
+	if (ret) return ret;
+
+	for (auto seg : elf.get_segments())
+	{
+		ret = svcWriteDebugProcessMemory(debug, seg.data, load_addr + seg.phdr->p_vaddr, seg.phdr->p_filesz);
+		if (ret) break;
+	}
+	svcCloseHandle(debug);
+
 	*start = load_addr;
 	*total_size = (max_vaddr - min_vaddr);
 	
