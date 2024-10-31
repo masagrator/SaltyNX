@@ -284,10 +284,8 @@ Result svcGetInfoIntercept (u64 *out, u32 id0, Handle handle, u64 id1)
 
 void SaltySDCore_PatchSVCs()
 {
-	Result ret;
 	static u8 orig_1[0x8] = {0x04, 0x00, 0x2D, 0xE5, 0x01, 0x00, 0x00, 0xEF}; //PUSH {r0}; SVC #0x1
 	static u8 orig_2[0x10] = {0x04, 0x00, 0x2D, 0xE5, 0x04, 0x00, 0x9D, 0xE5, 0x08, 0x30, 0x9D, 0xE5, 0x29, 0x00, 0x00, 0xEF}; //PUSH {R0}; LDR r0, [sp, #4]; LDR r3, [sp, #8]; SVC 0x29
-	const u8 nop[0x4] = {0x00, 0xF0, 0x20, 0xE3}; // NOP
 	static u8 patch[0x8] = {0x04, 0xF0, 0x1F, 0xE5, 0xDE, 0xAD, 0xBE, 0xEF}; // LDR pc, [pc, #-4]; 0xDEADBEEF
 	u64 dst_1 = SaltySDCore_findCode(orig_1, 8);
 	u64 dst_2 = SaltySDCore_findCode(orig_2, 16);
@@ -299,42 +297,9 @@ void SaltySDCore_PatchSVCs()
 	}
 
 	*(u32*)&patch[4] = (u32)svcSetHeapSizeIntercept;
-	if (dst_1 & 4)
-	{
-		ret = SaltySD_Memcpy(dst_1, (u64)nop, 0x4);
-		if (ret)
-		{
-			debug_log("svcSetHeapSize memcpy failed!\n");
-		}
-		else
-		{
-			ret = SaltySD_Memcpy(dst_1+4, (u64)patch, 8);
-		}
-	}
-	else
-	{
-		ret = SaltySD_Memcpy(dst_1, (u64)patch, 8);
-	}
-	if (ret) debug_log("svcSetHeapSize memcpy failed!\n");
-	
-	*(u32*)&patch[4] = (u32)svcGetInfoIntercept;	
-	if (dst_2 & 4)	
-	{	
-		ret = SaltySD_Memcpy(dst_2, (u64)nop, 0x4);	
-		if (ret)	
-		{	
-			debug_log("svcSetHeapSize memcpy failed!\n");	
-		}	
-		else	
-		{	
-			ret = SaltySD_Memcpy(dst_2+4, (u64)patch, 8);	
-		}	
-	}	
-	else	
-	{	
-		ret = SaltySD_Memcpy(dst_2, (u64)patch, 8);	
-	}	
-	if (ret) debug_log("svcSetHeapSize memcpy failed!\n");
+	SaltySD_Memcpy(dst_1, (u64)patch, 8);
+	*(u32*)&patch[4] = (u32)svcGetInfoIntercept;
+	SaltySD_Memcpy(dst_2, (u64)patch, 8);		
 }
 
 typedef void (*nnosQueryMemoryInfo)(void* memoryinfo);
