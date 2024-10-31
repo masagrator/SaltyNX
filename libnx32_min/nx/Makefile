@@ -33,7 +33,7 @@ INCLUDES	:=	include external/bsd/include
 #---------------------------------------------------------------------------------
 ARCH	:=	-march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIC -ftls-model=local-exec
 
-CFLAGS	:=	-g -Wall \
+CFLAGS	:=	-g -Wall -Wno-pointer-to-int-cast \
 			-ffunction-sections \
 			-fdata-sections \
 			$(ARCH) \
