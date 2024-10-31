@@ -1,6 +1,4 @@
 #include <elf.h>
-#define DT_RELR		35
-#define DT_RELRSZ	36
 #define DT_RELRENT	37
 typedef Elf64_Xword Elf64_Relr;
 
