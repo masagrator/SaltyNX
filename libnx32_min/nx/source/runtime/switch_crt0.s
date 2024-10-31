@@ -22,33 +22,26 @@ startup:
     b bssclr_start
 
 bssclr_start:
-    mov r12, r7
-    mov r11, r5
-    mov r10, r4
+    mov  r12, r7
+    mov  r11, r5
+    mov  r10, r4
 
     // clear .bss
-    ldr r0, =__bss_start__
-    ldr r1, =__bss_end__
+    ldr  r0, =__bss_start__
+    ldr  r1, =__bss_end__
     sub  r1, r1, r0  // calculate size
     add  r1, r1, #7  // round up to 8
     bic  r1, r1, #7
 
 bss_loop:
-	mov r2, #0
-    str  r2, [r0]
-	add r0, r0, #8
-    subs r1, r1, #8
+	mov  r2, #0
+    str  r2, [r0]!
+    subs r1, r1, #4
     bne  bss_loop
 
     // store stack pointer
-    mov  r1, sp
     ldr  r0, =__stack_top
-    str  r1, [r0]
-
-    // process .dynamic section
-    mov  r0, r6
-    ldr r1, =_DYNAMIC
-    blx   __nx_dynamic
+	str  sp, [r0]
 
     // initialize system
     mov  r0, r10
@@ -57,20 +50,19 @@ bss_loop:
     blx   __libnx_init
 
     // call entrypoint
-	ldr r0, =__system_argc // argc
+	ldr  r0, =__system_argc // argc
     ldr  r0, [r0]
-    ldr r1, =__system_argv // argv
+    ldr  r1, =__system_argv // argv
     ldr  r1, [r1]
-    ldr lr, =exit
+    ldr  lr, =exit
     b    main
 
 .global __nx_exit
 .type   __nx_exit, %function
 __nx_exit:
     // restore stack pointer
-    ldr r8, =__stack_top
-    ldr  r8, [r8]
-    mov  sp, r8
+    ldr  r8, =__stack_top
+	ldr  sp, [r8]
 
     // jump back to loader
     bx   r1

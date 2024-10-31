@@ -101,13 +101,13 @@ typedef struct
 static bool fsdev_initialised = false;
 static s32 fsdev_fsdevice_default = -1;
 static s32 fsdev_fsdevice_cwd = -1;
-static __thread Result fsdev_last_result = 0;
+static Result fsdev_last_result = 0;
 static fsdev_fsdevice fsdev_fsdevices[32];
 
 /*! @endcond */
 
 static char     __cwd[PATH_MAX+1] = "/";
-static __thread char     __fixedpath[PATH_MAX+1];
+static char     __fixedpath[PATH_MAX+1];
 
 static fsdev_fsdevice *fsdevFindDevice(const char *name)
 {
@@ -733,7 +733,7 @@ fsdev_write_safe(struct _reent *r,
   /* Copy to internal buffer and transfer in chunks.
    * You cannot use FS read/write with certain memory.
    */
-  static __thread char tmp_buffer[8192];
+  char tmp_buffer[8192];
   while(len > 0)
   {
     size_t toWrite = len;
@@ -838,7 +838,7 @@ fsdev_read_safe(struct _reent *r,
   /* Transfer in chunks with internal buffer.
    * You cannot use FS read/write with certain memory.
    */
-  static __thread char tmp_buffer[8192];
+  char tmp_buffer[8192];
   while(len > 0)
   {
     size_t toRead = len;

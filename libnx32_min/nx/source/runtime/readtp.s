@@ -4,6 +4,6 @@
 	.align 2
 	.cfi_startproc
 __aeabi_read_tp:
-	mcr p15, 0, r0, c13, c0, 3
+	mrc p15, 0, r0, c13, c0, 3
 	bx lr
 	.cfi_endproc

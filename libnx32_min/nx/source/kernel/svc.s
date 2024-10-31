@@ -41,7 +41,7 @@ SVC_BEGIN svcUnmapMemory
 SVC_END
 
 SVC_BEGIN svcQueryMemory
-	push {r0}
+	push {r1}
 	svc 0x6
 	ldr r2, [sp]
 	str r1, [r2]
@@ -55,11 +55,14 @@ SVC_BEGIN svcExitProcess
 SVC_END
 
 SVC_BEGIN svcCreateThread
-	push {r0}
+	push {r0,r4}
+	ldr r0, [sp, #8]
+	ldr r4, [sp, #0xc]
 	svc 0x8
 	ldr r2, [sp]
 	str r1, [r2]
 	add sp, sp, #4
+	pop {r4}
 	bx lr
 SVC_END
 
@@ -143,6 +146,8 @@ SVC_END
 
 SVC_BEGIN svcWaitSynchronization
 	push {r0}
+	ldr r0, [sp, #4]
+	ldr r3, [sp, #8]
 	svc 0x18
 	ldr r2, [sp]
 	str r1, [r2]
@@ -166,7 +171,11 @@ SVC_BEGIN svcArbitrateUnlock
 SVC_END
 
 SVC_BEGIN svcWaitProcessWideKeyAtomic
+	push {r4}
+	ldr r3, [sp, #4]
+	ldr r4, [sp, #8]
 	svc 0x1C
+	pop {r4}
 	bx lr
 SVC_END
 
@@ -211,8 +220,9 @@ SVC_END
 SVC_BEGIN svcGetProcessId
 	push {r0}
 	svc 0x24
-	ldr r2, [sp]
-	str r1, [r2]
+	ldr r3, [sp]
+	str r1, [r3]
+	str r2, [r3, #4]
 	add sp, sp, #4
 	bx lr
 SVC_END
@@ -220,8 +230,9 @@ SVC_END
 SVC_BEGIN svcGetThreadId
 	push {r0}
 	svc 0x25
-	ldr r2, [sp]
-	str r1, [r2]
+	ldr r3, [sp]
+	str r1, [r3]
+	str r2, [r3, #4]
 	add sp, sp, #4
 	bx lr
 SVC_END
@@ -243,9 +254,12 @@ SVC_END
 
 SVC_BEGIN svcGetInfo
 	push {r0}
+	ldr r0, [sp, #4]
+	ldr r3, [sp, #8]
 	svc 0x29
-	ldr r2, [sp]
-	str r1, [r2]
+	ldr r3, [sp]
+	str r1, [r3]
+	str r2, [r3, #4]
 	add sp, sp, #4
 	bx lr
 SVC_END
@@ -263,8 +277,9 @@ SVC_END
 SVC_BEGIN svcGetResourceLimitLimitValue
 	push {r0}
 	svc 0x30
-	ldr r2, [sp]
-	str r1, [r2]
+	ldr r3, [sp]
+	str r1, [r3]
+	str r2, [r3, #4]
 	add sp, sp, #4
 	bx lr
 SVC_END
@@ -272,8 +287,9 @@ SVC_END
 SVC_BEGIN svcGetResourceLimitCurrentValue
 	push {r0}
 	svc 0x31
-	ldr r2, [sp]
-	str r1, [r2]
+	ldr r3, [sp]
+	str r1, [r3]
+	str r2, [r3, #4]
 	add sp, sp, #4
 	bx lr
 SVC_END
@@ -298,20 +314,28 @@ SVC_BEGIN svcAcceptSession
 SVC_END
 
 SVC_BEGIN svcReplyAndReceive
-	push {r0}
+	push {r0, r4}
+	ldr r1, [sp, #4]
+	ldr r4, [sp, #8]
 	svc 0x43
 	ldr r2, [sp]
 	str r1, [r2]
 	add sp, sp, #4
+	pop {r4}
 	bx lr
 SVC_END
 
 SVC_BEGIN svcReplyAndReceiveWithUserBuffer
-	push {r0}
+	push {r0, r4-r6}
+	ldr r0, [sp, #0x10]
+	ldr r4, [sp, #0x14]
+	ldr r5, [sp, #0x18]
+	ldr r6, [sp, #0x1c]
 	svc 0x44
 	ldr r2, [sp]
 	str r1, [r2]
 	add sp, sp, #4
+	pop {r4-r6}
 	bx lr
 SVC_END
 
@@ -346,6 +370,8 @@ SVC_END
 
 SVC_BEGIN svcReadWriteRegister
 	push {r0}
+	ldr r0, [sp, #4]
+	ldr r1, [sp, #8]
 	svc 0x4E
 	ldr r2, [sp]
 	str r1, [r2]
@@ -382,6 +408,7 @@ SVC_END
 
 SVC_BEGIN svcLegacyQueryIoMapping
 	push {r0}
+	ldr r0, [sp, #4]
 	svc 0x55
 	ldr r2, [sp]
 	str r1, [r2]
@@ -391,6 +418,8 @@ SVC_END
 
 SVC_BEGIN svcCreateDeviceAddressSpace
 	push {r0}
+	ldr r0, [sp, #4]
+	ldr r1, [sp, #8]
 	svc 0x56
 	ldr r2, [sp]
 	str r1, [r2]
@@ -409,17 +438,34 @@ SVC_BEGIN svcDetachDeviceAddressSpace
 SVC_END
 
 SVC_BEGIN svcMapDeviceAddressSpaceByForce
+	push {r4-r7}
+	ldr r4, [sp, #0x10]
+	ldr r5, [sp, #0x18]
+	ldr r6, [sp, #0x1c]
+	ldr r7, [sp, #0x20]
 	svc 0x59
+	pop {r4-r7}
 	bx lr
 SVC_END
 
 SVC_BEGIN svcMapDeviceAddressSpaceAligned
+	push {r4-r7}
+	ldr r4, [sp, #0x10]
+	ldr r5, [sp, #0x18]
+	ldr r6, [sp, #0x1c]
+	ldr r7, [sp, #0x20]
 	svc 0x5A
+	pop {r4-r7}
 	bx lr
 SVC_END
 
 SVC_BEGIN svcUnmapDeviceAddressSpace
+	push {r4-r6}
+	ldr r4, [sp, #0xc]
+	ldr r5, [sp, #0x14]
+	ldr r6, [sp, #0x18]
 	svc 0x5C
+	pop {r4-r6}
 	bx lr
 SVC_END
 
@@ -476,17 +522,24 @@ SVC_BEGIN svcGetThreadList
 SVC_END
 
 SVC_BEGIN svcGetDebugThreadContext
+	push {r4}
+	ldr r4, [sp, #4]
 	svc 0x67
+	pop {r4}
 	bx lr
 SVC_END
 
 SVC_BEGIN svcSetDebugThreadContext
+	PUSH {r4}
+	ldr r1, [sp, #4]
+	ldr r4, [sp, #8]
 	svc 0x68
+	pop {r4}
 	bx lr
 SVC_END
 
 SVC_BEGIN svcQueryDebugProcessMemory
-	push {r0}
+	push {r1}
 	svc 0x69
 	ldr r2, [sp]
 	str r1, [r2]
@@ -532,22 +585,35 @@ SVC_BEGIN svcConnectToPort
 SVC_END
 
 SVC_BEGIN svcSetProcessMemoryPermission
+	push {r4, r5}
+	ldr r1, [sp, #8]
+	ldr r4, [sp, #0xc]
+	ldr r5, [sp, #0x10]
 	svc 0x73
+	pop {r4, r5}
 	bx lr
 SVC_END
 
 SVC_BEGIN svcMapProcessMemory
+	push {r4}
+	ldr r4, [sp, #4]
 	svc 0x74
+	pop {r4}
 	bx lr
 SVC_END
 
 SVC_BEGIN svcUnmapProcessMemory
+	push {r4}
+	ldr r4, [sp, #4]
 	svc 0x75
+	pop {r4}
 	bx lr
 SVC_END
 
 SVC_BEGIN svcQueryProcessMemory
-	push {r0}
+	push {r1}
+	ldr r1, [sp, #4]
+	ldr r3, [sp, #8]
 	svc 0x76
 	ldr r2, [sp]
 	str r1, [r2]
@@ -556,12 +622,24 @@ SVC_BEGIN svcQueryProcessMemory
 SVC_END
 
 SVC_BEGIN svcMapProcessCodeMemory
+	push {r4-r6}
+	ldr r1, [sp, #0xc]
+	ldr r4, [sp, #0x10]
+	ldr r5, [sp, #0x14]
+	ldr r6, [sp, #0x18]
 	svc 0x77
+	pop {r4-r6}
 	bx lr
 SVC_END
 
 SVC_BEGIN svcUnmapProcessCodeMemory
+	push {r4-r6}
+	ldr r1, [sp, #0xc]
+	ldr r4, [sp, #0x10]
+	ldr r5, [sp, #0x14]
+	ldr r6, [sp, #0x18]
 	svc 0x78
+	pop {r4-r6}
 	bx lr
 SVC_END
 
@@ -575,7 +653,11 @@ SVC_BEGIN svcCreateProcess
 SVC_END
 
 SVC_BEGIN svcStartProcess
+	push {r4}
+	ldr r3, [sp, #4]
+	ldr r4, [sp, #8]
 	svc 0x7A
+	pop {r4}
 	bx lr
 SVC_END
 
@@ -587,8 +669,9 @@ SVC_END
 SVC_BEGIN svcGetProcessInfo
 	push {r0}
 	svc 0x7C
-	ldr r2, [sp]
-	str r1, [r2]
+	ldr r3, [sp]
+	str r1, [r3]
+	str r2, [r3, #4]
 	add sp, sp, #4
 	bx lr
 SVC_END
