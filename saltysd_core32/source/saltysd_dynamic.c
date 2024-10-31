@@ -1,8 +1,4 @@
 #include <elf.h>
-#define DT_RELR		35
-#define DT_RELRSZ	36
-#define DT_RELRENT	37
-typedef Elf64_Xword Elf64_Relr;
 
 #include <switch_min.h>
 #include <stdlib.h>
@@ -64,10 +60,6 @@ uint32_t SaltySDCore_GetSymbolAddr(void* base, const char* name)
 				strtab = (const char*)(base + dyn->d_un.d_ptr);
 				break;
 			case DT_RELA:
-				break;
-			case DT_RELR:
-				break;
-			case DT_RELRSZ:
 				break;
 			case DT_RELASZ:
 				break;
@@ -149,11 +141,6 @@ void SaltySDCore_ReplaceModuleImport(void* base, const char* name, void* newfunc
 				break;
 			case DT_REL:
 				rela = (const Elf32_Rel*)(base + dyn->d_un.d_ptr);
-				break;
-			case DT_RELR:
-				relr_available = true;
-				break;
-			case DT_RELRSZ:
 				break;
 			case DT_RELSZ:
 				relasz += dyn->d_un.d_val / sizeof(Elf32_Rel);
@@ -248,11 +235,6 @@ void SaltySDCore_DynamicLinkModule(void* base)
 				break;
 			case DT_RELSZ:
 				relsz += dyn->d_un.d_val / sizeof(Elf32_Rel);
-				break;
-			case DT_RELR:
-				relr_available = true;
-				break;
-			case DT_RELRSZ:
 				break;
 			case DT_PLTRELSZ:
 				relsz += dyn->d_un.d_val / sizeof(Elf32_Rel);
