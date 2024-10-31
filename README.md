@@ -6,8 +6,8 @@ Created by: https://github.com/shinyquagsire23
 
 This fork includes many QoL improvements and beside plugins support also supports patches. 
 
-Since 0.7.0 version NX-FPS and ReverseNX-RT are an intergral part of SaltyNX Core.
-Since 1.0.0 32-bit games are supported (plugins are not supported for them).
+Since 0.7.0 version NX-FPS and ReverseNX-RT are an intergral part of SaltyNX Core.<br>
+Since 1.0.0 32-bit games are supported (plugins are not supported for them).<br>
 To use ReverseNX-RT download newest overlay from [HERE](https://github.com/masagrator/ReverseNX-RT/releases)
 
 ![GitHub all releases](https://img.shields.io/github/downloads/masagrator/SaltyNX/total?style=for-the-badge)
@@ -91,6 +91,6 @@ Remember to restart Switch
 | World of Goo | plugins | No support |
 | YouTube | plugins | Unknown |
 
-Titles other than 32-bit are added to exceptions.txt which is treated as Black list, you can find it in root of repo. SaltyNX reads it from SaltySD folder. `X` at the beginning of titleid means that this game will not load any patches and plugins. `R` at the beginning of titleid means that this game will not load any patches and plugins if romfs mod for this game is installed.
+Titles in exceptions.txt are treated as part of Blacklist, you can find it in root of repo. SaltyNX reads it from SaltySD folder. `X` at the beginning of titleid means that this game will not load any patches and plugins. `R` at the beginning of titleid means that this game will not load any patches and plugins if romfs mod for this game is installed.
 
-32-bit games are ignored by default for patches and plugins.
+32-bit games are ignored by default for plugins.
