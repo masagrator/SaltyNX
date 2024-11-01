@@ -72,11 +72,11 @@ u64  g_heapAddr;
 size_t g_heapSize;
 
 void SaltySDCore_LoadPatches (bool Aarch64) {
-	char* tmp4 = malloc(0x100);
-	char* tmp2 = malloc(0x100);
+	char tmp4[256] = "";
+	char tmp2[256] = "";
+	char instr[256] = "";
 	DIR *d;
 	struct dirent *dir;
-	char* instr;
 	
 	SaltySDCore_printf("SaltySD Patcher: Searching patches in dir '/'...\n");
 	
@@ -88,58 +88,31 @@ void SaltySDCore_LoadPatches (bool Aarch64) {
 		while ((dir = readdir(d)) != NULL)
 		{
 			char *dot = strrchr(dir->d_name, '.');
-			if (Aarch64 == true) {
-				if (dot && !strcmp(dot, ".asm64")) {
-					snprintf(tmp2, 0x100, "%s%s", tmp4, dir->d_name);
-					SaltySDCore_printf("SaltySD Patcher: Found %s\n", dir->d_name);
-					FILE* patch = fopen(tmp2, "rb");
-					fseek(patch, 0, SEEK_END);
-					uint32_t size = ftell(patch);
-					fseek(patch, 0, SEEK_SET);
-					//Test if filesize is valid
-					float val = (float)size;
-					val = val / 4;
-					uint32_t trunc = (uint32_t)val;
-					if ((float)trunc != val) {
-						fclose(patch);
-						SaltySDCore_printf("%s doesn't have valid filesize...\n", tmp2);
-						break;
-					}
-					fread(&instr, 4, trunc, patch);
+			if (dot && !strcmp(dot, ".asm64")) {
+				snprintf(tmp2, 0x100, "%s%s", tmp4, dir->d_name);
+				SaltySDCore_printf("SaltySD Patcher: Found %s\n", dir->d_name);
+				FILE* patch = fopen(tmp2, "rb");
+				fseek(patch, 0, SEEK_END);
+				uint32_t size = ftell(patch);
+				fseek(patch, 0, SEEK_SET);
+				//Test if filesize is valid
+				if (size % 4 != 0) {
 					fclose(patch);
-					char* filename = dir->d_name;
-					uint8_t namelen = strlen(filename);
-					filename[namelen - 6] = 0;
-					uint64_t position = SaltySDCore_FindSymbol(filename);
-					SaltySDCore_printf("SaltySD Patcher: Symbol Position: %016llx\n", position);
-					SaltySD_Memcpy(position, (uint64_t)&instr, 4*trunc);
+					SaltySDCore_printf("%s doesn't have valid filesize...\n", tmp2);
+					break;
 				}
-			}
-			else {
-				if (dot && !strcmp(dot, ".asm32")) {
-					snprintf(tmp2, 0x100, "%s%s", tmp4, dir->d_name);
-					SaltySDCore_printf("SaltySD Patcher: Found %s\n", dir->d_name);
-					FILE* patch = fopen(tmp2, "rb");
-					fseek(patch, 0, SEEK_END);
-					uint32_t size = ftell(patch);
-					fseek(patch, 0, SEEK_SET);
-					//Test if filesize is valid
-					float val = (float)size;
-					val = val / 4;
-					uint32_t trunc = (uint32_t)val;
-					if ((float)trunc != val) {
-						fclose(patch);
-						SaltySDCore_printf("%s doesn't have valid filesize...\n", tmp2);
-						break;
-					}
-					fread(&instr, 4, trunc, patch);
-					fclose(patch);
-					char* filename = dir->d_name;
-					uint8_t namelen = strlen(filename);
-					filename[namelen - 6] = 0;
-					uint64_t position = SaltySDCore_FindSymbol(filename);
-					SaltySDCore_printf("SaltySD Patcher: Symbol Position: %0l6llx$$$\n", position);
-					SaltySD_Memcpy(position, (uint64_t)&instr, 4*trunc);
+				fread(&instr, 1, size, patch);
+				fclose(patch);
+				char* filename = dir->d_name;
+				uint8_t namelen = strlen(filename);
+				filename[namelen - 6] = 0;
+				uint64_t position = SaltySDCore_FindSymbol(filename);
+				if (position) {
+					SaltySDCore_printf("SaltySD Patcher: Symbol Position: %016llx\n", position);
+					SaltySD_Memcpy(position, (uint64_t)instr, size);
+				}
+				else {
+					SaltySDCore_printf("SaltySD Patcher: Symbol Position: not found\n", position);
 				}
 			}
 		}
@@ -158,65 +131,36 @@ void SaltySDCore_LoadPatches (bool Aarch64) {
 		while ((dir = readdir(d)) != NULL)
 		{
 			char *dot = strrchr(dir->d_name, '.');
-			if (Aarch64 == true) {
-				if (dot && !strcmp(dot, ".asm64")) {
-					snprintf(tmp2, 0x100, "%s%s", tmp4, dir->d_name);
-					SaltySDCore_printf("SaltySD Patcher: Found %s\n", dir->d_name);
-					FILE* patch = fopen(tmp2, "rb");
-					fseek(patch, 0, SEEK_END);
-					uint32_t size = ftell(patch);
-					fseek(patch, 0, SEEK_SET);
-					//Test if filesize is valid
-					float val = (float)size;
-					val = val / 4;
-					uint32_t trunc = (uint32_t)val;
-					if ((float)trunc != val) {
-						fclose(patch);
-						SaltySDCore_printf("%s doesn't have valid filesize...\n", tmp2);
-						break;
-					}
-					fread(&instr, 4, trunc, patch);
+			if (dot && !strcmp(dot, ".asm64")) {
+				snprintf(tmp2, 0x100, "%s%s", tmp4, dir->d_name);
+				SaltySDCore_printf("SaltySD Patcher: Found %s\n", dir->d_name);
+				FILE* patch = fopen(tmp2, "rb");
+				fseek(patch, 0, SEEK_END);
+				uint32_t size = ftell(patch);
+				fseek(patch, 0, SEEK_SET);
+				//Test if filesize is valid
+				if (size % 4 != 0) {
 					fclose(patch);
-					char* filename = dir->d_name;
-					uint8_t namelen = strlen(filename);
-					filename[namelen - 6] = 0;
-					uint64_t position = SaltySDCore_FindSymbol(filename);
-					SaltySDCore_printf("SaltySD Patcher: Symbol Position: %016llx\n", position);
-					SaltySD_Memcpy(position, (uint64_t)&instr, 4*trunc);
+					SaltySDCore_printf("%s doesn't have valid filesize...\n", tmp2);
+					break;
 				}
-			}
-			else {
-				if (dot && !strcmp(dot, ".asm32")) {
-					snprintf(tmp2, 0x100, "%s%s", tmp4, dir->d_name);
-					SaltySDCore_printf("SaltySD Patcher: Found %s\n", dir->d_name);
-					FILE* patch = fopen(tmp2, "rb");
-					fseek(patch, 0, SEEK_END);
-					uint32_t size = ftell(patch);
-					fseek(patch, 0, SEEK_SET);
-					//Test if filesize is valid
-					float val = (float)size;
-					val = val / 4;
-					uint32_t trunc = (uint32_t)val;
-					if ((float)trunc != val) {
-						fclose(patch);
-						SaltySDCore_printf("%s doesn't have valid filesize...\n", tmp2);
-						break;
-					}
-					fread(&instr, 4, trunc, patch);
-					fclose(patch);
-					char* filename = dir->d_name;
-					uint8_t namelen = strlen(filename);
-					filename[namelen - 6] = 0;
-					uint64_t position = SaltySDCore_FindSymbol(filename);
-					SaltySDCore_printf("SaltySD Patcher: Symbol Position: %0l6llx$$$\n", position);
-					SaltySD_Memcpy(position, (uint64_t)&instr, 4*trunc);
+				fread(&instr, 1, size, patch);
+				fclose(patch);
+				char* filename = dir->d_name;
+				uint8_t namelen = strlen(filename);
+				filename[namelen - 6] = 0;
+				uint64_t position = SaltySDCore_FindSymbol(filename);
+				if (position) {
+					SaltySDCore_printf("SaltySD Patcher: Symbol Position: %016llx\n", position);
+					SaltySD_Memcpy(position, (uint64_t)instr, size);
+				}
+				else {
+					SaltySDCore_printf("SaltySD Patcher: Symbol Position: not found\n", position);
 				}
 			}
 		}
 		closedir(d);
 	}
-	free(tmp4);
-	free(tmp2);
 	
 	return;
 }
