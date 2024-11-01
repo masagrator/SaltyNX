@@ -265,7 +265,7 @@ uint32_t vulkanSwap2 (const void* VkQueue_T, const void* VkPresentInfoKHR) {
 	}
 	
 
-	if ((FPStiming && !LOCK::blockDelayFPS && (*(Shared.displaySync) == FPSlock || (*(Shared.displaySync) == 0 && (FPSlock == 60 || FPSlock == 30)))) || FPStimingoverride) {
+	if ((FPStiming && !LOCK::blockDelayFPS && (!*(Shared.displaySync) || *(Shared.FPSlocked) < *(Shared.displaySync))) || FPStimingoverride) {
 		uint64_t tick = 0;
 		((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))(&tick);
 		if ((tick - frameend) < (FPStimingoverride ? FPStimingoverride : FPStiming)) {
@@ -283,7 +283,7 @@ uint32_t vulkanSwap2 (const void* VkQueue_T, const void* VkPresentInfoKHR) {
 	frameavg = ((9*frameavg) + framedelta) / 10;
 	Stats.FPSavg = systemtickfrequency / (float)frameavg;
 
-	if (FPSlock_delayed && FPStiming) {
+	if ((FPSlock_delayed && FPStiming) || FPStimingoverride) {
 		if (Stats.FPSavg > ((float)FPSlock)) {
 			if (range < 200) {
 				FPStiming += 20;
@@ -294,6 +294,16 @@ uint32_t vulkanSwap2 (const void* VkQueue_T, const void* VkPresentInfoKHR) {
 			if (range > 0) {
 				FPStiming -= 20;
 				range--;
+			}
+		}
+		if (Stats.FPSavg > LOCK::overwriteRefreshRate) {
+			if (rangeoverride < 200) {
+				rangeoverride++;
+			}
+		}
+		else if ((std::lround(Stats.FPSavg) == LOCK::overwriteRefreshRate) && (Stats.FPSavg <  LOCK::overwriteRefreshRate)) {
+			if (rangeoverride > 0) {
+				rangeoverride--;
 			}
 		}
 	}
@@ -369,7 +379,7 @@ uint32_t vulkanSwap (const void* VkQueue, const void* VkPresentInfoKHR) {
 	}
 	
 
-	if ((FPStiming && !LOCK::blockDelayFPS && (*(Shared.displaySync) == FPSlock || (*(Shared.displaySync) == 0 && (FPSlock == 60 || FPSlock == 30)))) || FPStimingoverride) {
+	if ((FPStiming && !LOCK::blockDelayFPS && (!*(Shared.displaySync) || *(Shared.FPSlocked) < *(Shared.displaySync))) || FPStimingoverride) {
 		uint64_t tick = 0;
 		((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))(&tick);
 		if ((tick - frameend) < (FPStimingoverride ? FPStimingoverride : FPStiming)) {
@@ -387,7 +397,7 @@ uint32_t vulkanSwap (const void* VkQueue, const void* VkPresentInfoKHR) {
 	frameavg = ((9*frameavg) + framedelta) / 10;
 	Stats.FPSavg = systemtickfrequency / (float)frameavg;
 
-	if (FPSlock_delayed && FPStiming) {
+	if ((FPSlock_delayed && FPStiming) || FPStimingoverride) {
 		if (Stats.FPSavg > ((float)FPSlock)) {
 			if (range < 200) {
 				FPStiming += 20;
@@ -525,8 +535,8 @@ int eglSwap (const void* EGLDisplay, const void* EGLSurface) {
 			FPStimingoverride += 20 * rangeoverride;
 		}
 	}
-	
-	if ((FPStiming && !LOCK::blockDelayFPS && (*(Shared.displaySync) == FPSlock || (*(Shared.displaySync) == 0 && (FPSlock == 60 || FPSlock == 30)))) || FPStimingoverride) {
+
+	if ((FPStiming && !LOCK::blockDelayFPS && (!*(Shared.displaySync) || *(Shared.FPSlocked) < *(Shared.displaySync))) || FPStimingoverride) {
 		uint64_t tick = 0;
 		((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))(&tick);
 		if ((tick - frameend) < (FPStimingoverride ? FPStimingoverride : FPStiming)) {
@@ -544,7 +554,7 @@ int eglSwap (const void* EGLDisplay, const void* EGLSurface) {
 	frameavg = ((9*frameavg) + framedelta) / 10;
 	Stats.FPSavg = systemtickfrequency / (float)frameavg;
 
-	if (FPSlock_delayed && FPStiming) {
+	if ((FPSlock_delayed && FPStiming) || FPStimingoverride) {
 		if (Stats.FPSavg > ((float)FPSlock)) {
 			if (range < 200) {
 				FPStiming += 20;
@@ -595,7 +605,7 @@ int eglSwap (const void* EGLDisplay, const void* EGLSurface) {
 	*(Shared.FPSavg) = Stats.FPSavg;
 	*(Shared.pluginActive) = true;
 
-	if (FPSlock != *(Shared.FPSlocked) || (FPSlock && !FPStiming)) {
+	if ((FPSlock != *(Shared.FPSlocked)) || (FPSlock && !FPStiming) || (*(Shared.FPSlocked) > 30 && *(Shared.FPSmode) > 1)) {
 		changeFPS = true;
 		changedFPS = false;
 		if (*(Shared.FPSlocked) == 0) {
