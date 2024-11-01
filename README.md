@@ -71,15 +71,15 @@ Remember to restart Switch
 | Luigi's Mansion 3 | plugins | Heap related |
 | Mario Kart 8 Deluxe | plugins | 32-bit game, not supported |
 | Mario Strikers: Battle League | plugins | Heap related |
-| Megadimension Neptunia VII | all | 32-bit game, not supported |
+| Megadimension Neptunia VII | plugins | 32-bit game, not supported |
 | Moero Chronicle Hyper | plugins | 32-bit game, not supported |
 | Moero Crystal H | plugins | 32-bit game, not supported |
-| Monster Hunter Generations Ultimate | all | 32-bit game, not supported |
+| Monster Hunter Generations Ultimate | plugins | 32-bit game, not supported |
 | New Super Mario Bros. U Deluxe | plugins | 32-bit game, not supported |
 | Ni no Kuni: Wrath of the White Witch | plugins | 32-bit game, not supported |
 | Olympic Games Tokyo 2020 – The Official Video Game™ | plugins | Heap related |
 | Pikmin 3 Deluxe | plugins | 32-bit game, not supported |
-| Planescape: Torment and Icewind Dale | all | 32-bit game, not supported |
+| Planescape: Torment and Icewind Dale | plugins | 32-bit game, not supported |
 | Plants vs. Zombies: Battle for Neighborville | plugins | Heap related |
 | Radiant Silvergun | plugins | 32-bit game, not supported |
 | Sherlock Holmes and The Hound of The Baskervilles | plugins | 32-bit game, not supported |
