@@ -204,6 +204,19 @@ typedef enum {
     PhysicalMemoryInfo_SystemUnsafe = 3, ///< Memory allocated for unsafe system usage (accessible to devices).
 } PhysicalMemoryInfo;
 
+typedef enum {
+    BreakReason_Panic         = 0,
+    BreakReason_Assert        = 1,
+    BreakReason_User          = 2,
+    BreakReason_PreLoadDll    = 3,
+    BreakReason_PostLoadDll   = 4,
+    BreakReason_PreUnloadDll  = 5,
+    BreakReason_PostUnloadDll = 6,
+    BreakReason_CppException  = 7,
+
+    BreakReason_NotificationOnlyFlag = 0x80000000,
+} BreakReason;
+
 ///@name Memory management
 ///@{
 
@@ -214,7 +227,7 @@ typedef enum {
  * @return Result code.
  * @note Syscall number 0x00.
  */
-Result svcSetHeapSize(void** out_addr, u32 size);
+Result svcSetHeapSize(void** out_addr, size_t size);
 
 /**
  * @brief Set the memory permissions of a (page-aligned) range of memory.
@@ -226,7 +239,7 @@ Result svcSetHeapSize(void** out_addr, u32 size);
  *         This can be used to move back and forth between Perm_None, Perm_R and Perm_Rw.
  * @note Syscall number 0x01.
  */
-Result svcSetMemoryPermission(void* addr, u32 size, u32 perm);
+Result svcSetMemoryPermission(void* addr, size_t size, u32 perm);
 
 /**
  * @brief Set the memory attributes of a (page-aligned) range of memory.
@@ -238,7 +251,7 @@ Result svcSetMemoryPermission(void* addr, u32 size, u32 perm);
  * @remark See <a href="https://switchbrew.org/wiki/SVC#svcSetMemoryAttribute">switchbrew.org Wiki</a> for more details.
  * @note Syscall number 0x02.
  */
-Result svcSetMemoryAttribute(void* addr, u32 size, u32 val0, u32 val1);
+Result svcSetMemoryAttribute(void* addr, size_t size, u32 val0, u32 val1);
 
 /**
  * @brief Maps a memory range into a different range. Mainly used for adding guard pages around stack.
@@ -249,7 +262,7 @@ Result svcSetMemoryAttribute(void* addr, u32 size, u32 val0, u32 val1);
  * @return Result code.
  * @note Syscall number 0x04.
  */
-Result svcMapMemory(void* dst_addr, void* src_addr, u32 size);
+Result svcMapMemory(void* dst_addr, void* src_addr, size_t size);
 
 /**
  * @brief Unmaps a region that was previously mapped with \ref svcMapMemory.
@@ -259,7 +272,7 @@ Result svcMapMemory(void* dst_addr, void* src_addr, u32 size);
  * @return Result code.
  * @note Syscall number 0x05.
  */
-Result svcUnmapMemory(void* dst_addr, void* src_addr, u32 size);
+Result svcUnmapMemory(void* dst_addr, void* src_addr, size_t size);
 
 /**
  * @brief Query information about an address. Will always fetch the lowest page-aligned mapping that contains the provided address.
@@ -269,7 +282,7 @@ Result svcUnmapMemory(void* dst_addr, void* src_addr, u32 size);
  * @return Result code.
  * @note Syscall number 0x06.
  */
-Result svcQueryMemory(MemoryInfo* meminfo_ptr, u32 *pageinfo, u32 addr);
+Result svcQueryMemory(MemoryInfo* meminfo_ptr, u32* pageinfo, uintptr_t addr);
 
 ///@}
 
@@ -288,7 +301,7 @@ void NORETURN svcExitProcess(void);
  * @return Result code.
  * @note Syscall number 0x08.
  */
-Result svcCreateThread(Handle* out, void* entry, void* arg, void* stack_top, int prio, int cpuid);
+Result svcCreateThread(Handle* out, void* entry, void* arg, void* stack_top, int priority, int cpuid);
 
 /**
  * @brief Starts a freshly created thread.
@@ -315,28 +328,28 @@ void svcSleepThread(s64 nano);
  * @return Result code.
  * @note Syscall number 0x0C.
  */
-Result svcGetThreadPriority(u32* priority, Handle handle);
+Result svcGetThreadPriority(s32* priority, Handle handle);
 
 /**
  * @brief Sets a thread's priority.
  * @return Result code.
  * @note Syscall number 0x0D.
  */
-Result svcSetThreadPriority(Handle handle, u32 priority);
+Result svcSetThreadPriority(Handle handle, s32 priority);
 
 /**
  * @brief Gets a thread's core mask.
  * @return Result code.
  * @note Syscall number 0x0E.
  */
-Result svcGetThreadCoreMask(s32* preferred_core, u32* affinity_mask, Handle handle);
+Result svcGetThreadCoreMask(s32* preferred_core, u64* affinity_mask, Handle handle);
 
 /**
  * @brief Sets a thread's core mask.
  * @return Result code.
  * @note Syscall number 0x0F.
  */
-Result svcSetThreadCoreMask(Handle handle, s32 preferred_core, unsigned long long affinity_mask);
+Result svcSetThreadCoreMask(Handle handle, s32 preferred_core, u64 affinity_mask);
 
 /**
  * @brief Gets the current processor's number.
@@ -428,7 +441,7 @@ Result svcResetSignal(Handle handle);
  * @note \p handleCount must not be greater than \ref MAX_WAIT_OBJECTS. This is a Horizon kernel limitation.
  * @note This is the raw syscall, which can be cancelled by \ref svcCancelSynchronization or other means. \ref waitHandles or \ref waitMultiHandle should normally be used instead.
  */
-Result svcWaitSynchronization(s32* index, const Handle* handles, s32 handleCount, long long timeout);
+Result svcWaitSynchronization(s32* index, const Handle* handles, s32 handleCount, s64 timeout);
 
 /**
  * @brief Waits on a single synchronization object, optionally with a timeout.
@@ -436,7 +449,7 @@ Result svcWaitSynchronization(s32* index, const Handle* handles, s32 handleCount
  * @note Wrapper for \ref svcWaitSynchronization.
  * @note This is the raw syscall, which can be cancelled by \ref svcCancelSynchronization or other means. \ref waitSingleHandle should normally be used instead.
  */
-static inline Result svcWaitSynchronizationSingle(Handle handle, long long timeout) {
+static inline Result svcWaitSynchronizationSingle(Handle handle, s64 timeout) {
     s32 tmp;
     return svcWaitSynchronization(&tmp, &handle, 1, timeout);
 }
@@ -453,7 +466,7 @@ Result svcCancelSynchronization(Handle thread);
  * @return Result code.
  * @note Syscall number 0x1A.
  */
-Result svcArbitrateLock(u32 wait_tag, u32* tag_location, u32 self_tag);
+Result svcArbitrateLock(Handle wait_tag, u32* tag_location, u32 self_tag);
 
 /**
  * @brief Arbitrates a mutex unlock operation in userspace.
@@ -513,7 +526,7 @@ Result svcSendSyncRequest(Handle session);
  * @remark size must be allocated to 0x1000 bytes.
  * @note Syscall number 0x22.
  */
-Result svcSendSyncRequestWithUserBuffer(void* usrBuffer, u32 size, Handle session);
+Result svcSendSyncRequestWithUserBuffer(void* usrBuffer, size_t size, Handle session);
 
 /**
  * @brief Sends an IPC synchronization request to a session from an user allocated buffer (asynchronous version).
@@ -521,7 +534,7 @@ Result svcSendSyncRequestWithUserBuffer(void* usrBuffer, u32 size, Handle sessio
  * @remark size must be allocated to 0x1000 bytes.
  * @note Syscall number 0x23.
  */
-Result svcSendAsyncRequestWithUserBuffer(Handle* handle, void* usrBuffer, u32 size, Handle session);
+Result svcSendAsyncRequestWithUserBuffer(Handle* handle, void* usrBuffer, size_t size, Handle session);
 
 ///@}
 
@@ -555,7 +568,7 @@ Result svcGetThreadId(u64 *threadID, Handle handle);
  * @return Result code.
  * @note Syscall number 0x26.
  */
-Result svcBreak(u32 breakReason, u32 inval1, u32 inval2);
+Result svcBreak(BreakReason breakReason, u32 inval1, u32 inval2);
 
 ///@}
 
@@ -569,7 +582,7 @@ Result svcBreak(u32 breakReason, u32 inval1, u32 inval2);
  * @return Result code.
  * @note Syscall number 0x27.
  */
-Result svcOutputDebugString(const char *str, u32 size);
+Result svcOutputDebugString(const char *str, size_t size);
 
 ///@}
 
@@ -593,7 +606,7 @@ void NORETURN svcReturnFromException(Result res);
  * @remark The full list of property IDs can be found on the <a href="https://switchbrew.org/wiki/SVC#svcGetInfo">switchbrew.org wiki</a>.
  * @note Syscall number 0x29.
  */
-Result svcGetInfo(u64* out, u32 id0, Handle handle, u64 id1);
+Result svcGetInfo(u64* out, InfoType id0, Handle handle, u64 id1);
 
 ///@}
 
@@ -606,7 +619,7 @@ Result svcGetInfo(u64* out, u32 id0, Handle handle, u64 id1);
  * @note Syscall number 0x2C.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result svcMapPhysicalMemory(void *address, u32 size);
+Result svcMapPhysicalMemory(void *address, size_t size);
 
 /**
  * @brief Undoes the effects of \ref svcMapPhysicalMemory. [3.0.0+]
@@ -614,7 +627,7 @@ Result svcMapPhysicalMemory(void *address, u32 size);
  * @note Syscall number 0x2D.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result svcUnmapPhysicalMemory(void *address, u32 size);
+Result svcUnmapPhysicalMemory(void *address, size_t size);
 
 ///@}
 
@@ -670,7 +683,7 @@ Result svcGetThreadContext3(ThreadContext* ctx, Handle thread);
  * @note Syscall number 0x40.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result svcCreateSession(Handle *server_handle, Handle *client_handle, u32 unk0, u32 unk1);//unk* are normally 0?
+Result svcCreateSession(Handle *server_handle, Handle *client_handle, bool is_light, uintptr_t name);//unk* are normally 0?
 
 /**
  * @brief Accepts an IPC session.
@@ -694,7 +707,7 @@ Result svcReplyAndReceive(s32* index, const Handle* handles, s32 handleCount, Ha
  * @note Syscall number 0x44.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result svcReplyAndReceiveWithUserBuffer(s32* index, void* usrBuffer, u32 size, const Handle* handles, s32 handleCount, Handle replyTarget, s64 timeout);
+Result svcReplyAndReceiveWithUserBuffer(s32* index, void* usrBuffer, size_t size, const Handle* handles, s32 handleCount, Handle replyTarget, s64 timeout);
 
 ///@}
 
@@ -720,7 +733,7 @@ Result svcCreateEvent(Handle* server_handle, Handle* client_handle);
  * @note Syscall number 0x48.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result svcMapPhysicalMemoryUnsafe(void *address, u32 size);
+Result svcMapPhysicalMemoryUnsafe(void *address, size_t size);
 
 /**
  * @brief Undoes the effects of \ref svcMapPhysicalMemoryUnsafe. [5.0.0+]
@@ -728,7 +741,7 @@ Result svcMapPhysicalMemoryUnsafe(void *address, u32 size);
  * @note Syscall number 0x49.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result svcUnmapPhysicalMemoryUnsafe(void *address, u32 size);
+Result svcUnmapPhysicalMemoryUnsafe(void *address, size_t size);
 
 /**
  * @brief Sets the system-wide limit for unsafe memory mappable using \ref svcMapPhysicalMemoryUnsafe. [5.0.0+]
@@ -736,7 +749,7 @@ Result svcUnmapPhysicalMemoryUnsafe(void *address, u32 size);
  * @note Syscall number 0x4A.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result svcSetUnsafeLimit(u32 size);
+Result svcSetUnsafeLimit(size_t size);
 
 ///@}
 
@@ -750,7 +763,7 @@ Result svcSetUnsafeLimit(u32 size);
  * @note Syscall number 0x4B.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result svcCreateCodeMemory(Handle* code_handle, void* src_addr, u32 size);
+Result svcCreateCodeMemory(Handle* code_handle, void* src_addr, size_t size);
 
 /**
  * @brief Maps code memory in the caller's address space [4.0.0+].
@@ -758,7 +771,7 @@ Result svcCreateCodeMemory(Handle* code_handle, void* src_addr, u32 size);
  * @note Syscall number 0x4C.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result svcControlCodeMemory(Handle code_handle, CodeMapOperation op, void* dst_addr, u32 size, u32 perm);
+Result svcControlCodeMemory(Handle code_handle, CodeMapOperation op, void* dst_addr, size_t size, u32 perm);
 
 ///@}
 
@@ -821,7 +834,7 @@ Result svcCreateInterruptEvent(Handle* handle, u32 irqNum, u32 flag);
  * @note Syscall number 0x54.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result svcQueryPhysicalAddress(u32 out[3], u32 virtaddr);
+Result svcQueryPhysicalAddress(u32 out[3], void* virtaddr);
 
 /**
  * @brief Returns a virtual address mapped to a given IO range.
@@ -830,7 +843,7 @@ Result svcQueryPhysicalAddress(u32 out[3], u32 virtaddr);
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  * @warning Only exists on [10.0.0+]. For older versions use \ref svcLegacyQueryIoMapping.
  */
-Result svcQueryMemoryMapping(u32* virtaddr, u32* out_size, u64 physaddr, u32 size);
+Result svcQueryMemoryMapping(uintptr_t* virtaddr, size_t* out_size, uintptr_t physaddr, size_t size);
 
 /**
  * @brief Returns a virtual address mapped to a given IO range.
@@ -839,7 +852,7 @@ Result svcQueryMemoryMapping(u32* virtaddr, u32* out_size, u64 physaddr, u32 siz
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  * @warning Only exists on [1.0.0-9.2.0]. For newer versions use \ref svcQueryMemoryMapping.
  */
-Result svcLegacyQueryIoMapping(u32* virtaddr, u64 physaddr, u32 size);
+Result svcLegacyQueryIoMapping(uintptr_t virtaddr, uintptr_t physaddr, size_t size);
 
 ///@}
 
@@ -877,7 +890,7 @@ Result svcDetachDeviceAddressSpace(u32 device, Handle handle);
  * @note Syscall number 0x59.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result svcMapDeviceAddressSpaceByForce(Handle handle, Handle proc_handle, u64 map_addr, u32 dev_size, u64 dev_addr, u32 perm);
+Result svcMapDeviceAddressSpaceByForce(Handle handle, Handle proc_handle, u64 map_addr, size_t dev_size, u64 dev_addr, u32 perm);
 
 /**
  * @brief Maps an attached device address space to an userspace address.
@@ -886,7 +899,7 @@ Result svcMapDeviceAddressSpaceByForce(Handle handle, Handle proc_handle, u64 ma
  * @note Syscall number 0x5A.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result svcMapDeviceAddressSpaceAligned(Handle handle, Handle proc_handle, u64 map_addr, u32 dev_size, u64 dev_addr, u32 perm);
+Result svcMapDeviceAddressSpaceAligned(Handle handle, Handle proc_handle, u64 map_addr, size_t dev_size, u64 dev_addr, u32 perm);
 
 /**
  * @brief Unmaps an attached device address space from an userspace address.
@@ -894,7 +907,7 @@ Result svcMapDeviceAddressSpaceAligned(Handle handle, Handle proc_handle, u64 ma
  * @note Syscall number 0x5C.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result svcUnmapDeviceAddressSpace(Handle handle, Handle proc_handle, u64 map_addr, u32 map_size, u64 dev_addr);
+Result svcUnmapDeviceAddressSpace(Handle handle, Handle proc_handle, u64 map_addr, size_t map_size, u64 dev_addr);
 
 ///@}
 
@@ -940,7 +953,7 @@ Result svcGetDebugEvent(u8* event_out, Handle debug);
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  * @warning Only exists on 3.0.0+. For older versions use \ref svcLegacyContinueDebugEvent.
  */
-Result svcContinueDebugEvent(Handle debug, u32 flags, u64* tid_list, u64 num_tids);
+Result svcContinueDebugEvent(Handle debug, u32 flags, u64* tid_list, s32 num_tids);
 
 /**
  * @brief Continues a debugging session.
@@ -949,7 +962,7 @@ Result svcContinueDebugEvent(Handle debug, u32 flags, u64* tid_list, u64 num_tid
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  * @warning Only exists on 1.0.0-2.3.0. For newer versions use \ref svcContinueDebugEvent.
  */
-Result svcLegacyContinueDebugEvent(Handle debug, u32 flags, u32 threadID);
+Result svcLegacyContinueDebugEvent(Handle debug, u32 flags, u64 threadID);
 
 /**
  * @brief Gets the context (dump the registers) of a thread in a debugging session.
@@ -988,7 +1001,7 @@ Result svcSetDebugThreadContext(Handle debug, u64 threadID, const ThreadContext*
  * @note Syscall number 0x65.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result svcGetProcessList(u32 *num_out, u32 *pids_out, u32 max_pids);
+Result svcGetProcessList(u32 *num_out, u64 *pids_out, s32 max_pids);
 
 /**
  * @brief Retrieves a list of all threads for a debug handle (or zero).
@@ -996,7 +1009,7 @@ Result svcGetProcessList(u32 *num_out, u32 *pids_out, u32 max_pids);
  * @note Syscall number 0x66.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result svcGetThreadList(u32 *num_out, u32 *tids_out, u32 max_tids, Handle debug);
+Result svcGetThreadList(u32 *num_out, u64 *tids_out, s32 max_tids, Handle debug);
 
 ///@}
 
@@ -1009,7 +1022,7 @@ Result svcGetThreadList(u32 *num_out, u32 *tids_out, u32 max_tids, Handle debug)
  * @note Syscall number 0x69.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result svcQueryDebugProcessMemory(MemoryInfo* meminfo_ptr, u32* pageinfo, Handle debug, u32 addr);
+Result svcQueryDebugProcessMemory(MemoryInfo* meminfo_ptr, u32* pageinfo, Handle debug, uintptr_t addr);
 
 /**
  * @brief Reads memory from a process that is being debugged.
@@ -1017,7 +1030,7 @@ Result svcQueryDebugProcessMemory(MemoryInfo* meminfo_ptr, u32* pageinfo, Handle
  * @note Syscall number 0x6A.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result svcReadDebugProcessMemory(void* buffer, Handle debug, u32 addr, u32 size);
+Result svcReadDebugProcessMemory(void* buffer, Handle debug, uintptr_t addr, size_t size);
 
 /**
  * @brief Writes to memory in a process that is being debugged.
@@ -1025,7 +1038,7 @@ Result svcReadDebugProcessMemory(void* buffer, Handle debug, u32 addr, u32 size)
  * @note Syscall number 0x6B.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result svcWriteDebugProcessMemory(Handle debug, const void* buffer, u32 addr, u32 size);
+Result svcWriteDebugProcessMemory(Handle debug, const void* buffer, uintptr_t addr, size_t size);
 
 /**
  * @brief Gets parameters from a thread in a debugging session.
@@ -1033,7 +1046,7 @@ Result svcWriteDebugProcessMemory(Handle debug, const void* buffer, u32 addr, u3
  * @note Syscall number 0x6D.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result svcGetDebugThreadParam(u64* out_64, u32* out_32, Handle debug, u32 threadID, DebugThreadParam param);
+Result svcGetDebugThreadParam(u64* out_64, u32* out_32, Handle debug, u64 threadID, DebugThreadParam param);
 
 ///@}
 
@@ -1051,7 +1064,7 @@ Result svcGetDebugThreadParam(u64* out_64, u32* out_32, Handle debug, u32 thread
  * @note Syscall number 0x6F.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result svcGetSystemInfo(u32* out, u32 id0, Handle handle, u32 id1);
+Result svcGetSystemInfo(u64* out, u32 id0, Handle handle, u64 id1);
 
 ///@}
 
@@ -1111,7 +1124,7 @@ Result svcSetProcessMemoryPermission(Handle proc, u64 addr, u64 size, u32 perm);
  * @note Syscall number 0x74.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result svcMapProcessMemory(void* dst, Handle proc, u64 src, u32 size);
+Result svcMapProcessMemory(void* dst, Handle proc, u64 src, size_t size);
 
 /**
  * @brief Undoes the effects of \ref svcMapProcessMemory.
@@ -1124,7 +1137,7 @@ Result svcMapProcessMemory(void* dst, Handle proc, u64 src, u32 size);
  * @note Syscall number 0x75.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result svcUnmapProcessMemory(void* dst, Handle proc, u64 src, u32 size);
+Result svcUnmapProcessMemory(void* dst, Handle proc, u64 src, size_t size);
 
 /**
  * @brief Equivalent to \ref svcQueryMemory, for another process.
@@ -1136,7 +1149,7 @@ Result svcUnmapProcessMemory(void* dst, Handle proc, u64 src, u32 size);
  * @note Syscall number 0x76.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result svcQueryProcessMemory(MemoryInfo* meminfo_ptr, u32 *pageinfo, Handle proc, u64 addr);
+Result svcQueryProcessMemory(MemoryInfo* meminfo_ptr, u32* pageinfo, Handle proc, uintptr_t addr);
 
 /**
  * @brief Maps normal heap in a certain process as executable code (used when loading NROs).
@@ -1173,7 +1186,7 @@ Result svcUnmapProcessCodeMemory(Handle proc, u64 dst, u64 src, u64 size);
  * @note Syscall number 0x79.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result svcCreateProcess(Handle* out, const void* proc_info, const u32* caps, u32 cap_num);
+Result svcCreateProcess(Handle* out, const void* proc_info, const u32* caps, s32 cap_num);
 
 /**
  * @brief Starts executing a freshly created process.
@@ -1218,7 +1231,7 @@ Result svcCreateResourceLimit(Handle* out);
  * @note Syscall number 0x7E.
  * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
  */
-Result svcSetResourceLimitLimitValue(Handle reslimit, LimitableResource which, u32 value);
+Result svcSetResourceLimitLimitValue(Handle reslimit, LimitableResource which, s64 value);
 
 ///@}
 
