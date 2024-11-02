@@ -1115,7 +1115,7 @@ extern "C" {
 			Address.nvnCommandBufferSetViewports = (uintptr_t)&nvnCommandBufferSetViewports;
 
 			uint64_t titleid = 0;
-			svcGetInfo(&titleid, 18, CUR_PROCESS_HANDLE, 0);	
+			svcGetInfo(&titleid, InfoType_TitleId, CUR_PROCESS_HANDLE, 0);	
 			char path[128];
 			sprintf(path, "sdmc:/SaltySD/plugins/FPSLocker/%016llX.dat", titleid);
 			FILE* file_dat = SaltySDCore_fopen(path, "rb");
