@@ -231,7 +231,7 @@ inline void createBuildidPath(const uint64_t buildid, char* titleid, char* buffe
 
 inline void CheckTitleID(char* buffer) {
     uint64_t titid = 0;
-    svcGetInfo(&titid, 18, CUR_PROCESS_HANDLE, 0);	
+    svcGetInfo(&titid, InfoType_TitleId, CUR_PROCESS_HANDLE, 0);	
     ltoa(titid, buffer, 16);
 }
 
