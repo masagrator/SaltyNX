@@ -559,6 +559,7 @@ int eglSwap (const void* EGLDisplay, const void* EGLSurface) {
 				FPStimingoverride = (uint32_t)((double)systemtickfrequency / LOCK::overwriteRefreshRate) - 6000;		
 				FPStimingoverride += 20 * rangeoverride;
 			}
+		}
 	}
 	
 	if ((FPStiming && !LOCK::blockDelayFPS && (!*(Shared.displaySync) || *(Shared.FPSlocked) < *(Shared.displaySync))) || FPStimingoverride) {
