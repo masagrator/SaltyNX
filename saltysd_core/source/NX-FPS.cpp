@@ -145,6 +145,7 @@ struct {
 	uint8_t* displaySync = 0;
 	resolutionCalls* renderCalls = 0;
 	resolutionCalls* viewportCalls = 0;
+	bool* forceOriginalRefreshRate = 0;
 } Shared;
 
 struct {
@@ -541,16 +542,23 @@ int eglSwap (const void* EGLDisplay, const void* EGLSurface) {
 	}
 
 	uint32_t FPStimingoverride = 0;
+	*(Shared.forceOriginalRefreshRate) = false;
 	if (LOCK::overwriteRefreshRate > 0) {
-		eglInterval(EGLDisplay, -1);
-		if (LOCK::overwriteRefreshRate >= 60.0) {
-			FPStimingoverride = (uint32_t)((double)systemtickfrequency / LOCK::overwriteRefreshRate) - 8000;
-			FPStimingoverride += 20 * rangeoverride;
+		if (LOCK::overwriteRefreshRate == 30) {
+			*(Shared.forceOriginalRefreshRate) = true;
+			eglInterval(EGLDisplay, -2);
+			FPStimingoverride = 1;
 		}
 		else {
-			FPStimingoverride = (uint32_t)((double)systemtickfrequency / LOCK::overwriteRefreshRate) - 6000;		
-			FPStimingoverride += 20 * rangeoverride;
-		}
+			eglInterval(EGLDisplay, -1);
+			if (LOCK::overwriteRefreshRate >= 60.0) {
+				FPStimingoverride = (uint32_t)((double)systemtickfrequency / LOCK::overwriteRefreshRate) - 8000;
+				FPStimingoverride += 20 * rangeoverride;
+			}
+			else {
+				FPStimingoverride = (uint32_t)((double)systemtickfrequency / LOCK::overwriteRefreshRate) - 6000;		
+				FPStimingoverride += 20 * rangeoverride;
+			}
 	}
 	
 	if ((FPStiming && !LOCK::blockDelayFPS && (!*(Shared.displaySync) || *(Shared.FPSlocked) < *(Shared.displaySync))) || FPStimingoverride) {
@@ -766,15 +774,23 @@ void nvnPresentTexture(const void* _this, const NVNWindow* nvnWindow, const void
 	}
 
 	uint32_t FPStimingoverride = 0;
+	*(Shared.forceOriginalRefreshRate) = false;
 	if (LOCK::overwriteRefreshRate > 0) {
-		nvnSetPresentInterval(nvnWindow, -1);
-		if (LOCK::overwriteRefreshRate >= 60.0) {
-			FPStimingoverride = (uint32_t)((double)systemtickfrequency / LOCK::overwriteRefreshRate) - 8000;
-			FPStimingoverride += 20 * rangeoverride;
+		if (LOCK::overwriteRefreshRate == 30) {
+			*(Shared.forceOriginalRefreshRate) = true;
+			nvnSetPresentInterval(nvnWindow, -2);
+			FPStimingoverride = 1;
 		}
 		else {
-			FPStimingoverride = (uint32_t)((double)systemtickfrequency / LOCK::overwriteRefreshRate) - 6000;		
-			FPStimingoverride += 20 * rangeoverride;
+			nvnSetPresentInterval(nvnWindow, -1);
+			if (LOCK::overwriteRefreshRate >= 60.0) {
+				FPStimingoverride = (uint32_t)((double)systemtickfrequency / LOCK::overwriteRefreshRate) - 8000;
+				FPStimingoverride += 20 * rangeoverride;
+			}
+			else {
+				FPStimingoverride = (uint32_t)((double)systemtickfrequency / LOCK::overwriteRefreshRate) - 6000;		
+				FPStimingoverride += 20 * rangeoverride;
+			}
 		}
 	}
 
@@ -1066,7 +1082,7 @@ extern "C" {
 		SaltySDCore_printf("NX-FPS: alive\n");
 		LOCK::mappings.main_start = getMainAddress();
 		SaltySDCore_printf("NX-FPS: found main at: 0x%lX\n", LOCK::mappings.main_start);
-		Result ret = SaltySD_CheckIfSharedMemoryAvailable(&SharedMemoryOffset, 60 + sizeof(m_resolutionRenderCalls) + sizeof(m_resolutionViewportCalls));
+		Result ret = SaltySD_CheckIfSharedMemoryAvailable(&SharedMemoryOffset, 60 + sizeof(m_resolutionRenderCalls) + sizeof(m_resolutionViewportCalls) + 1);
 		SaltySDCore_printf("NX-FPS: ret: 0x%X\n", ret);
 		if (!ret) {
 			SaltySDCore_printf("NX-FPS: MemoryOffset: %d\n", SharedMemoryOffset);
@@ -1112,6 +1128,7 @@ extern "C" {
 			Shared.displaySync = (uint8_t*)(base + 59);
 			Shared.renderCalls = (resolutionCalls*)(base + 60);
 			Shared.viewportCalls = (resolutionCalls*)(base + 60 + sizeof(m_resolutionRenderCalls));
+			Shared.forceOriginalRefreshRate = (bool*)(base + 60 + sizeof(m_resolutionRenderCalls) + sizeof(m_resolutionViewportCalls));
 			Address.nvnWindowSetPresentInterval = (uint64_t)&nvnSetPresentInterval;
 			Address.nvnSyncWait = (uint64_t)&nvnSyncWait0;
 			Address.nvnWindowBuilderSetTextures = (uint64_t)&nvnWindowBuilderSetTextures;
