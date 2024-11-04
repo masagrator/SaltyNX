@@ -26,7 +26,7 @@ bool already_hijacking = false;
 DebugEventInfo eventinfo;
 bool check = false;
 u64 exception = 0x0;
-SharedMemory _sharedMemory = {};
+SharedMemory _sharedMemory = {0};
 size_t reservedSharedMemory = 0;
 uint64_t clkVirtAddr = 0;
 bool displaySync = false;
@@ -191,6 +191,18 @@ bool isModInstalled() {
     return flag;
 }
 
+ptrdiff_t searchNxFpsSharedMemoryBlock(uintptr_t base) {
+	ptrdiff_t search_offset = 0;
+	while(search_offset < 0x1000) {
+		uint32_t* MAGIC_shared = (uint32_t*)(base + search_offset);
+		if (*MAGIC_shared == 0x465053) {
+			return search_offset;
+		}
+		else search_offset += 4;
+	}
+	return -1;
+}
+
 bool hijack_bootstrap(Handle* debug, u64 pid, u64 tid, bool isA64)
 {
     ThreadContext context;
@@ -322,9 +334,8 @@ void hijack_pid(u64 pid)
                 SaltySD_printf("SaltySD: TID %016lx is a homebrew application, aborting bootstrap...\n", eventinfo.tid);
                 goto abort_bootstrap;
             }
-            if (!shmemMap(&_sharedMemory)) {
+            if (shmemGetAddr(&_sharedMemory)) {
                 memset(shmemGetAddr(&_sharedMemory), 0, 0x1000);
-                shmemUnmap(&_sharedMemory);
             }
             char* hbloader = "hbloader";
             if (strcasecmp(eventinfo.name, hbloader) == 0)
@@ -655,7 +666,7 @@ Result handleServiceCmd(int cmd)
             raw->result = 0xFFE;
         }
         else if (new_size < (_sharedMemory.size - reservedSharedMemory)) {
-            if (!shmemMap(&_sharedMemory)) {
+            if (shmemGetAddr(&_sharedMemory)) {
                 if (!reservedSharedMemory) {
                     memset(shmemGetAddr(&_sharedMemory), 0, 0x1000);
                 }
@@ -665,7 +676,6 @@ Result handleServiceCmd(int cmd)
                 if (reservedSharedMemory % 4 != 0) {
                     reservedSharedMemory += (4 - (reservedSharedMemory % 4));
                 }
-                shmemUnmap(&_sharedMemory);
             }
             else {
                 SaltySD_printf("SaltySD: cmd 6 failed. shmemMap error.");
@@ -998,6 +1008,7 @@ int main(int argc, char *argv[])
         clkVirtAddr = 0;
     }
     shmemCreate(&_sharedMemory, 0x1000, Perm_Rw, Perm_Rw);
+    shmemMap(&_sharedMemory);
     // Main service loop
     u64* pids = malloc(0x200 * sizeof(u64));
     u64 max = 0;
@@ -1016,6 +1027,15 @@ int main(int argc, char *argv[])
         }
         
         if (lastAppPID != -1) {
+            static bool* force60Hz = 0;
+            if (!force60Hz)  {
+                uintptr_t sharedAddress = (uintptr_t)shmemGetAddr(&_sharedMemory);
+                if (sharedAddress) {
+                    ptrdiff_t offset = searchNxFpsSharedMemoryBlock(sharedAddress);
+                    if (offset != -1)
+                        force60Hz = (bool*)(sharedAddress + offset + 0x9C);
+                }
+            }
             if (!cheatCheck) {
                 if (!isCheatsFolderInstalled() || !isServiceRunning("dmnt:cht"))
                     cheatCheck = true;
@@ -1047,6 +1067,7 @@ int main(int argc, char *argv[])
             }
             if (!found) {
                 lastAppPID = -1;
+                force60Hz = 0;
                 cheatCheck = false;
                 if (displaySync && !isOLED) {
                     uint32_t temp_refreshRate = 0;
@@ -1057,8 +1078,13 @@ int main(int argc, char *argv[])
             }
             else if (displaySync && !isOLED) {
                 uint32_t temp_refreshRate = 0;
-                if (GetDisplayRefreshRate(&temp_refreshRate) && temp_refreshRate != refreshRate)
-                    SetDisplayRefreshRate(refreshRate);
+                GetDisplayRefreshRate(&temp_refreshRate);
+                uint32_t check_refresh_rate = refreshRate;
+                if (force60Hz && *force60Hz) {
+                    check_refresh_rate = 60;
+                }
+                if (temp_refreshRate != check_refresh_rate)
+                    SetDisplayRefreshRate(check_refresh_rate);
             }
         }
 
