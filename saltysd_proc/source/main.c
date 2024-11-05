@@ -115,9 +115,6 @@ bool SetDisplayRefreshRate(uint32_t refreshRate) {
 
     memcpy((void*)(clkVirtAddr + 0xD0), &base, 4);
     memcpy((void*)(clkVirtAddr + 0xDC), &misc, 4);
-    uintptr_t sh_addr = (uintptr_t)shmemGetAddr(&_sharedMemory);
-    if (sh_addr) 
-        *(uint8_t*)(sh_addr + 1) = (uint8_t)refreshRate;
     return true;
 }
 
@@ -1093,6 +1090,8 @@ int main(int argc, char *argv[])
                     SetDisplayRefreshRate(check_refresh_rate);
             }
         }
+        uint32_t temp = 0;
+        GetDisplayRefreshRate(&temp);
 
         // Detected new PID
         if (max != old_max && max > 0x80)
