@@ -115,6 +115,9 @@ bool SetDisplayRefreshRate(uint32_t refreshRate) {
 
     memcpy((void*)(clkVirtAddr + 0xD0), &base, 4);
     memcpy((void*)(clkVirtAddr + 0xDC), &misc, 4);
+    uintptr_t sh_addr = (uintptr_t)shmemGetAddr(&_sharedMemory);
+    if (sh_addr) 
+        *(uint8_t*)(sh_addr + 1) = (uint8_t)refreshRate;
     return true;
 }
 
@@ -128,6 +131,9 @@ bool GetDisplayRefreshRate(uint32_t* refreshRate) {
     if (value == 0)
         value = 60;
     *refreshRate = value;
+    uintptr_t sh_addr = (uintptr_t)shmemGetAddr(&_sharedMemory);
+    if (sh_addr) 
+        *(uint8_t*)(sh_addr + 1) = (uint8_t)value;
     return true;
 }
 
