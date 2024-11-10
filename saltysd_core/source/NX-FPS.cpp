@@ -550,7 +550,7 @@ int eglSwap (const void* EGLDisplay, const void* EGLSurface) {
 		if ((LOCK::overwriteRefreshRate == 30) || (LOCK::overwriteRefreshRate == 60)) {
 			(Shared -> forceOriginalRefreshRate) = true;
 			FPStimingoverride = 1;
-			eglInterval(EGLDisplay, (LOCK::overwriteRefreshRate / -30));
+			eglInterval(EGLDisplay, (-60 / LOCK::overwriteRefreshRate));
 		}
 		else {
 			eglInterval(EGLDisplay, -1);
@@ -783,7 +783,7 @@ void nvnPresentTexture(const void* _this, const NVNWindow* nvnWindow, const void
 		if ((LOCK::overwriteRefreshRate == 30) || (LOCK::overwriteRefreshRate == 60)) {
 			(Shared -> forceOriginalRefreshRate) = true;
 			FPStimingoverride = 1;
-			nvnSetPresentInterval(nvnWindow, (LOCK::overwriteRefreshRate / -30));
+			nvnSetPresentInterval(nvnWindow, (-60 / LOCK::overwriteRefreshRate));
 		}
 		else {
 			nvnSetPresentInterval(nvnWindow, -1);
