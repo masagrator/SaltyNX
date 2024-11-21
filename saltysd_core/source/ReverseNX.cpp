@@ -3,6 +3,19 @@
 #include "saltysd_core.h"
 #include "saltysd_ipc.h"
 #include "saltysd_dynamic.h"
+#include <cerrno>
+
+enum ReverseNX_state {
+	ReverseNX_Switch_Invalid = -1,
+	ReverseNX_Switch_Handheld = 0,
+	ReverseNX_Switch_Docked = 1
+};
+
+struct ReverseNX_save {
+	char MAGIC[4];
+	uint8_t version;
+	uint8_t state;
+} NX_PACKED;
 
 struct SystemEvent {
 	const char reserved[16];
@@ -50,7 +63,7 @@ struct Shared {
 
 Shared* ReverseNX_RT;
 
-const char* ver = "3.0.0";
+const char* ver = "3.0.1";
 
 ptrdiff_t SharedMemoryOffset2 = -1;
 
@@ -58,6 +71,46 @@ SystemEvent* defaultDisplayResolutionChangeEventCopy = 0;
 SystemEvent* notificationMessageEventCopy = 0;
 void* multiWaitHolderCopy = 0;
 void* multiWaitCopy = 0;
+
+ReverseNX_state loadSave() {
+	char path[128];
+    uint64_t titid = 0;
+    svcGetInfo(&titid, InfoType_TitleId, CUR_PROCESS_HANDLE, 0);	
+	snprintf(path, sizeof(path), "sdmc:/SaltySD/plugins/ReverseNX-RT/%016lX.dat", titid);
+	errno = 0;
+	FILE* save_file = SaltySDCore_fopen(path, "rb");
+	if (save_file) {
+		uint32_t MAGIC = 0;
+		SaltySDCore_fread(&MAGIC, 4, 1, save_file);
+		if (MAGIC != 0x5452584E) {
+			SaltySDCore_fclose(save_file);
+			SaltySDCore_printf("ReverseNX: Save had wrong magic!\n", path);
+			return ReverseNX_Switch_Invalid;
+		}
+		uint8_t version = 0;
+		SaltySDCore_fread(&version, 1, 1, save_file);
+		if (version != 1) {
+			SaltySDCore_fclose(save_file);
+			SaltySDCore_printf("ReverseNX: Save had wrong version!\n", path);
+			return ReverseNX_Switch_Invalid;
+		}
+		uint8_t state = ReverseNX_Switch_Invalid;
+		SaltySDCore_fread(&state, 1, 1, save_file);
+		SaltySDCore_fclose(save_file);
+		if (state > ReverseNX_Switch_Docked) {
+			SaltySDCore_printf("ReverseNX: Save had wrong state!\n", path);
+			return ReverseNX_Switch_Invalid;
+		}
+		SaltySDCore_printf("ReverseNX: Save loaded successfully!\n", path);
+		return (ReverseNX_state)state;
+	}
+	else {
+		if (errno == -2)
+			SaltySDCore_printf("ReverseNX: Couldn't load save from %s! Using default settings.\n", path);
+		else SaltySDCore_printf("ReverseNX: Couldn't load save from %s! Errno: %d. Using default settings.\n", path, errno);
+		return ReverseNX_Switch_Invalid;
+	}
+}
 
 bool TryPopNotificationMessage(int &msg) {
 
@@ -127,7 +180,7 @@ uint8_t GetOperationMode() {
 	default display resolution of currently running mode.
 	Those are:
 	Handheld - 1280x720
-	Docked - 1920x1080
+	Docked - 1920x1080 only when true handheld mode is detected
 	
 	Game is waiting for DefaultDisplayResolutionChange event to check again
 	which mode is currently in use. And to do that nn::os::TryWaitSystemEvent is used
@@ -143,13 +196,20 @@ void GetDefaultDisplayResolution(int* width, int* height) {
 		((_ZN2nn2oe27GetDefaultDisplayResolutionEPiS1_)(Address_weaks.GetDefaultDisplayResolution))(width, height);
 		ReverseNX_RT->isDocked = ((_ZN2nn2oe18GetPerformanceModeEv)(Address_weaks.GetPerformanceMode))();
 	}
-	else if (ReverseNX_RT->isDocked) {
-		*width = 1920;
-		*height = 1080;
-	}
 	else {
-		*width = 1280;
-		*height = 720;
+		if (ReverseNX_RT->isDocked) {
+			if (((_ZN2nn2oe18GetPerformanceModeEv)(Address_weaks.GetPerformanceMode))()) {
+				return ((_ZN2nn2oe27GetDefaultDisplayResolutionEPiS1_)(Address_weaks.GetDefaultDisplayResolution))(width, height);
+			}
+			else {
+				*width = 1920;
+				*height = 1080;
+			}
+		}
+		else {
+			*width = 1280;
+			*height = 720;
+		}
 	}
 }
 
@@ -240,9 +300,16 @@ extern "C" {
 
 			ReverseNX_RT = (Shared*)((uintptr_t)shmemGetAddr(_sharedmemory) + SharedMemoryOffset2);
 			ReverseNX_RT->MAGIC = 0x5452584E;
-			ReverseNX_RT->isDocked = false;
-			ReverseNX_RT->def = true;
 			ReverseNX_RT->pluginActive = false;
+			ReverseNX_state state = loadSave();
+			if (state == ReverseNX_Switch_Docked || state == ReverseNX_Switch_Handheld) {
+				ReverseNX_RT->isDocked = state;
+				ReverseNX_RT->def = false;
+			}
+			else {
+				ReverseNX_RT->isDocked = false;
+				ReverseNX_RT->def = true;				
+			}
 			Address_weaks.GetPerformanceMode = SaltySDCore_FindSymbolBuiltin("_ZN2nn2oe18GetPerformanceModeEv");
 			Address_weaks.GetOperationMode = SaltySDCore_FindSymbolBuiltin("_ZN2nn2oe16GetOperationModeEv");
 			Address_weaks.TryPopNotificationMessage = SaltySDCore_FindSymbolBuiltin("_ZN2nn2oe25TryPopNotificationMessageEPj");
