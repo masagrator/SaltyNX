@@ -3,6 +3,19 @@
 #include "saltysd_core.h"
 #include "saltysd_ipc.h"
 #include "saltysd_dynamic.h"
+#include <cerrno>
+
+enum ReverseNX_state {
+	ReverseNX_Switch_Invalid = -1,
+	ReverseNX_Switch_Handheld = 0,
+	ReverseNX_Switch_Docked = 1
+};
+
+struct ReverseNX_save {
+	char MAGIC[4];
+	uint8_t version;
+	uint8_t state;
+} NX_PACKED;
 
 struct SystemEvent {
 	const char reserved[16];
@@ -41,10 +54,56 @@ struct {
 	uintptr_t TimedWaitAny;	
 } Address_weaks;
 
-bool* def_shared = 0;
-bool* isDocked_shared = 0;
-bool* pluginActive_shared = 0;
-const char* ver = "2.0.0";
+const char* ver = "3.0.1";
+
+struct Shared {
+	uint32_t MAGIC;
+	bool isDocked;
+	bool def;
+	bool pluginActive;
+} PACKED;
+
+Shared* ReverseNX_RT;
+
+ReverseNX_state loadSave() {
+	char path[128];
+    uint64_t titid = 0;
+    svcGetInfo(&titid, InfoType_TitleId, CUR_PROCESS_HANDLE, 0);	
+	snprintf(path, sizeof(path), "sdmc:/SaltySD/plugins/ReverseNX-RT/%016llX.dat", titid);
+	errno = 0;
+	FILE* save_file = SaltySDCore_fopen(path, "rb");
+	if (save_file) {
+		uint32_t MAGIC = 0;
+		SaltySDCore_fread(&MAGIC, 4, 1, save_file);
+		if (MAGIC != 0x5452584E) {
+			SaltySDCore_fclose(save_file);
+			SaltySDCore_printf("ReverseNX: Save had wrong magic!\n", path);
+			return ReverseNX_Switch_Invalid;
+		}
+		uint8_t version = 0;
+		SaltySDCore_fread(&version, 1, 1, save_file);
+		if (version != 1) {
+			SaltySDCore_fclose(save_file);
+			SaltySDCore_printf("ReverseNX: Save had wrong version!\n", path);
+			return ReverseNX_Switch_Invalid;
+		}
+		uint8_t state = ReverseNX_Switch_Invalid;
+		SaltySDCore_fread(&state, 1, 1, save_file);
+		SaltySDCore_fclose(save_file);
+		if (state > ReverseNX_Switch_Docked) {
+			SaltySDCore_printf("ReverseNX: Save had wrong state!\n", path);
+			return ReverseNX_Switch_Invalid;
+		}
+		SaltySDCore_printf("ReverseNX: Save loaded successfully!\n", path);
+		return (ReverseNX_state)state;
+	}
+	else {
+		if (errno == -2)
+			SaltySDCore_printf("ReverseNX: Couldn't load save from %s! Using default settings.\n", path);
+		else SaltySDCore_printf("ReverseNX: Couldn't load save from %s! Errno: %d. Using default settings.\n", path, errno);
+		return ReverseNX_Switch_Invalid;
+	}
+}
 
 ptrdiff_t SharedMemoryOffset2 = -1;
 
@@ -60,9 +119,9 @@ bool TryPopNotificationMessage(int &msg) {
 	static bool compare = false;
 	static bool compare2 = false;
 
-	*pluginActive_shared = true;
+	(ReverseNX_RT->pluginActive) = true;
 
-	if (*def_shared) {
+	if ((ReverseNX_RT->def)) {
 		if (!check1) {
 			check1 = true;
 			msg = 0x1f;
@@ -78,13 +137,13 @@ bool TryPopNotificationMessage(int &msg) {
 	
 	check1 = false;
 	check2 = false;
-	if (compare2 != *isDocked_shared) {
-		compare2 = *isDocked_shared;
+	if (compare2 != (ReverseNX_RT->isDocked)) {
+		compare2 = (ReverseNX_RT->isDocked);
 		msg = 0x1f;
 		return true;
 	}
-	if (compare != *isDocked_shared) {
-		compare = *isDocked_shared;
+	if (compare != (ReverseNX_RT->isDocked)) {
+		compare = (ReverseNX_RT->isDocked);
 		msg = 0x1e;
 		return true;
 	}
@@ -103,15 +162,15 @@ int PopNotificationMessage() {
 }
 
 uint32_t GetPerformanceMode() {
-	if (*def_shared) *isDocked_shared = ((_ZN2nn2oe18GetPerformanceModeEv)(Address_weaks.GetPerformanceMode))();
+	if ((ReverseNX_RT->def)) (ReverseNX_RT->isDocked) = ((_ZN2nn2oe18GetPerformanceModeEv)(Address_weaks.GetPerformanceMode))();
 	
-	return *isDocked_shared;
+	return (ReverseNX_RT->isDocked);
 }
 
 uint8_t GetOperationMode() {
-	if (*def_shared) *isDocked_shared = ((_ZN2nn2oe16GetOperationModeEv)(Address_weaks.GetOperationMode))();
+	if ((ReverseNX_RT->def)) (ReverseNX_RT->isDocked) = ((_ZN2nn2oe16GetOperationModeEv)(Address_weaks.GetOperationMode))();
 	
-	return *isDocked_shared;
+	return (ReverseNX_RT->isDocked);
 }
 
 /* 
@@ -133,12 +192,12 @@ uint8_t GetOperationMode() {
 
 */
 void GetDefaultDisplayResolution(int* width, int* height) {
-	if (*def_shared) {
+	if ((ReverseNX_RT->def)) {
 		((_ZN2nn2oe27GetDefaultDisplayResolutionEPiS1_)(Address_weaks.GetDefaultDisplayResolution))(width, height);
-		if (*width == 1920) *isDocked_shared = true;
-		else *isDocked_shared = false;
+		if (*width == 1920) (ReverseNX_RT->isDocked) = true;
+		else (ReverseNX_RT->isDocked) = false;
 	}
-	else if (*isDocked_shared) {
+	else if ((ReverseNX_RT->isDocked)) {
 		*width = 1920;
 		*height = 1080;
 	}
@@ -157,9 +216,9 @@ bool TryWaitSystemEvent(SystemEvent* systemEvent) {
 	static bool check = true;
 	static bool compare = false;
 
-	if (systemEvent != defaultDisplayResolutionChangeEventCopy || *def_shared) {
+	if (systemEvent != defaultDisplayResolutionChangeEventCopy || (ReverseNX_RT->def)) {
 		bool ret = ((nnosTryWaitSystemEvent)(Address_weaks.TryWaitSystemEvent))(systemEvent);
-		compare = *isDocked_shared;
+		compare = (ReverseNX_RT->isDocked);
 		if (systemEvent == defaultDisplayResolutionChangeEventCopy && !check) {
 			check = true;
 			return true;
@@ -168,8 +227,8 @@ bool TryWaitSystemEvent(SystemEvent* systemEvent) {
 	}
 	check = false;
 	if (systemEvent == defaultDisplayResolutionChangeEventCopy) {
-		if (compare != *isDocked_shared) {
-			compare = *isDocked_shared;
+		if (compare != (ReverseNX_RT->isDocked)) {
+			compare = (ReverseNX_RT->isDocked);
 			return true;
 		}
 		return false;
@@ -179,7 +238,7 @@ bool TryWaitSystemEvent(SystemEvent* systemEvent) {
 
 void WaitSystemEvent(SystemEvent* systemEvent) {
 	if (systemEvent == defaultDisplayResolutionChangeEventCopy) {
-		*pluginActive_shared = true;
+		(ReverseNX_RT->pluginActive) = true;
 		while(true) {
 			bool return_now = TryWaitSystemEvent(systemEvent);
 			if (return_now)
@@ -233,15 +292,18 @@ extern "C" {
 		if (!ret) {
 			SaltySDCore_printf("ReverseNX: SharedMemory MemoryOffset: %d\n", SharedMemoryOffset2);
 
-			uintptr_t base = (uintptr_t)shmemGetAddr(_sharedmemory) + SharedMemoryOffset2;
-			uint32_t* MAGIC = (uint32_t*)base;
-			*MAGIC = 0x5452584E;
-			isDocked_shared = (bool*)(base + 4);
-			def_shared = (bool*)(base + 5);
-			pluginActive_shared = (bool*)(base + 6);
-			*isDocked_shared = false;
-			*def_shared = true;
-			*pluginActive_shared = false;
+			ReverseNX_RT = (Shared*)((uintptr_t)shmemGetAddr(_sharedmemory) + SharedMemoryOffset2);
+			ReverseNX_RT->MAGIC = 0x5452584E;
+			ReverseNX_RT->pluginActive = false;
+			ReverseNX_state state = loadSave();
+			if (state == ReverseNX_Switch_Docked || state == ReverseNX_Switch_Handheld) {
+				ReverseNX_RT->isDocked = state;
+				ReverseNX_RT->def = false;
+			}
+			else {
+				ReverseNX_RT->isDocked = false;
+				ReverseNX_RT->def = true;				
+			}
 			Address_weaks.GetPerformanceMode = SaltySDCore_FindSymbolBuiltin("_ZN2nn2oe18GetPerformanceModeEv");
 			Address_weaks.GetOperationMode = SaltySDCore_FindSymbolBuiltin("_ZN2nn2oe16GetOperationModeEv");
 			Address_weaks.TryPopNotificationMessage = SaltySDCore_FindSymbolBuiltin("_ZN2nn2oe25TryPopNotificationMessageEPj");
