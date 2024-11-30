@@ -31,7 +31,7 @@ include $(DEVKITPRO)/libnx/switch_rules
 #---------------------------------------------------------------------------------
 TARGET		:=	saltysd_core
 BUILD		:=	build
-SOURCES		:=	source
+SOURCES		:=	source source/tinyexpr
 DATA		:=	data
 INCLUDES	:=	include
 EXEFS_SRC	:=	exefs_src
@@ -39,7 +39,7 @@ EXEFS_SRC	:=	exefs_src
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
-ARCH	:=	-march=armv8-a -mtune=cortex-a57 -mtp=soft -fPIE -fno-plt
+ARCH	    :=	-march=armv8-a -mtune=cortex-a57 -mtp=soft -fPIE -fno-plt
 
 CFLAGS	:=	-Wall -O2 \
 			-ffast-math \
@@ -49,8 +49,10 @@ CFLAGS	+=	$(INCLUDE) -DSWITCH
 
 CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++23
 
-ASFLAGS	:=	-g $(ARCH)
-LDFLAGS	=	-specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-s,--dynamic-list=$(CURDIR)/../dynamic_symbols.txt -Wl,-Map,$(notdir $*.map)
+ASFLAGS	     :=	-g $(ARCH)
+
+LDFLAGS				=	-specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-s,--dynamic-list=$(CURDIR)/../dynamic_symbols.txt -Wl,-Map,$(notdir $*.map)
+LDFLAGS_TEST_DEBUG	=	-specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH)
 
 LIBS	:= -lnx_min
 
@@ -98,6 +100,8 @@ endif
 export OFILES	:=	$(addsuffix .o,$(BINFILES)) \
 			$(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(SFILES:.s=.o)
 
+export OFILES2	:=	$(foreach file,$(OFILES),$(BUILD)/$(file))
+
 export INCLUDE	:=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
 			$(foreach dir,$(LIBDIRS),-I$(dir)/include) \
 			-I$(CURDIR)/$(BUILD)
@@ -139,11 +143,12 @@ all: $(BUILD)
 $(BUILD):
 	@[ -d $@ ] || mkdir -p $@
 	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
+	@$(LD) $(LDFLAGS_TEST_DEBUG) $(OFILES2) $(LIBPATHS) $(LIBS) -o $(TARGET)-debug.elf
 
 #---------------------------------------------------------------------------------
 clean:
 	@echo clean ...
-	@rm -fr $(BUILD) $(TARGET).pfs0 $(TARGET).nso $(TARGET).nro $(TARGET).nsp $(TARGET).nacp $(TARGET).elf
+	@rm -fr $(BUILD) $(TARGET).pfs0 $(TARGET).nso $(TARGET).nro $(TARGET).nsp $(TARGET).nacp $(TARGET).elf $(TARGET)-debug.elf
 
 
 #---------------------------------------------------------------------------------
