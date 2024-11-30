@@ -31,7 +31,7 @@ include $(DEVKITPRO)/devkitARM/base_rules
 #---------------------------------------------------------------------------------
 TARGET		:=	saltysd_core32
 BUILD		:=	build
-SOURCES		:=	source
+SOURCES		:=	source source/tinyexpr
 DATA		:=	data
 INCLUDES	:=	include
 EXEFS_SRC	:=	exefs_src
