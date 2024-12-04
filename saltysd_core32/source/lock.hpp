@@ -384,8 +384,11 @@ namespace LOCK {
 		blockDelayFPS = false;
 		static uint8_t* new_buffer = 0;
 		static uint8_t lastFPS = 0;
+		static uint8_t lastRefreshRate = 0;
+		if (!refreshRate) refreshRate = 60;
+		
 
-		if (lastFPS != FPS) {
+		if ((lastFPS != FPS) || (lastRefreshRate != refreshRate)) {
 			if (new_buffer != 0) {
 				free(new_buffer);
 			}
@@ -397,6 +400,7 @@ namespace LOCK {
 				return 0x3002;
 			}
 			lastFPS = FPS;
+			lastRefreshRate = refreshRate;
 		}
 		if (!new_buffer) {
 			return 0x3003;
