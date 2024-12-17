@@ -10,12 +10,13 @@ namespace LOCK {
 	bool blockDelayFPS = false;
 	uint8_t gen = 0;
 	bool MasterWriteApplied = false;
+	uint64_t DockedRefreshRateDelay = 4000000000;
 	double overwriteRefreshRate = 0;
 
 	struct {
-		uint32_t main_start;
-		uint32_t alias_start;
-		uint32_t heap_start;
+		int64_t main_start;
+		uint64_t alias_start;
+		uint64_t heap_start;
 	} mappings;
 
 	template <typename T>
@@ -74,32 +75,32 @@ namespace LOCK {
 	}
 
 	template <typename T>
-	void writeValue(T value, uint32_t address) {
+	void writeValue(T value, int64_t address) {
 		if (*(T*)address != value)
 			*(T*)address = value;
 	}
 
 	bool unsafeCheck = false;
 
-	bool NOINLINE isAddressValid(uint32_t address) {
+	bool NOINLINE isAddressValid(int64_t address) {
 		MemoryInfo memoryinfo = {0};
 		u32 pageinfo = 0;
 
 		if (unsafeCheck) return true;
 
-		if (address < 0x200000) return false;
+		if ((address < 0) || (address >= 0x8000000000)) return false;
 
 		Result rc = svcQueryMemory(&memoryinfo, &pageinfo, address);
 		if (R_FAILED(rc)) return false;
-		if (((memoryinfo.perm & Perm_Rw) == Perm_Rw) && ((address - memoryinfo.addr >= 0) && (address - memoryinfo.addr <= memoryinfo.size)))
+		if ((memoryinfo.perm & Perm_Rw) && ((address - memoryinfo.addr >= 0) && (address - memoryinfo.addr <= memoryinfo.size)))
 			return true;
 		return false;
 	}
 
-	uint32_t NOINLINE getAddress(uint8_t* buffer, uint8_t offsets_count) {
+	int64_t NOINLINE getAddress(uint8_t* buffer, uint8_t offsets_count) {
 		uint8_t region = read8(buffer);
 		offsets_count -= 1;
-		uint32_t address = 0;
+		int64_t address = 0;
 		switch(region) {
 			case 1: {
 				address = mappings.main_start;
@@ -117,11 +118,11 @@ namespace LOCK {
 				return -1;
 		}
 		for (int i = 0; i < offsets_count; i++) {
-			uint32_t temp_offset = (uint32_t)read32(buffer);
+			int32_t temp_offset = (int32_t)read32(buffer);
 			address += temp_offset;
 			if (i+1 < offsets_count) {
-				if (!isAddressValid(*(uint32_t*)address)) return -2;
-				address = *(uint32_t*)address;
+				if (!isAddressValid(*(int64_t*)address)) return -2;
+				address = *(uint64_t*)address;
 			}
 		}
 		return address;
@@ -244,7 +245,7 @@ namespace LOCK {
 			int8_t OPCODE = read8(buffer);
 			if (OPCODE == 1) {
 				uint8_t offsets_count = read8(buffer);
-				uint32_t address = getAddress(buffer, offsets_count);
+				int64_t address = getAddress(buffer, offsets_count);
 				if (address < 0) 
 					return 6;
 				/* value_type:
@@ -307,7 +308,7 @@ namespace LOCK {
 			}
 			else if (OPCODE == 2) {
 				uint8_t offsets_count = read8(buffer);
-				uint32_t address = getAddress(buffer, offsets_count);
+				int64_t address = getAddress(buffer, offsets_count);
 				if (address < 0) 
 					return 6;
 
