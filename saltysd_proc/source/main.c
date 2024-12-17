@@ -20,7 +20,6 @@
 #define	NVDISP_GET_MODE 0x80380204
 #define	NVDISP_SET_MODE 0x40380205
 #define NVDISP_VALIDATE_MODE 0xC038020A
-#define NVDISP_PANEL_GET_VENDOR_ID 0xC003021A
 #define DSI_CLOCK_HZ 234000000llu
 
 #define MIN(a,b) (((a)<(b))?(a):(b))
@@ -1310,18 +1309,6 @@ int main(int argc, char *argv[])
 
     if (!isLite) {
         ABORT_IF_FAILED(nvInitialize(), 6);
-        struct {
-            char reserved[3];
-        } pvi;
-        
-        u32 fd_temp;
-        if (R_SUCCEEDED(nvOpen(&fd_temp, "/dev/nvdisp-disp0"))) {
-            nvIoctl(fd_temp, NVDISP_PANEL_GET_VENDOR_ID, &pvi);
-            nvClose(fd_temp);
-            FILE* file = fopen("sdmc:/internal.dat", "wb");
-            fwrite(&pvi, 3, 1, file);
-            fclose(file);
-        }
     }
     
     ABORT_IF_FAILED(ldrDmntInitialize(), 7);
