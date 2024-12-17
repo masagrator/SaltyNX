@@ -599,12 +599,12 @@ void hijack_pid(u64 pid)
     Handle debug;
     
     FILE* disabled = fopen("sdmc:/SaltySD/flags/disable.flag", "r");
-    u8 disable = 1;
     
-    if (disabled == NULL) {
-        disable = 0;
+    if (disabled) {
+        fclose(disabled);
+        SaltySD_printf("SaltySD: Detected disable.flag, aborting bootstrap...\n");
+        return;
     }
-    else fclose(disabled);
     
     if (already_hijacking)
     {
@@ -645,10 +645,6 @@ void hijack_pid(u64 pid)
 
         if (eventinfo.type == DebugEvent_AttachProcess)
         {
-            if (disable == 1) {
-                SaltySD_printf("SaltySD: Detected disable.flag, aborting bootstrap...\n");
-                goto abort_bootstrap;
-            }
 
             if (eventinfo.tid <= 0x010000000000FFFF)
             {
@@ -751,14 +747,12 @@ void hijack_pid(u64 pid)
     }
     else {
         already_hijacking = false;
-        disable = 0;
     }
 
     return;
 
 abort_bootstrap:
     if (check) renameCheatsFolder();
-    disable = 0;
                 
     already_hijacking = false;
     svcCloseHandle(debug);
