@@ -10,6 +10,7 @@ namespace LOCK {
 	bool blockDelayFPS = false;
 	uint8_t gen = 0;
 	bool MasterWriteApplied = false;
+	uint64_t DockedRefreshRateDelay = 4000000000;
 	double overwriteRefreshRate = 0;
 
 	struct {

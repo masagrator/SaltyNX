@@ -101,7 +101,7 @@ Result readConfig(const char* path, uint8_t** output_buffer) {
 	if (SaltySDCore_ftell(patch_file) != header_size || !LOCK::isValid(buffer, header_size)) {
 		SaltySDCore_fclose(patch_file);
 		free(buffer);
-		return 1;
+		return 0x1201;
 	}
 	if (LOCK::gen == 2) {
 		Result ret = LOCK::applyMasterWrite(patch_file, configSize, header_size - 4);
@@ -174,25 +174,6 @@ struct {
 } Ptrs;
 
 struct {
-	uintptr_t nvnWindowGetProcAddress;
-	uintptr_t nvnQueuePresentTexture;
-	uintptr_t nvnWindowSetPresentInterval;
-	uintptr_t nvnWindowBuilderSetTextures;
-	uintptr_t nvnWindowAcquireTexture;
-	uintptr_t nvnSyncWait;
-	uintptr_t nvnGetProcAddress;
-	uintptr_t nvnWindowSetNumActiveTextures;
-	uintptr_t nvnWindowInitialize;
-	uintptr_t eglGetProcAddress;
-	uintptr_t eglSwapBuffers;
-	uintptr_t eglSwapInterval;
-	uintptr_t nvnCommandBufferSetRenderTargets;
-	uintptr_t nvnCommandBufferSetViewport;
-	uintptr_t nvnCommandBufferSetViewports;
-	uintptr_t nvnCommandBufferSetDepthRange;
-} Address;
-
-struct {
 	uint8_t FPS = 0xFF;
 	float FPSavg = 255;
 	bool FPSmode = 0;
@@ -255,682 +236,465 @@ inline uint64_t getMainAddress() {
 	return 0;
 }
 
-uint32_t vulkanSwap2 (const void* VkQueue_T, const void* VkPresentInfoKHR) {
-	static uint8_t FPS_temp = 0;
-	static uint64_t starttick = 0;
-	static uint64_t endtick = 0;
-	static uint64_t deltatick = 0;
-	static uint64_t frameend = 0;
-	static uint64_t framedelta = 0;
-	static uint64_t frameavg = 0;
-	static uint8_t FPSlock = 0;
-	static uint32_t FPStiming = 0;
-	static uint8_t FPStickItr = 0;
-	static uint8_t range = 0;
-	static uint8_t rangeoverride = 0;
+namespace NX_FPS_Math {
+	uint8_t FPS_temp = 0;
+	uint64_t starttick = 0;
+	uint64_t starttick2 = 0;
+	uint64_t frameend = 0;
+	uint64_t frameavg = 0;
+	uint8_t FPSlock = 0;
+	int32_t FPStiming = 0;
+	uint8_t FPStickItr = 0;
+	uint8_t range = 0;
 	
 	bool FPSlock_delayed = false;
-	
-	if (!starttick) {
-		(Shared -> API) = 3;
-		starttick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
+	u8 OpMode = 0;
+	bool old_force = false;
+	uint32_t new_fpslock = 0;
+
+	void PreFrame() {
+		new_fpslock = (LOCK::overwriteRefreshRate ? LOCK::overwriteRefreshRate : (Shared -> FPSlocked));
+		OpMode = ((_ZN2nn2oe16GetOperationModeEv)(Address_weaks.GetOperationMode))();
+		if (old_force != (Shared -> forceOriginalRefreshRate)) {
+			if (OpMode == 1)
+				svcSleepThread(LOCK::DockedRefreshRateDelay);
+			old_force = (Shared -> forceOriginalRefreshRate);
+		}
+
+		if ((FPStiming && !LOCK::blockDelayFPS && (!new_fpslock || new_fpslock < (Shared -> displaySync)))) {
+			if ((int32_t)(((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))() - frameend) < (FPStiming + (range * 20))) {
+				FPSlock_delayed = true;
+			}
+			while ((int32_t)(((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))() - frameend) < (FPStiming + (range * 20))) {
+				svcSleepThread(-2);
+				svcSleepThread(10000);
+			}
+		}
 	}
 
-	uint32_t FPStimingoverride = 0;
-	if (LOCK::overwriteRefreshRate > 0) {
-		if (LOCK::overwriteRefreshRate >= 60.0) {
-			FPStimingoverride = (uint32_t)((double)systemtickfrequency / LOCK::overwriteRefreshRate) - 8000;
-			FPStimingoverride += 20 * rangeoverride;
+	void PostFrame() {
+		uint64_t endtick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
+		uint64_t framedelta = endtick - frameend;
+
+		Shared -> FPSticks[FPStickItr++] = framedelta;
+		FPStickItr %= 10;
+		
+		frameavg = ((9*frameavg) + framedelta) / 10;
+		Stats.FPSavg = systemtickfrequency / (float)frameavg;
+
+		if (FPSlock_delayed && FPStiming) {
+			if (Stats.FPSavg > ((float)new_fpslock)) {
+				if (range < 200) {
+					range++;
+				}
+			}
+			else if ((std::lround(Stats.FPSavg) == new_fpslock) && (Stats.FPSavg < (float)new_fpslock)) {
+				if (range > 0) {
+					range--;
+				}
+			}
+		}
+
+		frameend = endtick;
+		FPS_temp++;
+		uint64_t deltatick = endtick - starttick;
+		uint64_t deltatick2 = endtick - starttick2;
+		if (deltatick2 > (systemtickfrequency / ((OpMode == 1) ? 30 : 1))) {
+			starttick2 = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
+			LOCK::overwriteRefreshRate = 0;
+			if (!configRC && FPSlock) {
+				LOCK::applyPatch(configBuffer, configSize, FPSlock, (Shared -> displaySync));
+			}
+		}
+		if (deltatick > systemtickfrequency) {
+			starttick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
+			Stats.FPS = FPS_temp - 1;
+			FPS_temp = 0;
+			(Shared -> FPS) = Stats.FPS;
+			if (!configRC && FPSlock) {
+				(Shared -> patchApplied) = 1;
+			}
+		}
+
+		if (LOCK::overwriteRefreshRate != 0) (Shared -> forceOriginalRefreshRate) = true;
+		else (Shared -> forceOriginalRefreshRate) = false;
+
+		(Shared -> FPSavg) = Stats.FPSavg;
+		(Shared -> pluginActive) = true;
+
+	}
+}
+
+namespace vk {
+
+	namespace nvSwapchain { 
+	uint32_t QueuePresent (const void* VkQueue_T, const void* VkPresentInfoKHR) {
+
+		if (!NX_FPS_Math::starttick) {
+			(Shared -> API) = 3;
+			NX_FPS_Math::starttick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
+			NX_FPS_Math::starttick2 = NX_FPS_Math::starttick;
+		}
+
+		NX_FPS_Math::PreFrame();
+
+		uint32_t vulkanResult = ((_ZN11NvSwapchain15QueuePresentKHREP9VkQueue_TPK16VkPresentInfoKHR_0)(Address_weaks.nvSwapchainQueuePresentKHR))(VkQueue_T, VkPresentInfoKHR);
+		NX_FPS_Math::PostFrame();
+
+		if (!NX_FPS_Math::new_fpslock) {
+			NX_FPS_Math::FPStiming = 0;
+			NX_FPS_Math::FPSlock = 0;
+			changeFPS = false;
 		}
 		else {
-			FPStimingoverride = (uint32_t)((double)systemtickfrequency / LOCK::overwriteRefreshRate) - 6000;		
-			FPStimingoverride += 20 * rangeoverride;
+			changeFPS = true;
+			NX_FPS_Math::FPSlock = (Shared -> FPSlocked);
+			if (NX_FPS_Math::new_fpslock != ((Shared -> displaySync) ? (Shared -> displaySync) : 60))
+				NX_FPS_Math::FPStiming = (systemtickfrequency/NX_FPS_Math::new_fpslock) - 6000;
+			else NX_FPS_Math::FPStiming = 0;
 		}
-	}
-	
+		
+		return vulkanResult;
+	}}
 
-	if ((FPStiming && !LOCK::blockDelayFPS && (!(Shared -> displaySync) || (Shared -> FPSlocked) < (Shared -> displaySync))) || FPStimingoverride) {
-		if ((((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))() - frameend) < (FPStimingoverride ? FPStimingoverride : FPStiming)) {
-			FPSlock_delayed = true;
-		}
-		while ((((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))() - frameend) < (FPStimingoverride ? FPStimingoverride : FPStiming)) {
-			svcSleepThread(-2);
-			svcSleepThread(10000);
-		}
-	}
-
-	uint32_t vulkanResult = ((_ZN11NvSwapchain15QueuePresentKHREP9VkQueue_TPK16VkPresentInfoKHR_0)(Address_weaks.nvSwapchainQueuePresentKHR))(VkQueue_T, VkPresentInfoKHR);
-	endtick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
-	framedelta = endtick - frameend;
-	frameavg = ((9*frameavg) + framedelta) / 10;
-	Stats.FPSavg = systemtickfrequency / (float)frameavg;
-
-	if ((FPSlock_delayed && FPStiming) || FPStimingoverride) {
-		if (Stats.FPSavg > ((float)FPSlock)) {
-			if (range < 200) {
-				FPStiming += 20;
-				range++;
-			}
-		}
-		else if ((std::lround(Stats.FPSavg) == FPSlock) && (Stats.FPSavg < (float)FPSlock)) {
-			if (range > 0) {
-				FPStiming -= 20;
-				range--;
-			}
+	uint32_t QueuePresent (const void* VkQueue, const void* VkPresentInfoKHR) {
+		
+		if (!NX_FPS_Math::starttick) {
+			(Shared -> API) = 3;
+			NX_FPS_Math::starttick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
+			NX_FPS_Math::starttick2 = NX_FPS_Math::starttick;
 		}
 
-		if (Stats.FPSavg > LOCK::overwriteRefreshRate) {
-			if (rangeoverride < 200) {
-				rangeoverride++;
-			}
-		}
-		else if ((std::lround(Stats.FPSavg) == LOCK::overwriteRefreshRate) && (Stats.FPSavg <  LOCK::overwriteRefreshRate)) {
-			if (rangeoverride > 0) {
-				rangeoverride--;
-			}
-		}
-	}
+		NX_FPS_Math::PreFrame();
+		uint32_t vulkanResult = ((vkQueuePresentKHR_0)(Address_weaks.vkQueuePresentKHR))(VkQueue, VkPresentInfoKHR);
+		NX_FPS_Math::PostFrame();
 
-	frameend = endtick;
-	
-	FPS_temp++;
-	deltatick = endtick - starttick;
-
-	Shared -> FPSticks[FPStickItr++] = framedelta;
-	FPStickItr %= 10;
-
-	if (deltatick > systemtickfrequency) {
-		starttick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
-		Stats.FPS = FPS_temp - 1;
-		FPS_temp = 0;
-		(Shared -> FPS) = Stats.FPS;
-		if (changeFPS && !configRC && FPSlock) {
-			LOCK::applyPatch(configBuffer, configSize, FPSlock, (Shared -> displaySync));
-			(Shared -> patchApplied) = 1;
-		}
-		if (((_ZN2nn2oe16GetOperationModeEv)(Address_weaks.GetOperationMode))() == true && (Shared -> displaySync) != 0) {
-			(Shared -> displaySync) = 0;
-			FPSlock = 0;
-		}
-	}
-
-	(Shared -> FPSavg) = Stats.FPSavg;
-	(Shared -> pluginActive) = true;
-
-	if (FPSlock != (Shared -> FPSlocked) || (FPSlock && !FPStiming)) {
-		if (((Shared -> FPSlocked) < 60) && ((Shared -> FPSlocked) > 0)) {
-			FPStiming = (systemtickfrequency/((Shared -> FPSlocked))) - 6000;
-		}
-		else FPStiming = 0;
-		if ((Shared -> FPSlocked) == 0) 
+		if (!NX_FPS_Math::new_fpslock) {
+			NX_FPS_Math::FPStiming = 0;
+			NX_FPS_Math::FPSlock = 0;
 			changeFPS = false;
-		else changeFPS = true;
-		FPSlock = (Shared -> FPSlocked);
-	}
-	
-	return vulkanResult;
-}
-
-uint32_t vulkanSwap (const void* VkQueue, const void* VkPresentInfoKHR) {
-	static uint8_t FPS_temp = 0;
-	static uint64_t starttick = 0;
-	static uint64_t endtick = 0;
-	static uint64_t deltatick = 0;
-	static uint64_t frameend = 0;
-	static uint64_t framedelta = 0;
-	static uint64_t frameavg = 0;
-	static uint8_t FPSlock = 0;
-	static uint32_t FPStiming = 0;
-	static uint8_t FPStickItr = 0;
-	static uint8_t range = 0;
-	static uint8_t rangeoverride = 0;
-	
-	bool FPSlock_delayed = false;
-	
-	if (!starttick) {
-		(Shared -> API) = 3;
-		starttick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
-	}
-
-	uint32_t FPStimingoverride = 0;
-	if (LOCK::overwriteRefreshRate > 0) {
-		if (LOCK::overwriteRefreshRate >= 60.0) {
-			FPStimingoverride = (uint32_t)((double)systemtickfrequency / LOCK::overwriteRefreshRate) - 8000;
-			FPStimingoverride += 20 * rangeoverride;
 		}
 		else {
-			FPStimingoverride = (uint32_t)((double)systemtickfrequency / LOCK::overwriteRefreshRate) - 6000;		
-			FPStimingoverride += 20 * rangeoverride;
+			changeFPS = true;
+			NX_FPS_Math::FPSlock = (Shared -> FPSlocked);
+			if (NX_FPS_Math::new_fpslock != ((Shared -> displaySync) ? (Shared -> displaySync) : 60))
+				NX_FPS_Math::FPStiming = (systemtickfrequency/NX_FPS_Math::new_fpslock) - 6000;
+			else NX_FPS_Math::FPStiming = 0;
 		}
-	}
-	
-
-	if ((FPStiming && !LOCK::blockDelayFPS && (!(Shared -> displaySync) || (Shared -> FPSlocked) < (Shared -> displaySync))) || FPStimingoverride) {
-		if ((((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))() - frameend) < (FPStimingoverride ? FPStimingoverride : FPStiming)) {
-			FPSlock_delayed = true;
-		}
-		while ((((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))() - frameend) < (FPStimingoverride ? FPStimingoverride : FPStiming)) {
-			svcSleepThread(-2);
-			svcSleepThread(10000);
-		}
+		
+		return vulkanResult;
 	}
 
-	uint32_t vulkanResult = ((vkQueuePresentKHR_0)(Address_weaks.vkQueuePresentKHR))(VkQueue, VkPresentInfoKHR);
-	endtick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
-	framedelta = endtick - frameend;
-	frameavg = ((9*frameavg) + framedelta) / 10;
-	Stats.FPSavg = systemtickfrequency / (float)frameavg;
-
-	if ((FPSlock_delayed && FPStiming) || FPStimingoverride) {
-		if (Stats.FPSavg > ((float)FPSlock)) {
-			if (range < 200) {
-				FPStiming += 20;
-				range++;
-			}
+	void* GetDeviceProcAddr(void* device, const char* vkFunction) {
+		if (!strcmp("vkQueuePresentKHR", vkFunction)) {
+			Address_weaks.vkQueuePresentKHR = (uintptr_t)((vkGetDeviceProcAddr_0)(Ptrs.vkGetDeviceProcAddr))(device, vkFunction);
+			return (void*)&QueuePresent;
 		}
-		else if ((std::lround(Stats.FPSavg) == FPSlock) && (Stats.FPSavg < (float)FPSlock)) {
-			if (range > 0) {
-				FPStiming -= 20;
-				range--;
-			}
+		if (!strcmp("vkGetDeviceProcAddr", vkFunction)) {
+			Ptrs.vkGetDeviceProcAddr = (uintptr_t)((vkGetDeviceProcAddr_0)(Ptrs.vkGetDeviceProcAddr))(device, vkFunction);
+			return (void*)&GetDeviceProcAddr;
 		}
-
-		if (Stats.FPSavg > LOCK::overwriteRefreshRate) {
-			if (rangeoverride < 200) {
-				rangeoverride++;
-			}
-		}
-		else if ((std::lround(Stats.FPSavg) == LOCK::overwriteRefreshRate) && (Stats.FPSavg <  LOCK::overwriteRefreshRate)) {
-			if (rangeoverride > 0) {
-				rangeoverride--;
-			}
-		}
+		return ((vkGetDeviceProcAddr_0)(Ptrs.vkGetDeviceProcAddr))(device, vkFunction);
 	}
 
-	frameend = endtick;
-	
-	FPS_temp++;
-	deltatick = endtick - starttick;
-
-	Shared -> FPSticks[FPStickItr++] = framedelta;
-	FPStickItr %= 10;
-
-	if (deltatick > systemtickfrequency) {
-		starttick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
-		Stats.FPS = FPS_temp - 1;
-		FPS_temp = 0;
-		(Shared -> FPS) = Stats.FPS;
-		if (changeFPS && !configRC && FPSlock) {
-			LOCK::applyPatch(configBuffer, configSize, FPSlock, (Shared -> displaySync));
-			(Shared -> patchApplied) = 1;
+	void* GetInstanceProcAddr(void* instance, const char* vkFunction) {
+		if (!strcmp("vkQueuePresentKHR", vkFunction)) {
+			Address_weaks.vkQueuePresentKHR = (uintptr_t)((_vkGetInstanceProcAddr_0)(Address_weaks.vkGetInstanceProcAddr))(instance, vkFunction);
+			return (void*)&QueuePresent;
 		}
-		if (((_ZN2nn2oe16GetOperationModeEv)(Address_weaks.GetOperationMode))() == true && (Shared -> displaySync) != 0) {
-			(Shared -> displaySync) = 0;
-			FPSlock = 0;
+		if (!strcmp("vkGetDeviceProcAddr", vkFunction)) {
+			Ptrs.vkGetDeviceProcAddr = (uintptr_t)((_vkGetInstanceProcAddr_0)(Address_weaks.vkGetInstanceProcAddr))(instance, vkFunction);
+			return (void*)&GetDeviceProcAddr;
 		}
+		return ((_vkGetInstanceProcAddr_0)(Address_weaks.vkGetInstanceProcAddr))(instance, vkFunction);
 	}
-
-	(Shared -> FPSavg) = Stats.FPSavg;
-	(Shared -> pluginActive) = true;
-
-	if (FPSlock != (Shared -> FPSlocked) || (FPSlock && !FPStiming)) {
-		if (((Shared -> FPSlocked) < 60) && ((Shared -> FPSlocked) > 0)) {
-			FPStiming = (systemtickfrequency/((Shared -> FPSlocked))) - 6000;
-		}
-		else FPStiming = 0;
-		if ((Shared -> FPSlocked) == 0) 
-			changeFPS = false;
-		else changeFPS = true;
-		FPSlock = (Shared -> FPSlocked);
-	}
-	
-	return vulkanResult;
 }
 
-void* vkGetDeviceProcAddr(void* device, const char* vkFunction) {
-	if (!strcmp("vkQueuePresentKHR", vkFunction)) {
-		Address_weaks.vkQueuePresentKHR = (uintptr_t)((vkGetDeviceProcAddr_0)(Ptrs.vkGetDeviceProcAddr))(device, vkFunction);
-		return (void*)&vulkanSwap;
-	}
-	if (!strcmp("vkGetDeviceProcAddr", vkFunction)) {
-		Ptrs.vkGetDeviceProcAddr = (uintptr_t)((vkGetDeviceProcAddr_0)(Ptrs.vkGetDeviceProcAddr))(device, vkFunction);
-		return (void*)&vkGetDeviceProcAddr;
-	}
-	return ((vkGetDeviceProcAddr_0)(Ptrs.vkGetDeviceProcAddr))(device, vkFunction);
-}
+namespace EGL {
 
-void* vkGetInstanceProcAddr(void* instance, const char* vkFunction) {
-	if (!strcmp("vkQueuePresentKHR", vkFunction)) {
-		Address_weaks.vkQueuePresentKHR = (uintptr_t)((_vkGetInstanceProcAddr_0)(Address_weaks.vkGetInstanceProcAddr))(instance, vkFunction);
-		return (void*)&vulkanSwap;
-	}
-	if (!strcmp("vkGetDeviceProcAddr", vkFunction)) {
-		Ptrs.vkGetDeviceProcAddr = (uintptr_t)((_vkGetInstanceProcAddr_0)(Address_weaks.vkGetInstanceProcAddr))(instance, vkFunction);
-		return (void*)&vkGetDeviceProcAddr;
-	}
-	return ((_vkGetInstanceProcAddr_0)(Address_weaks.vkGetInstanceProcAddr))(instance, vkFunction);
-}
-
-int eglInterval(const void* EGLDisplay, int interval) {
-	int result = false;
-	if (!changeFPS) {
-		result = ((eglSwapInterval_0)(Address_weaks.eglSwapInterval))(EGLDisplay, interval);
-		changedFPS = false;
-		(Shared -> FPSmode) = interval;
-	}
-	else if (interval < 0) {
-		interval *= -1;
-		if ((Shared -> FPSmode) != interval) {
+	int Interval(const void* EGLDisplay, int interval) {
+		int result = false;
+		if (!changeFPS) {
 			result = ((eglSwapInterval_0)(Address_weaks.eglSwapInterval))(EGLDisplay, interval);
+			changedFPS = false;
 			(Shared -> FPSmode) = interval;
 		}
-		changedFPS = true;
-	}
-	return result;
-}
-
-int eglSwap (const void* EGLDisplay, const void* EGLSurface) {
-	static uint8_t FPS_temp = 0;
-	static uint64_t starttick = 0;
-	static uint64_t endtick = 0;
-	static uint64_t deltatick = 0;
-	static uint64_t frameend = 0;
-	static uint64_t framedelta = 0;
-	static uint64_t frameavg = 0;
-	static uint8_t FPSlock = 0;
-	static uint32_t FPStiming = 0;
-	static uint8_t FPStickItr = 0;
-	static uint8_t range = 0;
-	static uint8_t rangeoverride = 0;
-	
-	bool FPSlock_delayed = false;
-
-	if (!starttick) {
-		(Shared -> API) = 2;
-		starttick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
+		else if (interval < 0) {
+			interval *= -1;
+			if ((Shared -> FPSmode) != interval) {
+				result = ((eglSwapInterval_0)(Address_weaks.eglSwapInterval))(EGLDisplay, interval);
+				(Shared -> FPSmode) = interval;
+			}
+			changedFPS = true;
+		}
+		return result;
 	}
 
-	uint32_t FPStimingoverride = 0;
-	(Shared -> forceOriginalRefreshRate) = false;
-	if (LOCK::overwriteRefreshRate > 0) {
-		if ((LOCK::overwriteRefreshRate == 30) || (LOCK::overwriteRefreshRate == 60)) {
-			(Shared -> forceOriginalRefreshRate) = true;
-			FPStimingoverride = 1;
-			eglInterval(EGLDisplay, (-60 / LOCK::overwriteRefreshRate));
-		}
-		else {
-			eglInterval(EGLDisplay, -1);
-			if (LOCK::overwriteRefreshRate >= 60.0) {
-				FPStimingoverride = (uint32_t)((double)systemtickfrequency / LOCK::overwriteRefreshRate) - 8000;
-				FPStimingoverride += 20 * rangeoverride;
-			}
-			else {
-				FPStimingoverride = (uint32_t)((double)systemtickfrequency / LOCK::overwriteRefreshRate) - 6000;		
-				FPStimingoverride += 20 * rangeoverride;
-			}
-		}
-	}
-	
-	if ((FPStiming && !LOCK::blockDelayFPS && (!(Shared -> displaySync) || (Shared -> FPSlocked) < (Shared -> displaySync))) || FPStimingoverride) {
-		if ((((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))() - frameend) < (FPStimingoverride ? FPStimingoverride : FPStiming)) {
-			FPSlock_delayed = true;
-		}
-		while ((((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))() - frameend) < (FPStimingoverride ? FPStimingoverride : FPStiming)) {
-			svcSleepThread(-2);
-			svcSleepThread(10000);
-		}
-	}
-	
-	int result = ((eglSwapBuffers_0)(Address_weaks.eglSwapBuffers))(EGLDisplay, EGLSurface);
-	endtick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
-	framedelta = endtick - frameend;
-	frameavg = ((9*frameavg) + framedelta) / 10;
-	Stats.FPSavg = systemtickfrequency / (float)frameavg;
+	int Swap (const void* EGLDisplay, const void* EGLSurface) {
 
-	if ((FPSlock_delayed && FPStiming) || FPStimingoverride) {
-		if (Stats.FPSavg > ((float)FPSlock)) {
-			if (range < 200) {
-				FPStiming += 20;
-				range++;
-			}
+		if (!NX_FPS_Math::starttick) {
+			(Shared -> API) = 2;
+			NX_FPS_Math::starttick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
+			NX_FPS_Math::starttick2 = NX_FPS_Math::starttick;
 		}
-		else if ((std::lround(Stats.FPSavg) == FPSlock) && (Stats.FPSavg < (float)FPSlock)) {
-			if (range > 0) {
-				FPStiming -= 20;
-				range--;
-			}
-		}
-		if (Stats.FPSavg > LOCK::overwriteRefreshRate) {
-			if (rangeoverride < 200) {
-				rangeoverride++;
-			}
-		}
-		else if ((std::lround(Stats.FPSavg) == LOCK::overwriteRefreshRate) && (Stats.FPSavg <  LOCK::overwriteRefreshRate)) {
-			if (rangeoverride > 0) {
-				rangeoverride--;
-			}
-		}
-	}
 
-	frameend = endtick;
-	
-	FPS_temp++;
-	deltatick = endtick - starttick;
+		NX_FPS_Math::PreFrame();
+		
+		int result = ((eglSwapBuffers_0)(Address_weaks.eglSwapBuffers))(EGLDisplay, EGLSurface);
+		NX_FPS_Math::PostFrame();
 
-	Shared -> FPSticks[FPStickItr++] = framedelta;
-	FPStickItr %= 10;
-
-	if (deltatick > systemtickfrequency) {
-		starttick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
-		Stats.FPS = FPS_temp - 1;
-		FPS_temp = 0;
-		(Shared -> FPS) = Stats.FPS;
-		if (changeFPS && !configRC && FPSlock) {
-			LOCK::applyPatch(configBuffer, configSize, FPSlock, (Shared -> displaySync));
-			(Shared -> patchApplied) = 1;
-		}
-		if (((_ZN2nn2oe16GetOperationModeEv)(Address_weaks.GetOperationMode))() == true && (Shared -> displaySync) != 0) {
-			(Shared -> displaySync) = 0;
-			FPSlock = 0;
-		}
-	}
-	
-	(Shared -> FPSavg) = Stats.FPSavg;
-	(Shared -> pluginActive) = true;
-
-	if ((FPSlock != (Shared -> FPSlocked)) || (FPSlock && !FPStiming) || ((Shared -> FPSlocked) > 30 && (Shared -> FPSmode) > 1)) {
-		changeFPS = true;
-		changedFPS = false;
-		if ((Shared -> FPSlocked) == 0) {
-			FPStiming = 0;
+		if (!NX_FPS_Math::new_fpslock) {
+			NX_FPS_Math::FPStiming = 0;
+			NX_FPS_Math::FPSlock = 0;
 			changeFPS = false;
-			FPSlock = (Shared -> FPSlocked);
-		}
-		else if ((Shared -> FPSlocked) <= 30) {
-			eglInterval(EGLDisplay, -2);
-			if ((Shared -> FPSlocked) != 30) {
-				FPStiming = (systemtickfrequency/((Shared -> FPSlocked))) - 6000;
-			}
-			else FPStiming = 0;
 		}
 		else {
-			eglInterval(EGLDisplay, -1);
-			if ((Shared -> FPSlocked) != 60) {
-				FPStiming = (systemtickfrequency/((Shared -> FPSlocked))) - 6000;
+			changeFPS = true;
+			NX_FPS_Math::FPSlock = (Shared -> FPSlocked);
+			if (NX_FPS_Math::new_fpslock <= ((Shared -> displaySync) ? ((Shared -> displaySync) / 4) : 15)) {
+				if ((Shared -> FPSmode) != 4)
+					EGL::Interval(EGLDisplay, -4);
+				if (NX_FPS_Math::new_fpslock != ((Shared -> displaySync) ? ((Shared -> displaySync) / 4) : 15)) {
+					NX_FPS_Math::FPStiming = (systemtickfrequency/NX_FPS_Math::new_fpslock) - 6000;
+				}
+				else NX_FPS_Math::FPStiming = 0;			
 			}
-			else FPStiming = 0;
+			else if (NX_FPS_Math::new_fpslock <= ((Shared -> displaySync) ? ((Shared -> displaySync) / 3) : 20)) {
+				if ((Shared -> FPSmode) != 3)
+					EGL::Interval(EGLDisplay, -3);
+				if (NX_FPS_Math::new_fpslock != ((Shared -> displaySync) ? ((Shared -> displaySync) / 3) : 20)) {
+					NX_FPS_Math::FPStiming = (systemtickfrequency/NX_FPS_Math::new_fpslock) - 6000;
+				}
+				else NX_FPS_Math::FPStiming = 0;			
+			}
+			else if (NX_FPS_Math::new_fpslock <= ((Shared -> displaySync) ? ((Shared -> displaySync) / 2) : 30)) {
+				if ((Shared -> FPSmode) != 2)
+					EGL::Interval(EGLDisplay, -2);
+				if (NX_FPS_Math::new_fpslock != ((Shared -> displaySync) ? ((Shared -> displaySync) / 2) : 30)) {
+					NX_FPS_Math::FPStiming = (systemtickfrequency/NX_FPS_Math::new_fpslock) - 6000;
+				}
+				else NX_FPS_Math::FPStiming = 0;			
+			}
+			else if (NX_FPS_Math::new_fpslock > ((Shared -> displaySync) ? ((Shared -> displaySync) / 2) : 30)) {
+				if ((Shared -> FPSmode) != 1)
+					EGL::Interval(EGLDisplay, -1);
+				if (NX_FPS_Math::new_fpslock != ((Shared -> displaySync) ? (Shared -> displaySync) : 60)) {
+					NX_FPS_Math::FPStiming = (systemtickfrequency/NX_FPS_Math::new_fpslock) - 6000;
+				}
+				else NX_FPS_Math::FPStiming = 0;
+			}
 		}
-		if (changedFPS) {
-			FPSlock = (Shared -> FPSlocked);
+
+		return result;
+	}
+
+	uintptr_t GetProc(const char* eglName) {
+		if (!strcmp(eglName, "eglSwapInterval")) {
+			return (uintptr_t)&Interval;
 		}
-	}
-
-	return result;
-}
-
-uintptr_t eglGetProc(const char* eglName) {
-	if (!strcmp(eglName, "eglSwapInterval")) {
-		return Address.eglSwapInterval;
-	}
-	else if (!strcmp(eglName, "eglSwapBuffers")) {
-		return Address.eglSwapBuffers;
-	}
-	return ((eglGetProcAddress_0)(Address_weaks.eglGetProcAddress))(eglName);
-}
-
-bool nvnWindowInitialize(const NVNWindow* nvnWindow, struct nvnWindowBuilder* windowBuilder) {
-	m_nvnWindow = (NVNWindow*)nvnWindow;
-	if (!(Shared -> Buffers)) {
-		(Shared -> Buffers) = windowBuilder -> numBufferedFrames;
-		if ((Shared -> SetBuffers) >= 2 && (Shared -> SetBuffers) <= windowBuilder -> numBufferedFrames) {
-			windowBuilder -> numBufferedFrames = (Shared -> SetBuffers);
+		else if (!strcmp(eglName, "eglSwapBuffers")) {
+			return (uintptr_t)&Swap;
 		}
-		(Shared -> ActiveBuffers) = windowBuilder -> numBufferedFrames;	
+		return ((eglGetProcAddress_0)(Address_weaks.eglGetProcAddress))(eglName);
 	}
-	return ((nvnWindowInitialize_0)(Ptrs.nvnWindowInitialize))(nvnWindow, windowBuilder);
 }
 
-void nvnWindowBuilderSetTextures(const nvnWindowBuilder* nvnWindowBuilder, int numBufferedFrames, NVNTexture** nvnTextures) {
-	(Shared -> Buffers) = numBufferedFrames;
-	for (int i = 0; i < numBufferedFrames; i++) {
-		framebufferTextures[i] = nvnTextures[i];
+namespace NVN {
+	bool WindowInitialize(const NVNWindow* nvnWindow, struct nvnWindowBuilder* windowBuilder) {
+		m_nvnWindow = (NVNWindow*)nvnWindow;
+		if (!(Shared -> Buffers)) {
+			(Shared -> Buffers) = windowBuilder -> numBufferedFrames;
+			if ((Shared -> SetBuffers) >= 2 && (Shared -> SetBuffers) <= windowBuilder -> numBufferedFrames) {
+				windowBuilder -> numBufferedFrames = (Shared -> SetBuffers);
+			}
+			(Shared -> ActiveBuffers) = windowBuilder -> numBufferedFrames;	
+		}
+		return ((nvnWindowInitialize_0)(Ptrs.nvnWindowInitialize))(nvnWindow, windowBuilder);
 	}
-	if ((Shared -> SetBuffers) >= 2 && (Shared -> SetBuffers) <= numBufferedFrames) {
-		numBufferedFrames = (Shared -> SetBuffers);
-	}
-	(Shared -> ActiveBuffers) = numBufferedFrames;
-	return ((nvnBuilderSetTextures_0)(Ptrs.nvnWindowBuilderSetTextures))(nvnWindowBuilder, numBufferedFrames, nvnTextures);
-}
 
-void nvnWindowSetNumActiveTextures(const NVNWindow* nvnWindow, int numBufferedFrames) {
-	(Shared -> SetActiveBuffers) = numBufferedFrames;
-	if ((Shared -> SetBuffers) >= 2 && (Shared -> SetBuffers) <= (Shared -> Buffers)) {
-		numBufferedFrames = (Shared -> SetBuffers);
+	void WindowBuilderSetTextures(const nvnWindowBuilder* nvnWindowBuilder, int numBufferedFrames, NVNTexture** nvnTextures) {
+		(Shared -> Buffers) = numBufferedFrames;
+		for (int i = 0; i < numBufferedFrames; i++) {
+			framebufferTextures[i] = nvnTextures[i];
+		}
+		if ((Shared -> SetBuffers) >= 2 && (Shared -> SetBuffers) <= numBufferedFrames) {
+			numBufferedFrames = (Shared -> SetBuffers);
+		}
+		(Shared -> ActiveBuffers) = numBufferedFrames;
+		return ((nvnBuilderSetTextures_0)(Ptrs.nvnWindowBuilderSetTextures))(nvnWindowBuilder, numBufferedFrames, nvnTextures);
 	}
-	(Shared -> ActiveBuffers) = numBufferedFrames;
-	return ((nvnWindowSetNumActiveTextures_0)(Ptrs.nvnWindowSetNumActiveTextures))(nvnWindow, numBufferedFrames);
-}
 
-void nvnSetPresentInterval(const NVNWindow* nvnWindow, int mode) {
-	if (mode < 0) {
-		mode *= -1;
-		if ((Shared -> FPSmode) != mode) {
+	void WindowSetNumActiveTextures(const NVNWindow* nvnWindow, int numBufferedFrames) {
+		(Shared -> SetActiveBuffers) = numBufferedFrames;
+		if ((Shared -> SetBuffers) >= 2 && (Shared -> SetBuffers) <= (Shared -> Buffers)) {
+			numBufferedFrames = (Shared -> SetBuffers);
+		}
+		(Shared -> ActiveBuffers) = numBufferedFrames;
+		return ((nvnWindowSetNumActiveTextures_0)(Ptrs.nvnWindowSetNumActiveTextures))(nvnWindow, numBufferedFrames);
+	}
+
+	void SetPresentInterval(const NVNWindow* nvnWindow, int mode) {
+		if (mode < 0) {
+			mode *= -1;
+			if ((Shared -> FPSmode) != mode) {
+				((nvnSetPresentInterval_0)(Ptrs.nvnWindowSetPresentInterval))(nvnWindow, mode);
+				(Shared -> FPSmode) = mode;
+			}
+			changedFPS = true;
+		}
+		else if (!changeFPS) {
 			((nvnSetPresentInterval_0)(Ptrs.nvnWindowSetPresentInterval))(nvnWindow, mode);
+			changedFPS = false;
 			(Shared -> FPSmode) = mode;
 		}
-		changedFPS = true;
-	}
-	else if (!changeFPS) {
-		((nvnSetPresentInterval_0)(Ptrs.nvnWindowSetPresentInterval))(nvnWindow, mode);
-		changedFPS = false;
-		(Shared -> FPSmode) = mode;
-	}
-	return;
-}
-
-void* nvnSyncWait0(const void* _this, uint64_t timeout_ns) {
-	uint64_t endFrameTick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
-	if (_this == WindowSync && (Shared -> ActiveBuffers) == 2) {
-		if ((Shared -> ZeroSync) == ZeroSyncType_Semi) {
-			u64 FrameTarget = (systemtickfrequency/60) - 8000;
-			s64 new_timeout = (FrameTarget - (endFrameTick - startFrameTick)) - 19200;
-			if ((Shared -> FPSlocked) == 60) {
-				new_timeout = (systemtickfrequency/101) - (endFrameTick - startFrameTick);
-			}
-			if (new_timeout > 0) {
-				timeout_ns = ((_ZN2nn2os17ConvertToTimeSpanENS0_4TickE_0)(Address_weaks.ConvertToTimeSpan))(new_timeout);
-			}
-			else timeout_ns = 0;
-		}
-		else if ((Shared -> ZeroSync) == ZeroSyncType_Soft) 
-			timeout_ns = 0;
-	}
-	return ((nvnSyncWait_0)(Ptrs.nvnSyncWait))(_this, timeout_ns);
-}
-
-bool nvnPresentedTexture = false;
-
-void nvnPresentTexture(const void* _this, const NVNWindow* nvnWindow, const void* unk3) {
-	static uint8_t FPS_temp = 0;
-	static uint64_t starttick = 0;
-	static uint64_t endtick = 0;
-	static uint64_t deltatick = 0;
-	static uint64_t frameend = 0;
-	static uint64_t framedelta = 0;
-	static uint64_t frameavg = 0;
-	static uint8_t FPSlock = 0;
-	static uint32_t FPStiming = 0;
-	static uint8_t FPStickItr = 0;
-	static uint8_t range = 0;
-	static uint8_t rangeoverride = 0;
-	
-	bool FPSlock_delayed = false;
-
-	if (!starttick) {
-		starttick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
-		(Shared -> FPSmode) = (uint8_t)((nvnGetPresentInterval_0)(Ptrs.nvnWindowGetPresentInterval))(nvnWindow);
+		return;
 	}
 
-	if (FPSlock) {
-		if (((Shared -> ZeroSync) == ZeroSyncType_None) && FPStiming && ((Shared -> displaySync) == FPSlock || ((Shared -> displaySync) == 0 && (FPSlock == 60 || FPSlock == 30)))) {
-			FPStiming = 0;
-		}
-		else if (((Shared -> ZeroSync) != ZeroSyncType_None) && !FPStiming) {
-			if (FPSlock == 60) {
-				FPStiming = (systemtickfrequency/((Shared -> FPSlocked))) - 8000;
-			}
-			else FPStiming = (systemtickfrequency/((Shared -> FPSlocked))) - 6000;
-		}
-	}
-
-	uint32_t FPStimingoverride = 0;
-	(Shared -> forceOriginalRefreshRate) = false;
-	if (LOCK::overwriteRefreshRate > 0) {
-		if ((LOCK::overwriteRefreshRate == 30) || (LOCK::overwriteRefreshRate == 60)) {
-			(Shared -> forceOriginalRefreshRate) = true;
-			FPStimingoverride = 1;
-			nvnSetPresentInterval(nvnWindow, (-60 / LOCK::overwriteRefreshRate));
-		}
-		else {
-			nvnSetPresentInterval(nvnWindow, -1);
-			if (LOCK::overwriteRefreshRate >= 60.0) {
-				FPStimingoverride = (uint32_t)((double)systemtickfrequency / LOCK::overwriteRefreshRate) - 8000;
-				FPStimingoverride += 20 * rangeoverride;
-			}
-			else {
-				FPStimingoverride = (uint32_t)((double)systemtickfrequency / LOCK::overwriteRefreshRate) - 6000;		
-				FPStimingoverride += 20 * rangeoverride;
-			}
-		}
-	}
-
-	if ((FPStiming && !LOCK::blockDelayFPS && (!(Shared -> displaySync) || (Shared -> FPSlocked) < (Shared -> displaySync))) || FPStimingoverride) {
-		if ((((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))() - frameend) < (FPStimingoverride ? FPStimingoverride : FPStiming)) {
-			FPSlock_delayed = true;
-		}
-		while ((((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))() - frameend) < (FPStimingoverride ? FPStimingoverride : FPStiming)) {
-			svcSleepThread(-2);
-			svcSleepThread(10000);
-		}
-	}
-	
-	((nvnQueuePresentTexture_0)(Ptrs.nvnQueuePresentTexture))(_this, nvnWindow, unk3);
-	nvnPresentedTexture = true;
-	endtick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
-	framedelta = endtick - frameend;
-
-	Shared -> FPSticks[FPStickItr++] = framedelta;
-	FPStickItr %= 10;
-	
-	frameavg = ((9*frameavg) + framedelta) / 10;
-	Stats.FPSavg = systemtickfrequency / (float)frameavg;
-
-	if ((FPSlock_delayed && FPStiming) || FPStimingoverride) {
-		if (Stats.FPSavg > ((float)FPSlock)) {
-			if (range < 200) {
-				FPStiming += 20;
-				range++;
-			}
-		}
-		else if ((std::lround(Stats.FPSavg) == FPSlock) && (Stats.FPSavg < (float)FPSlock)) {
-			if (range > 0) {
-				FPStiming -= 20;
-				range--;
-			}
-		}
-
-		if (Stats.FPSavg > LOCK::overwriteRefreshRate) {
-			if (rangeoverride < 200) {
-				rangeoverride++;
-			}
-		}
-		else if ((std::lround(Stats.FPSavg) == LOCK::overwriteRefreshRate) && (Stats.FPSavg <  LOCK::overwriteRefreshRate)) {
-			if (rangeoverride > 0) {
-				rangeoverride--;
-			}
-		}
-	}
-
-	frameend = endtick;
-	FPS_temp++;
-	deltatick = endtick - starttick;
-	if (deltatick > systemtickfrequency) {
-		starttick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
-		Stats.FPS = FPS_temp - 1;
-		FPS_temp = 0;
-		(Shared -> FPS) = Stats.FPS;
-		(Shared -> FPSmode) = (uint8_t)((nvnGetPresentInterval_0)(Ptrs.nvnWindowGetPresentInterval))(nvnWindow);
-		if (changeFPS && !configRC && FPSlock) {
-			LOCK::applyPatch(configBuffer, configSize, FPSlock, (Shared -> displaySync));
-			(Shared -> patchApplied) = 1;
-		}
-		if (((_ZN2nn2oe16GetOperationModeEv)(Address_weaks.GetOperationMode))() == true && (Shared -> displaySync) != 0) {
-			(Shared -> displaySync) = 0;
-			FPSlock = 0;
-		}
-	}
-
-	(Shared -> FPSavg) = Stats.FPSavg;
-	(Shared -> pluginActive) = true;
-
-	if ((FPSlock != (Shared -> FPSlocked)) || (FPSlock && !FPStiming) || ((Shared -> FPSlocked) > 30 && (Shared -> FPSmode) > 1)) {
-		changeFPS = true;
-		changedFPS = false;
-		if ((Shared -> FPSlocked) == 0) {
-			FPStiming = 0;
-			changeFPS = false;
-			FPSlock = (Shared -> FPSlocked);
-		}
-		else if ((Shared -> displaySync) == 0 && ((Shared -> FPSlocked) <= 30)) {
-			nvnSetPresentInterval(nvnWindow, -2);
-			if ((Shared -> FPSlocked) != 30 || (Shared -> ZeroSync)) {
-				if ((Shared -> FPSlocked) == 30) {
-					FPStiming = (systemtickfrequency/((Shared -> FPSlocked))) - 8000;
-				}
-				else FPStiming = (systemtickfrequency/((Shared -> FPSlocked))) - 6000;
-			}
-			else FPStiming = 0;
-		}
-		else {
-			nvnSetPresentInterval(nvnWindow, -2); //This allows in game with glitched interval to unlock 60 FPS, f.e. WRC Generations
-			nvnSetPresentInterval(nvnWindow, -1);
-			if ((Shared -> FPSlocked) != 60 || (Shared -> ZeroSync)) {
+	void* SyncWait0(const void* _this, uint64_t timeout_ns) {
+		uint64_t endFrameTick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
+		if (_this == WindowSync && (Shared -> ActiveBuffers) == 2) {
+			if ((Shared -> ZeroSync) == ZeroSyncType_Semi) {
+				u64 FrameTarget = (systemtickfrequency/60) - 8000;
+				s64 new_timeout = (FrameTarget - (endFrameTick - startFrameTick)) - 19200;
 				if ((Shared -> FPSlocked) == 60) {
-					FPStiming = (systemtickfrequency/((Shared -> FPSlocked))) - 8000;
+					new_timeout = (systemtickfrequency/101) - (endFrameTick - startFrameTick);
 				}
-				else FPStiming = (systemtickfrequency/((Shared -> FPSlocked))) - 6000;
+				if (new_timeout > 0) {
+					timeout_ns = ((_ZN2nn2os17ConvertToTimeSpanENS0_4TickE_0)(Address_weaks.ConvertToTimeSpan))(new_timeout);
+				}
+				else timeout_ns = 0;
 			}
-			else FPStiming = 0;
+			else if ((Shared -> ZeroSync) == ZeroSyncType_Soft) 
+				timeout_ns = 0;
 		}
-		if (changedFPS) {
-			FPSlock = (Shared -> FPSlocked);
+		return ((nvnSyncWait_0)(Ptrs.nvnSyncWait))(_this, timeout_ns);
+	}
+
+	bool nvnPresentedTexture = false;
+
+	void PresentTexture(const void* _this, const NVNWindow* nvnWindow, const void* unk3) {
+
+		//Initialize time calculation;
+		if (!NX_FPS_Math::starttick) {
+			NX_FPS_Math::starttick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
+			NX_FPS_Math::starttick2 = NX_FPS_Math::starttick;
+			(Shared -> FPSmode) = (uint8_t)((nvnGetPresentInterval_0)(Ptrs.nvnWindowGetPresentInterval))(nvnWindow);
 		}
+		
+		NX_FPS_Math::PreFrame();
+		((nvnQueuePresentTexture_0)(Ptrs.nvnQueuePresentTexture))(_this, nvnWindow, unk3);
+		nvnPresentedTexture = true;
+		NX_FPS_Math::PostFrame();
+
+		(Shared -> FPSmode) = (uint8_t)((nvnGetPresentInterval_0)(Ptrs.nvnWindowGetPresentInterval))(nvnWindow);
+
+		if (!NX_FPS_Math::new_fpslock) {
+			NX_FPS_Math::FPStiming = 0;
+			NX_FPS_Math::FPSlock = 0;
+			changeFPS = false;
+		}
+		else {
+			changeFPS = true;
+			NX_FPS_Math::FPSlock = (Shared -> FPSlocked);
+			if (NX_FPS_Math::new_fpslock <= ((Shared -> displaySync) ? ((Shared -> displaySync) / 4) : 15)) {
+				if (((nvnGetPresentInterval_0)(Ptrs.nvnWindowGetPresentInterval))(nvnWindow) != 4)
+					NVN::SetPresentInterval(nvnWindow, -4);
+				if ((NX_FPS_Math::new_fpslock != ((Shared -> displaySync) ? ((Shared -> displaySync) / 4) : 15))
+				|| (Shared -> ZeroSync)) {
+					NX_FPS_Math::FPStiming = (systemtickfrequency/NX_FPS_Math::new_fpslock) - 6000;
+					if (NX_FPS_Math::new_fpslock == ((Shared -> displaySync) ? ((Shared -> displaySync) / 4) : 15)) {
+						NX_FPS_Math::FPStiming -= 2000;
+					}
+				}
+				else NX_FPS_Math::FPStiming = 0;			
+			}
+			else if (NX_FPS_Math::new_fpslock <= ((Shared -> displaySync) ? ((Shared -> displaySync) / 3) : 20)) {
+				if (((nvnGetPresentInterval_0)(Ptrs.nvnWindowGetPresentInterval))(nvnWindow) != 3)
+					NVN::SetPresentInterval(nvnWindow, -3);
+				if ((NX_FPS_Math::new_fpslock != ((Shared -> displaySync) ? ((Shared -> displaySync) / 3) : 20))
+				|| (Shared -> ZeroSync)) {
+					NX_FPS_Math::FPStiming = (systemtickfrequency/NX_FPS_Math::new_fpslock) - 6000;
+					if (NX_FPS_Math::new_fpslock == ((Shared -> displaySync) ? ((Shared -> displaySync) / 3) : 20)) {
+						NX_FPS_Math::FPStiming -= 2000;
+					}
+				}
+				else NX_FPS_Math::FPStiming = 0;			
+			}
+			else if (NX_FPS_Math::new_fpslock <= ((Shared -> displaySync) ? ((Shared -> displaySync) / 2) : 30)) {
+				if (((nvnGetPresentInterval_0)(Ptrs.nvnWindowGetPresentInterval))(nvnWindow) != 2)
+					NVN::SetPresentInterval(nvnWindow, -2);
+				if (NX_FPS_Math::new_fpslock != ((Shared -> displaySync) ? ((Shared -> displaySync) / 2) : 30)
+				|| (Shared -> ZeroSync)) {
+					NX_FPS_Math::FPStiming = (systemtickfrequency/NX_FPS_Math::new_fpslock) - 6000;
+					if (NX_FPS_Math::new_fpslock == ((Shared -> displaySync) ? ((Shared -> displaySync) / 2) : 30)) {
+						NX_FPS_Math::FPStiming -= 2000;
+					}
+				}
+				else NX_FPS_Math::FPStiming = 0;			
+			}
+			else if (NX_FPS_Math::new_fpslock > ((Shared -> displaySync) ? ((Shared -> displaySync) / 2) : 30)) {
+				if (((nvnGetPresentInterval_0)(Ptrs.nvnWindowGetPresentInterval))(nvnWindow) != 1) {
+					NVN::SetPresentInterval(nvnWindow, -2); //This allows in game with glitched interval to unlock 60 FPS, f.e. WRC Generations
+					NVN::SetPresentInterval(nvnWindow, -1);
+				}
+				if ((NX_FPS_Math::new_fpslock != ((Shared -> displaySync) ? (Shared -> displaySync) : 60))
+				|| (Shared -> ZeroSync)) {
+					NX_FPS_Math::FPStiming = (systemtickfrequency/NX_FPS_Math::new_fpslock) - 6000;
+					if (NX_FPS_Math::new_fpslock == ((Shared -> displaySync) ? (Shared -> displaySync) : 60)) {
+						NX_FPS_Math::FPStiming -= 2000;
+					}
+				}
+				else NX_FPS_Math::FPStiming = 0;
+			}
+		}
+		
+		return;
 	}
-	
-	return;
-}
 
-void* nvnAcquireTexture(const NVNWindow* nvnWindow, const void* nvnSync, const void* index) {
-	if (WindowSync != nvnSync) {
-		WindowSync = (void*)nvnSync;
+	void* AcquireTexture(const NVNWindow* nvnWindow, const void* nvnSync, const void* index) {
+		if (WindowSync != nvnSync) {
+			WindowSync = (void*)nvnSync;
+		}
+		void* ret = ((nvnWindowAcquireTexture_0)(Ptrs.nvnWindowAcquireTexture))(nvnWindow, nvnSync, index);
+		startFrameTick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
+		return ret;
 	}
-	void* ret = ((nvnWindowAcquireTexture_0)(Ptrs.nvnWindowAcquireTexture))(nvnWindow, nvnSync, index);
-	startFrameTick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
-	return ret;
-}
 
-struct nvnCommandBuffer {
-	char reserved[0x80];
-};
+	struct nvnCommandBuffer {
+		char reserved[0x80];
+	};
 
-resolutionCalls m_resolutionRenderCalls[8] = {0};
-resolutionCalls m_resolutionViewportCalls[8] = {0};
+	resolutionCalls m_resolutionRenderCalls[8] = {0};
+	resolutionCalls m_resolutionViewportCalls[8] = {0};
 
-void* nvnCommandBufferSetViewports(nvnCommandBuffer* cmdBuf, int start, int count, NVNViewport* viewports) {
-	if (resolutionLookup) for (int i = start; i < count; i++) {
-		if (viewports[i].height > 1.f && viewports[i].width > 1.f && viewports[i].x == 0.f && viewports[i].y == 0.f) {
-			uint16_t width = (uint16_t)(viewports[i].width);
-			uint16_t height = (uint16_t)(viewports[i].height);
+	void* CommandBufferSetViewports(nvnCommandBuffer* cmdBuf, int start, int count, NVNViewport* viewports) {
+		if (resolutionLookup) for (int i = start; i < count; i++) {
+			if (viewports[i].height > 1.f && viewports[i].width > 1.f && viewports[i].x == 0.f && viewports[i].y == 0.f) {
+				uint16_t width = (uint16_t)(viewports[i].width);
+				uint16_t height = (uint16_t)(viewports[i].height);
+				int ratio = (width * 10) / height;
+				if (ratio >= 12 && ratio <= 18) {
+					//Dynamic Resolution is always the second value passed
+					for (size_t i = 0; i < 8; i++) {
+						if (width == m_resolutionViewportCalls[i].width) {
+							m_resolutionViewportCalls[i].calls++;
+							break;
+						}
+						if (m_resolutionViewportCalls[i].width == 0) {
+							m_resolutionViewportCalls[i].width = width;
+							m_resolutionViewportCalls[i].height = height;
+							m_resolutionViewportCalls[i].calls = 1;
+							break;
+						}
+					}			
+				}
+			}
+		}
+		return ((nvnCommandBufferSetViewports_0)(Ptrs.nvnCommandBufferSetViewports))(cmdBuf, start, count, viewports);
+	}
+
+	void* CommandBufferSetViewport(nvnCommandBuffer* cmdBuf, int x, int y, int width, int height) {
+		if (resolutionLookup && height > 1 && width > 1 && !x && !y) {
 			int ratio = (width * 10) / height;
 			if (ratio >= 12 && ratio <= 18) {
 				//Dynamic Resolution is always the second value passed
@@ -948,142 +712,119 @@ void* nvnCommandBufferSetViewports(nvnCommandBuffer* cmdBuf, int start, int coun
 				}			
 			}
 		}
+		return ((nvnCommandBufferSetViewport_0)(Ptrs.nvnCommandBufferSetViewport))(cmdBuf, x, y, width, height);
 	}
-	return ((nvnCommandBufferSetViewports_0)(Ptrs.nvnCommandBufferSetViewports))(cmdBuf, start, count, viewports);
-}
 
-void* nvnCommandBufferSetViewport(nvnCommandBuffer* cmdBuf, int x, int y, int width, int height) {
-	if (resolutionLookup && height > 1 && width > 1 && !x && !y) {
-		int ratio = (width * 10) / height;
-		if (ratio >= 12 && ratio <= 18) {
-			//Dynamic Resolution is always the second value passed
-			for (size_t i = 0; i < 8; i++) {
-				if (width == m_resolutionViewportCalls[i].width) {
-					m_resolutionViewportCalls[i].calls++;
-					break;
-				}
-				if (m_resolutionViewportCalls[i].width == 0) {
-					m_resolutionViewportCalls[i].width = width;
-					m_resolutionViewportCalls[i].height = height;
-					m_resolutionViewportCalls[i].calls = 1;
-					break;
-				}
-			}			
+	void* CommandBufferSetRenderTargets(nvnCommandBuffer* cmdBuf, int numTextures, NVNTexture** texture, NVNTextureView** textureView, NVNTexture* depthTexture, NVNTextureView* depthView) {
+		if (!resolutionLookup && Shared -> renderCalls[0].calls == 0xFFFF) {
+			resolutionLookup = true;
+			Shared -> renderCalls[0].calls = 0;
 		}
-	}
-	return ((nvnCommandBufferSetViewport_0)(Ptrs.nvnCommandBufferSetViewport))(cmdBuf, x, y, width, height);
-}
-
-void* nvnCommandBufferSetRenderTargets(nvnCommandBuffer* cmdBuf, int numTextures, NVNTexture** texture, NVNTextureView** textureView, NVNTexture* depthTexture, NVNTextureView* depthView) {
-	if (!resolutionLookup && Shared -> renderCalls[0].calls == 0xFFFF) {
-		resolutionLookup = true;
-		Shared -> renderCalls[0].calls = 0;
-	}
-	if (resolutionLookup && depthTexture != NULL && texture != NULL) {
-		uint16_t depth_width = ((nvnTextureGetWidth_0)(Ptrs.nvnTextureGetWidth))(depthTexture);
-		uint16_t depth_height = ((nvnTextureGetHeight_0)(Ptrs.nvnTextureGetHeight))(depthTexture);
-		int depth_format = ((nvnTextureGetFormat_0)(Ptrs.nvnTextureGetFormat))(depthTexture);
-		if (depth_width > 1 && depth_height > 1 && (depth_format >= 51 && depth_format <= 54)) {
-			if (nvnPresentedTexture) {
-				memcpy(Shared -> renderCalls, m_resolutionRenderCalls, sizeof(m_resolutionRenderCalls));
-				memcpy(Shared -> viewportCalls, m_resolutionViewportCalls, sizeof(m_resolutionViewportCalls));
-				memset(&m_resolutionRenderCalls, 0, sizeof(m_resolutionRenderCalls));
-				memset(&m_resolutionViewportCalls, 0, sizeof(m_resolutionViewportCalls));
-				nvnPresentedTexture = false;
-			}
-			bool found = false;
-			int ratio = ((depth_width * 10) / (depth_height));
-			if (ratio < 12 || ratio > 18) {
-				found = true;
-			}
-			if (!found) {
-				for (size_t i = 0; i < 8; i++) {
-					if (depth_width == m_resolutionRenderCalls[i].width) {
-						m_resolutionRenderCalls[i].calls++;
-						break;
-					}
-					if (m_resolutionRenderCalls[i].width == 0) {
-						m_resolutionRenderCalls[i].width = depth_width;
-						m_resolutionRenderCalls[i].height = depth_height;
-						m_resolutionRenderCalls[i].calls = 1;
-						break;
+		if (resolutionLookup && depthTexture != NULL && texture != NULL) {
+			uint16_t depth_width = ((nvnTextureGetWidth_0)(Ptrs.nvnTextureGetWidth))(depthTexture);
+			uint16_t depth_height = ((nvnTextureGetHeight_0)(Ptrs.nvnTextureGetHeight))(depthTexture);
+			int depth_format = ((nvnTextureGetFormat_0)(Ptrs.nvnTextureGetFormat))(depthTexture);
+			if (depth_width > 1 && depth_height > 1 && (depth_format >= 51 && depth_format <= 54)) {
+				if (nvnPresentedTexture) {
+					memcpy(Shared -> renderCalls, m_resolutionRenderCalls, sizeof(m_resolutionRenderCalls));
+					memcpy(Shared -> viewportCalls, m_resolutionViewportCalls, sizeof(m_resolutionViewportCalls));
+					memset(&m_resolutionRenderCalls, 0, sizeof(m_resolutionRenderCalls));
+					memset(&m_resolutionViewportCalls, 0, sizeof(m_resolutionViewportCalls));
+					nvnPresentedTexture = false;
+				}
+				bool found = false;
+				int ratio = ((depth_width * 10) / (depth_height));
+				if (ratio < 12 || ratio > 18) {
+					found = true;
+				}
+				if (!found) {
+					for (size_t i = 0; i < 8; i++) {
+						if (depth_width == m_resolutionRenderCalls[i].width) {
+							m_resolutionRenderCalls[i].calls++;
+							break;
+						}
+						if (m_resolutionRenderCalls[i].width == 0) {
+							m_resolutionRenderCalls[i].width = depth_width;
+							m_resolutionRenderCalls[i].height = depth_height;
+							m_resolutionRenderCalls[i].calls = 1;
+							break;
+						}
 					}
 				}
 			}
 		}
+		return ((nvnCommandBufferSetRenderTargets_0)(Ptrs.nvnCommandBufferSetRenderTargets))(cmdBuf, numTextures, texture, textureView, depthTexture, depthView);
 	}
-	return ((nvnCommandBufferSetRenderTargets_0)(Ptrs.nvnCommandBufferSetRenderTargets))(cmdBuf, numTextures, texture, textureView, depthTexture, depthView);
-}
 
-uintptr_t nvnGetProcAddress (NVNDevice* nvnDevice, const char* nvnFunction) {
-	uintptr_t address = ((GetProcAddress)(Ptrs.nvnDeviceGetProcAddress))(nvnDevice, nvnFunction);
-	m_nvnDevice = nvnDevice;
-	if (!strcmp("nvnDeviceGetProcAddress", nvnFunction))
-		return Address.nvnGetProcAddress;
-	else if (!strcmp("nvnQueuePresentTexture", nvnFunction)) {
-		Ptrs.nvnQueuePresentTexture = address;
-		return Address.nvnQueuePresentTexture;
-	}
-	else if (!strcmp("nvnWindowAcquireTexture", nvnFunction)) {
-		Ptrs.nvnWindowAcquireTexture = address;
-		return Address.nvnWindowAcquireTexture;
-	}
-	else if (!strcmp("nvnWindowSetPresentInterval", nvnFunction)) {
-		Ptrs.nvnWindowSetPresentInterval = address;
-		return Address.nvnWindowSetPresentInterval;
-	}
-	else if (!strcmp("nvnWindowGetPresentInterval", nvnFunction)) {
-		Ptrs.nvnWindowGetPresentInterval = address;
+	uintptr_t GetProcAddress0 (NVNDevice* nvnDevice, const char* nvnFunction) {
+		uintptr_t address = ((GetProcAddress)(Ptrs.nvnDeviceGetProcAddress))(nvnDevice, nvnFunction);
+		m_nvnDevice = nvnDevice;
+		if (!strcmp("nvnDeviceGetProcAddress", nvnFunction))
+			return (uintptr_t)&NVN::GetProcAddress0;
+		else if (!strcmp("nvnQueuePresentTexture", nvnFunction)) {
+			Ptrs.nvnQueuePresentTexture = address;
+			return (uintptr_t)&NVN::PresentTexture;
+		}
+		else if (!strcmp("nvnWindowAcquireTexture", nvnFunction)) {
+			Ptrs.nvnWindowAcquireTexture = address;
+			return (uintptr_t)&NVN::AcquireTexture;
+		}
+		else if (!strcmp("nvnWindowSetPresentInterval", nvnFunction)) {
+			Ptrs.nvnWindowSetPresentInterval = address;
+			return (uintptr_t)&NVN::SetPresentInterval;
+		}
+		else if (!strcmp("nvnWindowGetPresentInterval", nvnFunction)) {
+			Ptrs.nvnWindowGetPresentInterval = address;
+		}
+		else if (!strcmp("nvnWindowSetNumActiveTextures", nvnFunction)) {
+			Ptrs.nvnWindowSetNumActiveTextures = address;
+			return (uintptr_t)&NVN::WindowSetNumActiveTextures;
+		}
+		else if (!strcmp("nvnWindowBuilderSetTextures", nvnFunction)) {
+			Ptrs.nvnWindowBuilderSetTextures = address;
+			return (uintptr_t)&NVN::WindowBuilderSetTextures;
+		}
+		else if (!strcmp("nvnWindowInitialize", nvnFunction)) {
+			Ptrs.nvnWindowInitialize = address;
+			return (uintptr_t)&NVN::WindowInitialize;
+		}
+		else if (!strcmp("nvnSyncWait", nvnFunction)) {
+			Ptrs.nvnSyncWait = address;
+			return (uintptr_t)&NVN::SyncWait0;
+		}
+		else if (!strcmp("nvnCommandBufferSetRenderTargets", nvnFunction)) {
+			Ptrs.nvnCommandBufferSetRenderTargets = address;
+			return (uintptr_t)&NVN::CommandBufferSetRenderTargets;
+		}
+		else if (!strcmp("nvnCommandBufferSetViewport", nvnFunction)) {
+			Ptrs.nvnCommandBufferSetViewport = address;
+			return (uintptr_t)&NVN::CommandBufferSetViewport;
+		}
+		else if (!strcmp("nvnCommandBufferSetViewports", nvnFunction)) {
+			Ptrs.nvnCommandBufferSetViewports = address;
+			return (uintptr_t)&NVN::CommandBufferSetViewports;
+		}
+		else if (!strcmp("nvnTextureGetWidth", nvnFunction)) {
+			Ptrs.nvnTextureGetWidth = address;
+		}
+		else if (!strcmp("nvnTextureGetHeight", nvnFunction)) {
+			Ptrs.nvnTextureGetHeight = address;
+		}
+		else if (!strcmp("nvnTextureGetFormat", nvnFunction)) {
+			Ptrs.nvnTextureGetFormat = address;
+		}
 		return address;
 	}
-	else if (!strcmp("nvnWindowSetNumActiveTextures", nvnFunction)) {
-		Ptrs.nvnWindowSetNumActiveTextures = address;
-		return Address.nvnWindowSetNumActiveTextures;
-	}
-	else if (!strcmp("nvnWindowBuilderSetTextures", nvnFunction)) {
-		Ptrs.nvnWindowBuilderSetTextures = address;
-		return Address.nvnWindowBuilderSetTextures;
-	}
-	else if (!strcmp("nvnWindowInitialize", nvnFunction)) {
-		Ptrs.nvnWindowInitialize = address;
-		return Address.nvnWindowInitialize;
-	}
-	else if (!strcmp("nvnSyncWait", nvnFunction)) {
-		Ptrs.nvnSyncWait = address;
-		return Address.nvnSyncWait;
-	}
-	else if (!strcmp("nvnCommandBufferSetRenderTargets", nvnFunction)) {
-		Ptrs.nvnCommandBufferSetRenderTargets = address;
-		return Address.nvnCommandBufferSetRenderTargets;
-	}
-	else if (!strcmp("nvnCommandBufferSetViewport", nvnFunction)) {
-		Ptrs.nvnCommandBufferSetViewport = address;
-		return Address.nvnCommandBufferSetViewport;
-	}
-	else if (!strcmp("nvnCommandBufferSetViewports", nvnFunction)) {
-		Ptrs.nvnCommandBufferSetViewports = address;
-		return Address.nvnCommandBufferSetViewports;
-	}
-	else if (!strcmp("nvnTextureGetWidth", nvnFunction)) {
-		Ptrs.nvnTextureGetWidth = address;
-	}
-	else if (!strcmp("nvnTextureGetHeight", nvnFunction)) {
-		Ptrs.nvnTextureGetHeight = address;
-	}
-	else if (!strcmp("nvnTextureGetFormat", nvnFunction)) {
-		Ptrs.nvnTextureGetFormat = address;
-	}
-	return address;
-}
 
-uintptr_t nvnBootstrapLoader_1(const char* nvnName) {
-	if (strcmp(nvnName, "nvnDeviceGetProcAddress") == 0) {
-		(Shared -> API) = 1;
-		Ptrs.nvnDeviceGetProcAddress = ((nvnBootstrapLoader_0)(Address_weaks.nvnBootstrapLoader))("nvnDeviceGetProcAddress");
-		return Address.nvnGetProcAddress;
+	uintptr_t BootstrapLoader_1(const char* nvnName) {
+		if (strcmp(nvnName, "nvnDeviceGetProcAddress") == 0) {
+			(Shared -> API) = 1;
+			Ptrs.nvnDeviceGetProcAddress = ((nvnBootstrapLoader_0)(Address_weaks.nvnBootstrapLoader))("nvnDeviceGetProcAddress");
+			return (uintptr_t)&GetProcAddress0;
+		}
+		uintptr_t ptrret = ((nvnBootstrapLoader_0)(Address_weaks.nvnBootstrapLoader))(nvnName);
+		return ptrret;
 	}
-	uintptr_t ptrret = ((nvnBootstrapLoader_0)(Address_weaks.nvnBootstrapLoader))(nvnName);
-	return ptrret;
 }
 
 extern "C" {
@@ -1100,10 +841,6 @@ extern "C" {
 			Shared = (NxFpsSharedBlock*)((uintptr_t)shmemGetAddr(_sharedmemory) + SharedMemoryOffset);
 			Shared -> MAGIC = 0x465053;
 			
-			Address.nvnGetProcAddress = (uint64_t)&nvnGetProcAddress;
-			Address.nvnQueuePresentTexture = (uint64_t)&nvnPresentTexture;
-			Address.nvnWindowAcquireTexture = (uint64_t)&nvnAcquireTexture;
-			Address.nvnWindowInitialize = (uint64_t)&nvnWindowInitialize;
 			Address_weaks.nvnBootstrapLoader = SaltySDCore_FindSymbolBuiltin("nvnBootstrapLoader");
 			Address_weaks.eglSwapBuffers = SaltySDCore_FindSymbolBuiltin("eglSwapBuffers");
 			Address_weaks.eglSwapInterval = SaltySDCore_FindSymbolBuiltin("eglSwapInterval");
@@ -1114,23 +851,13 @@ extern "C" {
 			Address_weaks.eglGetProcAddress = SaltySDCore_FindSymbolBuiltin("eglGetProcAddress");
 			Address_weaks.GetOperationMode = SaltySDCore_FindSymbolBuiltin("_ZN2nn2oe16GetOperationModeEv");
 			Address_weaks.vkGetInstanceProcAddr = SaltySDCore_FindSymbolBuiltin("vkGetInstanceProcAddr");
-			SaltySDCore_ReplaceImport("nvnBootstrapLoader", (void*)nvnBootstrapLoader_1);
-			SaltySDCore_ReplaceImport("eglSwapBuffers", (void*)eglSwap);
-			SaltySDCore_ReplaceImport("eglSwapInterval", (void*)eglInterval);
-			SaltySDCore_ReplaceImport("vkQueuePresentKHR", (void*)vulkanSwap);
-			SaltySDCore_ReplaceImport("_ZN11NvSwapchain15QueuePresentKHREP9VkQueue_TPK16VkPresentInfoKHR", (void*)vulkanSwap2);
-			SaltySDCore_ReplaceImport("eglGetProcAddress", (void*)eglGetProc);
-			SaltySDCore_ReplaceImport("vkGetInstanceProcAddr", (void*)vkGetInstanceProcAddr);
-			Address.nvnWindowSetPresentInterval = (uint64_t)&nvnSetPresentInterval;
-			Address.nvnSyncWait = (uint64_t)&nvnSyncWait0;
-			Address.nvnWindowBuilderSetTextures = (uint64_t)&nvnWindowBuilderSetTextures;
-			Address.nvnWindowSetNumActiveTextures = (uint64_t)&nvnWindowSetNumActiveTextures;
-			Address.eglGetProcAddress = (uint64_t)&eglGetProc;
-			Address.eglSwapBuffers = (uint64_t)&eglSwap;
-			Address.eglSwapInterval = (uint64_t)&eglInterval;
-			Address.nvnCommandBufferSetRenderTargets = (uint64_t)&nvnCommandBufferSetRenderTargets;
-			Address.nvnCommandBufferSetViewport = (uint64_t)&nvnCommandBufferSetViewport;
-			Address.nvnCommandBufferSetViewports = (uint64_t)&nvnCommandBufferSetViewports;
+			SaltySDCore_ReplaceImport("nvnBootstrapLoader", (void*)NVN::BootstrapLoader_1);
+			SaltySDCore_ReplaceImport("eglSwapBuffers", (void*)EGL::Swap);
+			SaltySDCore_ReplaceImport("eglSwapInterval", (void*)EGL::Interval);
+			SaltySDCore_ReplaceImport("vkQueuePresentKHR", (void*)vk::QueuePresent);
+			SaltySDCore_ReplaceImport("_ZN11NvSwapchain15QueuePresentKHREP9VkQueue_TPK16VkPresentInfoKHR", (void*)vk::nvSwapchain::QueuePresent);
+			SaltySDCore_ReplaceImport("eglGetProcAddress", (void*)EGL::GetProc);
+			SaltySDCore_ReplaceImport("vkGetInstanceProcAddr", (void*)vk::GetInstanceProcAddr);
 
 			char titleid[17];
 			CheckTitleID(&titleid[0]);
