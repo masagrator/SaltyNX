@@ -14,15 +14,53 @@
 #include "loadelf.h"
 #include "useful.h"
 #include "dmntcht.h"
+#include <math.h>
 
 #define MODULE_SALTYSD 420
+#define	NVDISP_GET_MODE 0x80380204
+#define	NVDISP_SET_MODE 0x40380205
+#define NVDISP_VALIDATE_MODE 0xC038020A
+#define NVDISP_PANEL_GET_VENDOR_ID 0xC003021A
+#define DSI_CLOCK_HZ 234000000llu
+
+#define MIN(a,b) (((a)<(b))?(a):(b))
+#define MAX(a,b) (((a)>(b))?(a):(b))
+
+struct resolutionCalls {
+	uint16_t width;
+	uint16_t height;
+	uint16_t calls;
+};
+
+struct NxFpsSharedBlock {
+	uint32_t MAGIC;
+	uint8_t FPS;
+	float FPSavg;
+	bool pluginActive;
+	uint8_t FPSlocked;
+	uint8_t FPSmode;
+	uint8_t ZeroSync;
+	uint8_t patchApplied;
+	uint8_t API;
+	uint32_t FPSticks[10];
+	uint8_t Buffers;
+	uint8_t SetBuffers;
+	uint8_t ActiveBuffers;
+	uint8_t SetActiveBuffers;
+	uint8_t displaySync;
+	struct resolutionCalls renderCalls[8];
+	struct resolutionCalls viewportCalls[8];
+	bool forceOriginalRefreshRate;
+} NX_PACKED;
+
+struct NxFpsSharedBlock* nx_fps = 0;
 
 u32 __nx_applet_type = AppletType_None;
 
 void serviceThread(void* buf);
 
 Handle saltyport, sdcard, injectserv;
-static char g_heap[0x70000];
+static char g_heap[0x80000];
 bool should_terminate = false;
 bool already_hijacking = false;
 DebugEventInfo eventinfo;
@@ -35,8 +73,24 @@ bool displaySync = false;
 uint8_t refreshRate = 0;
 s64 lastAppPID = -1;
 bool isOLED = false;
-bool isErista = false;
+bool isLite = false;
 bool cheatCheck = false;
+bool isDocked = false;
+bool dontForce60InDocked = false;
+bool matchLowestDocked = false;
+
+/// Edid2
+typedef struct {
+	SetSysEdid edid;
+	char reserved[0x100];
+} SetSysEdid2;
+
+Result setsysGetEdid2(Service* g_setsysSrv, SetSysEdid2 *out) {
+    return serviceDispatch(g_setsysSrv, 41,
+        .buffer_attrs = { SfBufferAttr_FixedSize | SfBufferAttr_HipcPointer | SfBufferAttr_Out },
+        .buffers = { { out, sizeof(*out) } },
+    );
+}
 
 void __libnx_initheap(void)
 {
@@ -49,20 +103,57 @@ void __libnx_initheap(void)
 
 void __appInit(void)
 {
-    
+    svcSleepThread(1*1000*1000*1000);
 }
 
 void __appExit(void)
 {
     already_hijacking = false;
-    fsdevUnmountAll();
-    fsExit();
+    fsdevUnmountAll_old();
     smExit();
+    setsysExit();
+}
+
+void ABORT_IF_FAILED(Result rc, uint8_t ID) {
+    if (R_FAILED(rc)) {
+        uint32_t* address = (uint32_t*)(0x7100000000 + ID);
+        *address = rc;
+    }
+}
+
+//Tweaks to nvInitialize so it will take less RAM
+#define NVDRV_TMEM_SIZE (8 * 0x1000)
+alignas(0x1000) char nvdrv_tmem_data[NVDRV_TMEM_SIZE];
+
+Result __nx_nv_create_tmem(TransferMemory *t, u32 *out_size, Permission perm) {
+    *out_size = NVDRV_TMEM_SIZE;
+    return tmemCreateFromMemory(t, nvdrv_tmem_data, NVDRV_TMEM_SIZE, perm);
 }
 
 u64 TIDnow;
 u64 PIDnow;
 u64 BIDnow;
+
+bool DockedModeRefreshRateAllowed[]         = { false,  //40Hz
+                                                false,  //45Hz
+                                                true,   //50Hz
+                                                false,  //55Hz
+                                                true};  //60Hz
+
+uint8_t DockedModeRefreshRateAllowedValues[] = { 40,
+                                                 45,
+                                                 50,
+                                                 55,
+                                                 60};
+
+static_assert(sizeof(DockedModeRefreshRateAllowedValues) == sizeof(DockedModeRefreshRateAllowed));
+
+struct MinMax {
+    u8 min;
+    u8 max;
+};
+
+struct MinMax HandheldModeRefreshRateAllowed = {40, 60};
 
 struct PLLD_BASE {
     unsigned int PLLD_DIVM: 8;
@@ -96,41 +187,284 @@ struct PLLD_MISC {
     unsigned int reserved: 2;
 };
 
-bool SetDisplayRefreshRate(uint32_t refreshRate) {
-    if (!clkVirtAddr)
-        return false;
-    if (refreshRate > 75 || refreshRate < 35 || refreshRate % 5 != 0)
+struct nvdcMode {
+    unsigned int hActive;
+    unsigned int vActive;
+    unsigned int hSyncWidth;
+    unsigned int vSyncWidth;
+    unsigned int hFrontPorch;
+    unsigned int vFrontPorch;
+    unsigned int hBackPorch;
+    unsigned int vBackPorch;
+    unsigned int hRefToSync; //always 1
+    unsigned int vRefToSync; //always 1
+    unsigned int pclkKHz;
+    unsigned int bitsPerPixel; //always 0
+    unsigned int vmode; //always 0
+};
+
+void setDefaultDockedSettings() {
+    for (size_t i = 0; i < sizeof(DockedModeRefreshRateAllowed); i++) {
+        if (DockedModeRefreshRateAllowedValues[i] == 50 || DockedModeRefreshRateAllowedValues[i] == 60) DockedModeRefreshRateAllowed[i] = true;
+        else DockedModeRefreshRateAllowed[i] = false;
+    }
+    dontForce60InDocked = false;
+    matchLowestDocked = false;
+}
+
+void LoadDockedModeAllowedSave() {
+    SetSysEdid2 edid2 = {0};
+    setDefaultDockedSettings();
+    if (R_FAILED(setsysGetEdid2(setsysGetServiceSession(), &edid2))) {
+        SaltySD_printf("SaltySD: Couldn't retrieve display EDID! Locking allowed refresh rates in docked mode to 50 and 60 Hz.\n");
+        return;
+    }
+    char path[128] = "";
+    snprintf(path, sizeof(path), "sdmc:/SaltySD/plugins/FPSLocker/ExtDisplays/%08X.dat", crc32Calculate(&edid2.edid, sizeof(edid2.edid)));
+    FILE* file = fopen(path, "rb");
+    if (file) {
+        u64 MAGIC = 0x00FFFFFFFFFFFF00;
+        u64 checkMAGIC = 0;
+        fread(&checkMAGIC, 8, 1, file);
+        if (checkMAGIC != MAGIC) {
+            fclose(file);
+            SaltySD_printf("SaltySD: File \"%s\" is invalid! Locking allowed refresh rates in docked mode to 50 and 60 Hz.\n", path);
+            return;
+        }
+
+        SaltySD_printf("SaltySD: File \"%s\" was loaded! Allowed refresh rates: 60", path);
+        fseek(file, 0x100, 0);
+        for (size_t i = 0; i < sizeof(DockedModeRefreshRateAllowed); i++) {
+            bool temp = false;
+            if (!fread(&temp, 1, 1, file))
+                break;
+            if (DockedModeRefreshRateAllowedValues[i] == 60)
+                continue;
+            DockedModeRefreshRateAllowed[i] = temp;
+            if (temp == true) {
+                SaltySD_printf(", %d", DockedModeRefreshRateAllowedValues[i]);
+            }
+        }
+        SaltySD_printf(".\n");
+        fseek(file, 0x180, 0);
+        uint8_t temp = 2;
+        fread(&temp, 1, 1, file);
+        if (temp > 1) SaltySD_printf("SaltySD: File \"%s\" has invalid dontForce60InDocked value. Setting it to false.\n", path);
+        else dontForce60InDocked = (bool)temp;
+        temp = 2;
+        fread(&temp, 1, 1, file);
+        if (temp > 1) SaltySD_printf("SaltySD: File \"%s\" has invalid matchLowestDocked value. Setting it to false.\n", path);
+        else matchLowestDocked = (bool)temp;
+        fclose(file);
+    }
+    else {
+        SaltySD_printf("SaltySD: File \"%s\" not found! Locking allowed refresh rates in docked mode to 50 and 60 Hz.\n", path);
+    }
+}
+
+bool canChangeRefreshRateDocked = false;
+
+bool SetDisplayRefreshRate(uint32_t new_refreshRate) {
+    if (!clkVirtAddr || !new_refreshRate)
         return false;
     struct PLLD_BASE base = {0};
     struct PLLD_MISC misc = {0};
     memcpy(&base, (void*)(clkVirtAddr + 0xD0), 4);
     memcpy(&misc, (void*)(clkVirtAddr + 0xDC), 4);
+    uint32_t value = ((base.PLLD_DIVN / base.PLLD_DIVM) * 10) / 4;
+    if (value == 0 || value == 80) { //We are in docked mode
+        if (isLite || !canChangeRefreshRateDocked)
+            return false;
+        uint32_t fd = 0;
+        if (R_FAILED(nvOpen(&fd, "/dev/nvdisp-disp1"))) {
+            return false;
+        }
+        struct nvdcMode DISPLAY_B = {0};
+        Result nvrc = nvIoctl(fd, NVDISP_GET_MODE, &DISPLAY_B);
+        if (R_FAILED(nvrc)) {
+            SaltySD_printf("SaltySD: NVDISP_GET_MODE failed! rc: 0x%x\n", nvrc);
+            nvClose(fd);
+            return false;
+        }
+        if (!DISPLAY_B.pclkKHz) {
+            nvClose(fd);
+            return false;
+        }
+        uint32_t h_total = DISPLAY_B.hActive + DISPLAY_B.hFrontPorch + DISPLAY_B.hSyncWidth + DISPLAY_B.hBackPorch;
+        uint32_t v_total = DISPLAY_B.vActive + DISPLAY_B.vFrontPorch + DISPLAY_B.vSyncWidth + DISPLAY_B.vBackPorch;
+        uint32_t refreshRateNow = ((DISPLAY_B.pclkKHz) * 1000 + 999) / (h_total * v_total);
+        int8_t itr = -1;
+        if ((60 == new_refreshRate) || (60 == (new_refreshRate * 2)) || (60 == (new_refreshRate * 3)) || (60 == (new_refreshRate * 4))) {
+            itr = 4;
+        }
+        if (itr == -1) for (size_t i = 0; i < sizeof(DockedModeRefreshRateAllowed); i++) {
+            if (DockedModeRefreshRateAllowed[i] != true)
+                continue;
+            uint8_t val = DockedModeRefreshRateAllowedValues[i];
+            if ((val == new_refreshRate) || (val == (new_refreshRate * 2)) || (val == (new_refreshRate * 3)) || (val == (new_refreshRate * 4))) {
+                itr = i;
+                break;
+            }
+        }
+        if (itr == -1) {
+            if (!matchLowestDocked)
+                itr = 4;
+            else for (size_t i = 0; i < sizeof(DockedModeRefreshRateAllowed); i++) {
+                if ((DockedModeRefreshRateAllowed[i] == true) && (new_refreshRate < DockedModeRefreshRateAllowedValues[i])) {
+                    itr = i;
+                    break;
+                }
+            }
+        }
+        bool increase = refreshRateNow < DockedModeRefreshRateAllowedValues[itr];
+        while(itr >= 0 && itr < sizeof(DockedModeRefreshRateAllowed) && DockedModeRefreshRateAllowed[itr] != true) {
+            if (!displaySync) {
+                if (increase) itr++;
+                else itr--;
+            }
+            else itr++;
+        }
+        if (refreshRateNow == DockedModeRefreshRateAllowedValues[itr]) {
+            if (nx_fps) nx_fps->displaySync = DockedModeRefreshRateAllowedValues[itr];
+            nvClose(fd);
+            return true;
+        }
+        
+        if (itr >= 0 && itr < sizeof(DockedModeRefreshRateAllowed)) {
+            uint32_t clock = ((h_total * v_total) * DockedModeRefreshRateAllowedValues[itr]) / 1000;
+            DISPLAY_B.pclkKHz = clock;
+            nvrc = nvIoctl(fd, NVDISP_VALIDATE_MODE, &DISPLAY_B);
+            if (R_SUCCEEDED(nvrc)) {
+                nvrc = nvIoctl(fd, NVDISP_SET_MODE, &DISPLAY_B);
+                if (R_FAILED(nvrc)) SaltySD_printf("SaltySD: NVDISP_SET_MODE failed! rc: 0x%x\n", nvrc);
+                else if (nx_fps) nx_fps->displaySync = DockedModeRefreshRateAllowedValues[itr];
+            }
+            else SaltySD_printf("SaltySD: NVDISP_VALIDATE_MODE failed! rc: 0x%x, pclkKHz: %d, Hz: %d\n", nvrc, clock, DockedModeRefreshRateAllowedValues[itr]);
+        }
+        nvClose(fd);
+        return true;
+
+    }
+    //We are in handheld mode
     
-    base.PLLD_DIVN = (4 * refreshRate) / 10;
+    if (new_refreshRate > HandheldModeRefreshRateAllowed.max) {
+        new_refreshRate = HandheldModeRefreshRateAllowed.max;
+    }
+    else if (new_refreshRate < HandheldModeRefreshRateAllowed.min) {
+        bool skip = false;
+        for (size_t i = 2; i <= 4; i++) {
+            if (new_refreshRate * i == 60) {
+                skip = true;
+                new_refreshRate = 60;
+                break;
+            }
+        }
+        if (!skip) for (size_t i = 2; i <= 4; i++) {
+            if (((new_refreshRate * i) >= HandheldModeRefreshRateAllowed.min) && ((new_refreshRate * i) <= HandheldModeRefreshRateAllowed.max)) {
+                skip = true;
+                new_refreshRate *= i;
+                break;
+            }
+        }
+        if (!skip) new_refreshRate = 60;
+    }
+    uint32_t pixelClock = (9375 * ((4096 * ((2 * base.PLLD_DIVN) + 1)) + misc.PLLD_SDM_DIN)) / (8 * base.PLLD_DIVM);
+    uint16_t refreshRateNow = pixelClock / (DSI_CLOCK_HZ / 60);
+
+    if (refreshRateNow == new_refreshRate) {
+        if (nx_fps) nx_fps->displaySync = new_refreshRate;
+        return true;
+    }
+
+    uint8_t base_refreshRate = new_refreshRate - (new_refreshRate % 5);
+
+    base.PLLD_DIVN = (4 * base_refreshRate) / 10;
     base.PLLD_DIVM = 1;
 
-    int16_t Step_5Hz = 256;
-    int16_t default_SDM_DIN = -1024;
-    int8_t steps = ((int32_t)refreshRate - 60) / 5;
-    
-    misc.PLLD_SDM_DIN = default_SDM_DIN + (Step_5Hz * steps);
+    uint64_t expected_pixel_clock = (DSI_CLOCK_HZ * new_refreshRate) / 60;
+
+    misc.PLLD_SDM_DIN = ((8 * base.PLLD_DIVM * expected_pixel_clock) / 9375) - (4096 * ((2 * base.PLLD_DIVN)+1));
 
     memcpy((void*)(clkVirtAddr + 0xD0), &base, 4);
     memcpy((void*)(clkVirtAddr + 0xDC), &misc, 4);
+    if (nx_fps) nx_fps->displaySync = new_refreshRate;
     return true;
 }
 
-bool GetDisplayRefreshRate(uint32_t* refreshRate) {
+bool GetDisplayRefreshRate(uint32_t* out_refreshRate, bool internal) {
     if (!clkVirtAddr)
         return false;
-    struct PLLD_BASE temp = {0};
-    uint32_t value = *(uint32_t*)(clkVirtAddr + 0xD0);
-    memcpy(&temp, &value, 4);
-    value = ((temp.PLLD_DIVN / temp.PLLD_DIVM) * 10) / 4;
-    if (value == 0)
-        value = 60;
-    *refreshRate = value;
     uintptr_t sh_addr = (uintptr_t)shmemGetAddr(&_sharedMemory);
+    if (!internal) {
+        // We are using this trick because using nvOpen severes connection 
+        // with whatever is actually connected to this sysmodule
+        if (sh_addr) {
+            *out_refreshRate = *(uint8_t*)(sh_addr + 1);
+            return true;
+        }
+        else return false;
+    }
+    struct PLLD_BASE temp = {0};
+    struct PLLD_MISC misc = {0};
+    memcpy(&temp, (void*)(clkVirtAddr + 0xD0), 4);
+    memcpy(&misc, (void*)(clkVirtAddr + 0xDC), 4);
+    uint32_t value = ((temp.PLLD_DIVN / temp.PLLD_DIVM) * 10) / 4;
+    static uint64_t tick = 0;
+    if (value == 0 || value == 80) { //We are in docked mode
+        if (isLite)
+            return false;
+        isDocked = true;
+        //We must add delay for changing refresh rate when it was just put into dock to avoid doing calculation on default values instead of adjusted ones
+        //From my tests 1 second is enough
+        if (!canChangeRefreshRateDocked) {
+            if (!tick) {
+                tick = svcGetSystemTick();
+                return false;
+            }
+            if (svcGetSystemTick() - tick < 19200000) {
+                return false;
+            }
+            else {
+                tick = 0;
+                LoadDockedModeAllowedSave();
+                canChangeRefreshRateDocked = true;
+            }
+        }
+        uint32_t fd = 0;
+        if (R_SUCCEEDED(nvOpen(&fd, "/dev/nvdisp-disp1"))) {
+            struct nvdcMode DISPLAY_B = {0};
+            if (R_SUCCEEDED(nvIoctl(fd, NVDISP_GET_MODE, &DISPLAY_B))) {
+                if (!DISPLAY_B.pclkKHz) {
+                    nvClose(fd);
+                    return false;
+                }
+                uint32_t h_total = DISPLAY_B.hActive + DISPLAY_B.hFrontPorch + DISPLAY_B.hSyncWidth + DISPLAY_B.hBackPorch;
+                uint32_t v_total = DISPLAY_B.vActive + DISPLAY_B.vFrontPorch + DISPLAY_B.vSyncWidth + DISPLAY_B.vBackPorch;
+                uint32_t pixelClock = DISPLAY_B.pclkKHz * 1000 + 999;
+                value = pixelClock / (h_total * v_total);
+            }
+            else value = 60;
+            nvClose(fd);
+        }
+        else value = 60;
+    }
+    else {
+        tick = 0;
+        isDocked = false;
+        canChangeRefreshRateDocked = false;
+        //We are in handheld mode
+        /*
+            Official formula:
+            Fvco = Fref / DIVM * (DIVN + 0.5 + (SDM_DIN / 8192))
+            Fref = CNTFRQ_EL0 / 2
+            Defaults: DIVM = 1, DIVN = 24, SDM_DIN = -1024
+
+            My math formula allows avoiding decimals whenever possible
+        */
+        uint32_t pixelClock = (9375 * ((4096 * ((2 * temp.PLLD_DIVN) + 1)) + misc.PLLD_SDM_DIN)) / (8 * temp.PLLD_DIVM);
+        value = pixelClock / (DSI_CLOCK_HZ / 60);
+    }
+    *out_refreshRate = value;
     if (sh_addr) 
         *(uint8_t*)(sh_addr + 1) = (uint8_t)value;
     return true;
@@ -748,9 +1082,9 @@ Result handleServiceCmd(int cmd)
         raw = ipcPrepareHeader(&c, sizeof(*raw));
 
         raw->magic = SFCO_MAGIC;
-        uint32_t refreshRate = 0;
-        raw->result = !GetDisplayRefreshRate(&refreshRate);
-        raw->refreshRate = refreshRate;
+        uint32_t temp_refreshRate = 0;
+        raw->result = !GetDisplayRefreshRate(&temp_refreshRate, false);
+        raw->refreshRate = temp_refreshRate;
 
         return 0;
     }
@@ -768,17 +1102,12 @@ Result handleServiceCmd(int cmd)
 
         u64 refreshRate_temp = resp -> refreshRate;
 
-        if (refreshRate_temp > 79 || refreshRate_temp < 31) {
-            SaltySD_printf("SaltySD: cmd 11 handler -> %d, invalid value. Setting 60...\n", refreshRate_temp);
-            refreshRate = 60;
-        }
-        else {
-            SaltySD_printf("SaltySD: cmd 11 handler -> %d\n", refreshRate_temp);
+        if (SetDisplayRefreshRate(refreshRate_temp)) {
             refreshRate = refreshRate_temp;
-        }
-        if (SetDisplayRefreshRate(refreshRate)) 
             ret = 0;
+        }
         else ret = 0x1234;
+        SaltySD_printf("SaltySD: cmd 11 handler -> %d\n", refreshRate_temp);
     }
     else if (cmd == 12) // SetDisplaySync
     {
@@ -792,20 +1121,81 @@ Result handleServiceCmd(int cmd)
             u64 reserved;
         } *resp = r.Raw;
 
-        if (!isOLED) displaySync = (bool)(resp -> value);
-        if (!isOLED && displaySync) {
+        displaySync = (bool)(resp -> value);
+        if (displaySync) {
             FILE* file = fopen("sdmc:/SaltySD/flags/displaysync.flag", "wb");
             fclose(file);
             SaltySD_printf("SaltySD: cmd 12 handler -> %d\n", displaySync);
-        }
-        else if (isOLED) {
-            SaltySD_printf("SaltySD: cmd 12 handler -> %d. Detected OLED model, ignoring...\n", displaySync);
-            remove("sdmc:/SaltySD/flags/displaysync.flag");
         }
         else {
             remove("sdmc:/SaltySD/flags/displaysync.flag");
             SaltySD_printf("SaltySD: cmd 12 handler -> %d\n", displaySync);
         }
+
+        ret = 0;
+    }
+    else if (cmd == 13) // SetAllowedDockedRefreshRates
+    {
+        IpcParsedCommand r = {0};
+        ipcParse(&r);
+
+        struct {
+            u64 magic;
+            u64 cmd_id;
+            u32 refreshRate;
+            u32 reserved[3];
+        } *resp = r.Raw;
+
+        struct {
+            unsigned int Hz_40: 1;
+            unsigned int Hz_45: 1;
+            unsigned int Hz_50: 1;
+            unsigned int Hz_55: 1;
+            unsigned int Hz_60: 1;
+            unsigned int reserved: 27;
+        } DockedRefreshRates;
+
+        memcpy(&DockedRefreshRates, &(resp -> refreshRate), 4);
+        DockedModeRefreshRateAllowed[0] = DockedRefreshRates.Hz_40;
+        DockedModeRefreshRateAllowed[1] = DockedRefreshRates.Hz_45;
+        DockedModeRefreshRateAllowed[2] = DockedRefreshRates.Hz_50;
+        DockedModeRefreshRateAllowed[3] = DockedRefreshRates.Hz_55;
+        DockedModeRefreshRateAllowed[4] = true;
+        SaltySD_printf("SaltySD: cmd 13 handler\n");
+
+        ret = 0;
+    }
+    else if (cmd == 14) // SetDontForce60InDocked
+    {
+        IpcParsedCommand r = {0};
+        ipcParse(&r);
+
+        struct {
+            u64 magic;
+            u64 cmd_id;
+            u64 force;
+            u64 reserved;
+        } *resp = r.Raw;
+
+        dontForce60InDocked = (bool)(resp -> force);
+        SaltySD_printf("SaltySD: cmd 14 handler\n");
+
+        ret = 0;
+    }
+    else if (cmd == 15) // SetMatchLowestRR
+    {
+        IpcParsedCommand r = {0};
+        ipcParse(&r);
+
+        struct {
+            u64 magic;
+            u64 cmd_id;
+            u64 force;
+            u64 reserved;
+        } *resp = r.Raw;
+
+        matchLowestDocked = (bool)(resp -> force);
+        SaltySD_printf("SaltySD: cmd 15 handler\n");
 
         ret = 0;
     }
@@ -889,41 +1279,59 @@ void serviceThread(void* buf)
 
 int main(int argc, char *argv[])
 {
-    
-    svcSleepThread(1*1000*1000*1000);
-    smInitialize_old();
+    ABORT_IF_FAILED(smInitialize_old(), 0);
     Service_old toget;
-    smGetService_old(&toget, "fsp-srv");
-    fsp_init(toget);
-    fsp_getSdCard(toget, &sdcard);
+    ABORT_IF_FAILED(smGetService_old(&toget, "fsp-srv"), 1);
+    ABORT_IF_FAILED(fsp_init(toget), 2);
+    ABORT_IF_FAILED(fsp_getSdCard(toget, &sdcard), 3);
     FsFileSystem_old sdcardfs;
     sdcardfs.s.handle = sdcard;
-    fsdevMountDevice_old("sdmc", sdcardfs);
-    //serviceClose_old(&toget);
+    if (fsdevMountDevice_old("sdmc", sdcardfs) == -1) {
+        ABORT_IF_FAILED(0xDEADBEEF, 4);
+    }
+    serviceClose_old(&toget);
     smExit_old();
-    smInitialize();
     SaltySD_printf("SaltySD: got SD card.\n");
+
+    ABORT_IF_FAILED(smInitialize(), 5);
+    ABORT_IF_FAILED(setsysInitialize(), 10);
+
+    SetSysProductModel model;
+    if (R_SUCCEEDED(setsysGetProductModel(&model))) {
+        if (model == SetSysProductModel_Aula) {
+            SaltySD_printf("SaltySD: Detected OLED model. Display Sync is not available in handheld mode.\n");
+            isOLED = true;
+        }
+        else if (model == SetSysProductModel_Hoag) {
+            isLite = true;
+            SaltySD_printf("SaltySD: Detected Lite model. Docked refresh rate will be blocked.\n");
+        }
+    }
+
+    if (!isLite) {
+        ABORT_IF_FAILED(nvInitialize(), 6);
+        struct {
+            char reserved[3];
+        } pvi;
+        
+        u32 fd_temp;
+        if (R_SUCCEEDED(nvOpen(&fd_temp, "/dev/nvdisp-disp0"))) {
+            nvIoctl(fd_temp, NVDISP_PANEL_GET_VENDOR_ID, &pvi);
+            nvClose(fd_temp);
+            FILE* file = fopen("sdmc:/internal.dat", "wb");
+            fwrite(&pvi, 3, 1, file);
+            fclose(file);
+        }
+    }
     
-    ldrDmntInitialize();
+    ABORT_IF_FAILED(ldrDmntInitialize(), 7);
     Service* ldrDmntSrv = ldrDmntGetServiceSession();
     Service ldrDmntClone;
     serviceClone(ldrDmntSrv, &ldrDmntClone);
     serviceClose(ldrDmntSrv);
     memcpy(ldrDmntSrv, &ldrDmntClone, sizeof(Service));
 
-    setsysInitialize();
-    SetSysProductModel model;
-    if (R_SUCCEEDED(setsysGetProductModel(&model))) {
-        if (model == SetSysProductModel_Aula) {
-            SaltySD_printf("SaltySD: Detected OLED model. Display Sync is not available.\n");
-            isOLED = true;
-            remove("sdmc:/SaltySD/flags/displaysync.flag");
-        }
-        else if (model == SetSysProductModel_Nx) {
-            isErista = true;
-        }
-    }
-    setsysExit();
+
     FILE* file = fopen("sdmc:/SaltySD/flags/displaysync.flag", "rb");
     if (file) {
         fclose(file);
@@ -960,13 +1368,13 @@ int main(int argc, char *argv[])
         }
         
         if (lastAppPID != -1) {
-            static bool* force60Hz = 0;
-            if (!force60Hz)  {
+            if (!nx_fps)  {
                 uintptr_t sharedAddress = (uintptr_t)shmemGetAddr(&_sharedMemory);
                 if (sharedAddress) {
                     ptrdiff_t offset = searchNxFpsSharedMemoryBlock(sharedAddress);
-                    if (offset != -1)
-                        force60Hz = (bool*)(sharedAddress + offset + 0x9C);
+                    if (offset != -1) {
+                        nx_fps = (struct NxFpsSharedBlock*)(sharedAddress + offset);
+                    }
                 }
             }
             if (!cheatCheck) {
@@ -981,9 +1389,10 @@ int main(int argc, char *argv[])
                         svcCloseHandle(debug_handle);
                         if (thread_count > 1) {
                             cheatCheck = true;
-                            dmntchtInitialize();
-                            dmntchtForceOpenCheatProcess();
-                            dmntchtExit();
+                            if (R_SUCCEEDED(dmntchtInitialize())) {
+                                dmntchtForceOpenCheatProcess();
+                                dmntchtExit();
+                            }
                         }
                     }
                     else cheatCheck = true;
@@ -1000,20 +1409,20 @@ int main(int argc, char *argv[])
             }
             if (!found) {
                 lastAppPID = -1;
-                force60Hz = 0;
+                nx_fps = 0;
                 cheatCheck = false;
-                if (displaySync && !isOLED) {
+                if (displaySync) {
                     uint32_t temp_refreshRate = 0;
-                    if (GetDisplayRefreshRate(&temp_refreshRate) && temp_refreshRate != 60)
+                    if (GetDisplayRefreshRate(&temp_refreshRate, true) && temp_refreshRate != 60)
                         SetDisplayRefreshRate(60);
                     refreshRate = 0;
                 }
             }
-            else if (displaySync && !isOLED) {
+            else if (displaySync && (!isOLED || isDocked)) {
                 uint32_t temp_refreshRate = 0;
-                GetDisplayRefreshRate(&temp_refreshRate);
+                GetDisplayRefreshRate(&temp_refreshRate, true);
                 uint32_t check_refresh_rate = refreshRate;
-                if (force60Hz && *force60Hz) {
+                if (nx_fps && nx_fps->forceOriginalRefreshRate && (!isDocked || (isDocked && !dontForce60InDocked))) {
                     check_refresh_rate = 60;
                 }
                 if (temp_refreshRate != check_refresh_rate)
@@ -1021,7 +1430,7 @@ int main(int argc, char *argv[])
             }
         }
         uint32_t temp = 0;
-        GetDisplayRefreshRate(&temp);
+        GetDisplayRefreshRate(&temp, true);
 
         // Detected new PID
         if (max != old_max && max > 0x80)
