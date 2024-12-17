@@ -7,7 +7,7 @@ $(error "Please set DEVKITPRO in your environment. export DEVKITPRO=<path to>/de
 endif
 
 TOPDIR ?= $(CURDIR)
-include $(DEVKITPRO)/libnx/switch_rules
+include $(TOPDIR)/../libnx_min/nx/switch_rules
 
 #---------------------------------------------------------------------------------
 # TARGET is the name of the output
@@ -51,8 +51,8 @@ CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++23
 
 ASFLAGS	     :=	-g $(ARCH)
 
-LDFLAGS				=	-specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH) -Wl,-s,--dynamic-list=$(CURDIR)/../dynamic_symbols.txt -Wl,-Map,$(notdir $*.map)
-LDFLAGS_TEST_DEBUG	=	-specs=$(DEVKITPRO)/libnx/switch.specs -g $(ARCH)
+LDFLAGS				=	-specs=$(TOPDIR)/../libnx_min/nx/switch.specs -g $(ARCH) -Wl,-s,--dynamic-list=$(CURDIR)/../dynamic_symbols.txt -Wl,-Map,$(notdir $*.map)
+LDFLAGS_TEST_DEBUG	=	-specs=$(TOPDIR)/../libnx_min/nx/switch.specs -g $(ARCH)
 
 LIBS	:= -lnx_min
 
@@ -60,7 +60,7 @@ LIBS	:= -lnx_min
 # list of directories containing libraries, this must be the top level containing
 # include and lib
 #---------------------------------------------------------------------------------
-LIBDIRS	:= $(PORTLIBS) $(LIBNX) $(CURDIR)/../libnx_min/nx/
+LIBDIRS	:= $(PORTLIBS) $(CURDIR)/../libnx_min/nx/
 
 
 #---------------------------------------------------------------------------------
