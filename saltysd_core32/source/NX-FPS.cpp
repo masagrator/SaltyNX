@@ -286,7 +286,7 @@ namespace NX_FPS_Math {
 		if (deltatick2 > (systemtickfrequency / ((OpMode == 1) ? 30 : 1))) {
 			((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))(&starttick2);
 			if (!configRC && FPSlock) {
-				LOCK::applyPatch(configBuffer, configSize, FPSlock, (Shared -> displaySync));
+				LOCK::applyPatch(configBuffer, configSize, FPSlock);
 			}
 		}
 

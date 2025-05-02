@@ -154,7 +154,7 @@ namespace LOCK {
 
 	}
 
-	Result applyMasterWrite(FILE* file, size_t filesize, size_t master_offset) {
+	Result applyMasterWrite(FILE* file, size_t filesize) {
 		uint32_t offset = 0;
 		if (gen != 2) return 0x311;
 
