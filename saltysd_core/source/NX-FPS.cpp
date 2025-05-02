@@ -43,6 +43,15 @@ struct NVNViewport {
 	float height;
 };
 
+struct VkViewport{
+	float    x;
+	float    y;
+	float    width;
+	float    height;
+	float    minDepth;
+	float    maxDepth;
+};
+
 extern "C" {
 	typedef u64 (*nvnBootstrapLoader_0)(const char * nvnName);
 	typedef int (*eglSwapBuffers_0)(const void* EGLDisplay, const void* EGLSurface);
@@ -62,6 +71,9 @@ extern "C" {
 	typedef u32 (*nvnTextureGetFormat_0)(NVNTexture* texture);
 	typedef void* (*_vkGetInstanceProcAddr_0)(void* instance, const char* vkFunction);
 	typedef void* (*vkGetDeviceProcAddr_0)(void* device, const char* vkFunction);
+	typedef u32 (*_ZN2nn2ro12LookupSymbolEPmPKc_0)(uintptr_t* pOutAddress, const char* name);
+	typedef void (*vkCmdSetViewport_0)(void* commandBuffer, uint32_t firstViewport, uint32_t viewportCount, const VkViewport* pViewports);
+	typedef void (*vkCmdSetViewportWithCount_0)(void* commandBuffer, uint32_t viewportCount, const VkViewport* pViewports);
 }
 
 struct {
@@ -76,6 +88,9 @@ struct {
 	uintptr_t GetOperationMode;
 	uintptr_t ReferSymbol;
 	uintptr_t vkGetInstanceProcAddr;
+	uintptr_t LookupSymbol;
+	uintptr_t vkCmdSetViewport;
+	uintptr_t vkCmdSetViewportWithCount;
 } Address_weaks;
 
 struct nvnWindowBuilder {
@@ -104,7 +119,7 @@ Result readConfig(const char* path, uint8_t** output_buffer) {
 		return 0x1201;
 	}
 	if (LOCK::gen == 2) {
-		Result ret = LOCK::applyMasterWrite(patch_file, configSize, header_size - 4);
+		Result ret = LOCK::applyMasterWrite(patch_file, configSize);
 		if (R_FAILED(ret))  {
 			SaltySDCore_fclose(patch_file);
 			return ret;
@@ -127,6 +142,9 @@ struct resolutionCalls {
 };
 
 bool resolutionLookup = false;
+
+resolutionCalls m_resolutionRenderCalls[8] = {0};
+resolutionCalls m_resolutionViewportCalls[8] = {0};
 
 struct NxFpsSharedBlock {
 	uint32_t MAGIC;
@@ -303,7 +321,7 @@ namespace NX_FPS_Math {
 			starttick2 = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
 			LOCK::overwriteRefreshRate = 0;
 			if (!configRC && FPSlock) {
-				LOCK::applyPatch(configBuffer, configSize, FPSlock, (Shared -> displaySync));
+				LOCK::applyPatch(configBuffer, configSize, FPSlock);
 			}
 		}
 		if (deltatick > systemtickfrequency) {
@@ -385,6 +403,64 @@ namespace vk {
 		return vulkanResult;
 	}
 
+	void CmdSetViewport(void* commandBuffer, uint32_t firstViewport, uint32_t viewportCount, const VkViewport* pViewports) {
+		if (!resolutionLookup && Shared -> renderCalls[0].calls == 0xFFFF) {
+			resolutionLookup = true;
+			Shared -> renderCalls[0].calls = 0;
+		}
+		if (resolutionLookup) for (uint i = firstViewport; i < viewportCount; i++) {
+			if (pViewports[i].height > 1.f && pViewports[i].width > 1.f && pViewports[i].x == 0.f && pViewports[i].y == 0.f) {
+				uint16_t width = (uint16_t)(pViewports[i].width);
+				uint16_t height = (uint16_t)(pViewports[i].height);
+				int ratio = (width * 10) / height;
+				if (ratio >= 12 && ratio <= 18) {
+					for (size_t i = 0; i < 8; i++) {
+						if (width == m_resolutionViewportCalls[i].width) {
+							m_resolutionViewportCalls[i].calls++;
+							break;
+						}
+						if (m_resolutionViewportCalls[i].width == 0) {
+							m_resolutionViewportCalls[i].width = width;
+							m_resolutionViewportCalls[i].height = height;
+							m_resolutionViewportCalls[i].calls = 1;
+							break;
+						}
+					}			
+				}
+			}
+		}
+		return ((vkCmdSetViewport_0)(Address_weaks.vkCmdSetViewport))(commandBuffer, firstViewport, viewportCount, pViewports);
+	}
+
+	void CmdSetViewportWithCount(void* commandBuffer, uint32_t viewportCount, const VkViewport* pViewports) {
+		if (!resolutionLookup && Shared -> renderCalls[0].calls == 0xFFFF) {
+			resolutionLookup = true;
+			Shared -> renderCalls[0].calls = 0;
+		}
+		if (resolutionLookup) for (uint i = 0; i < viewportCount; i++) {
+			if (pViewports[i].height > 1.f && pViewports[i].width > 1.f && pViewports[i].x == 0.f && pViewports[i].y == 0.f) {
+				uint16_t width = (uint16_t)(pViewports[i].width);
+				uint16_t height = (uint16_t)(pViewports[i].height);
+				int ratio = (width * 10) / height;
+				if (ratio >= 12 && ratio <= 18) {
+					for (size_t i = 0; i < 8; i++) {
+						if (width == m_resolutionViewportCalls[i].width) {
+							m_resolutionViewportCalls[i].calls++;
+							break;
+						}
+						if (m_resolutionViewportCalls[i].width == 0) {
+							m_resolutionViewportCalls[i].width = width;
+							m_resolutionViewportCalls[i].height = height;
+							m_resolutionViewportCalls[i].calls = 1;
+							break;
+						}
+					}			
+				}
+			}
+		}
+		return ((vkCmdSetViewportWithCount_0)(Address_weaks.vkCmdSetViewportWithCount))(commandBuffer, viewportCount, pViewports);
+	}
+
 	void* GetDeviceProcAddr(void* device, const char* vkFunction) {
 		if (!strcmp("vkQueuePresentKHR", vkFunction)) {
 			Address_weaks.vkQueuePresentKHR = (uintptr_t)((vkGetDeviceProcAddr_0)(Ptrs.vkGetDeviceProcAddr))(device, vkFunction);
@@ -393,6 +469,14 @@ namespace vk {
 		if (!strcmp("vkGetDeviceProcAddr", vkFunction)) {
 			Ptrs.vkGetDeviceProcAddr = (uintptr_t)((vkGetDeviceProcAddr_0)(Ptrs.vkGetDeviceProcAddr))(device, vkFunction);
 			return (void*)&GetDeviceProcAddr;
+		}
+		if (!strcmp("vkCmdSetViewport", vkFunction)) {
+			Address_weaks.vkCmdSetViewport = (uintptr_t)((vkGetDeviceProcAddr_0)(Ptrs.vkGetDeviceProcAddr))(device, vkFunction);
+			return (void*)&CmdSetViewport;
+		}
+		if (!strcmp("vkCmdSetViewportWithCount", vkFunction)) {
+			Address_weaks.vkCmdSetViewportWithCount = (uintptr_t)((vkGetDeviceProcAddr_0)(Ptrs.vkGetDeviceProcAddr))(device, vkFunction);
+			return (void*)&CmdSetViewportWithCount;
 		}
 		return ((vkGetDeviceProcAddr_0)(Ptrs.vkGetDeviceProcAddr))(device, vkFunction);
 	}
@@ -407,6 +491,19 @@ namespace vk {
 			return (void*)&GetDeviceProcAddr;
 		}
 		return ((_vkGetInstanceProcAddr_0)(Address_weaks.vkGetInstanceProcAddr))(instance, vkFunction);
+	}
+
+	u32 LookupSymbol(uintptr_t* pOutAddress, const char* name) {
+		if (!strcmp("vkGetInstanceProcAddr", name)) {
+			*pOutAddress = (uintptr_t)&GetInstanceProcAddr;
+			return 0;
+		}
+		if (!strcmp("vkGetDeviceProcAddr", name)) {
+			((_ZN2nn2ro12LookupSymbolEPmPKc_0)(Address_weaks.LookupSymbol))(&Ptrs.vkGetDeviceProcAddr, name);
+			*pOutAddress = (uintptr_t)&GetDeviceProcAddr;
+			return 0;
+		}
+		return ((_ZN2nn2ro12LookupSymbolEPmPKc_0)(Address_weaks.LookupSymbol))(pOutAddress, name);
 	}
 }
 
@@ -664,9 +761,6 @@ namespace NVN {
 		char reserved[0x80];
 	};
 
-	resolutionCalls m_resolutionRenderCalls[8] = {0};
-	resolutionCalls m_resolutionViewportCalls[8] = {0};
-
 	void* CommandBufferSetViewports(nvnCommandBuffer* cmdBuf, int start, int count, NVNViewport* viewports) {
 		if (resolutionLookup) for (int i = start; i < count; i++) {
 			if (viewports[i].height > 1.f && viewports[i].width > 1.f && viewports[i].x == 0.f && viewports[i].y == 0.f) {
@@ -851,6 +945,8 @@ extern "C" {
 			Address_weaks.eglGetProcAddress = SaltySDCore_FindSymbolBuiltin("eglGetProcAddress");
 			Address_weaks.GetOperationMode = SaltySDCore_FindSymbolBuiltin("_ZN2nn2oe16GetOperationModeEv");
 			Address_weaks.vkGetInstanceProcAddr = SaltySDCore_FindSymbolBuiltin("vkGetInstanceProcAddr");
+			Address_weaks.LookupSymbol = SaltySDCore_FindSymbolBuiltin("_ZN2nn2ro12LookupSymbolEPmPKc");
+			Address_weaks.vkCmdSetViewport = SaltySDCore_FindSymbolBuiltin("vkCmdSetViewport");
 			SaltySDCore_ReplaceImport("nvnBootstrapLoader", (void*)NVN::BootstrapLoader_1);
 			SaltySDCore_ReplaceImport("eglSwapBuffers", (void*)EGL::Swap);
 			SaltySDCore_ReplaceImport("eglSwapInterval", (void*)EGL::Interval);
@@ -858,6 +954,12 @@ extern "C" {
 			SaltySDCore_ReplaceImport("_ZN11NvSwapchain15QueuePresentKHREP9VkQueue_TPK16VkPresentInfoKHR", (void*)vk::nvSwapchain::QueuePresent);
 			SaltySDCore_ReplaceImport("eglGetProcAddress", (void*)EGL::GetProc);
 			SaltySDCore_ReplaceImport("vkGetInstanceProcAddr", (void*)vk::GetInstanceProcAddr);
+			SaltySDCore_ReplaceImport("vkCmdSetViewport", (void*)vk::CmdSetViewport);
+			SaltySDCore_ReplaceImport("vkCmdSetViewportWithCount", (void*)vk::CmdSetViewportWithCount);
+			if (Address_weaks.vkGetInstanceProcAddr) {
+				//Minecraft is using nn::ro::LookupSymbol to search for Vulkan functions
+				SaltySDCore_ReplaceImport("_ZN2nn2ro12LookupSymbolEPmPKc", (void*)vk::LookupSymbol);
+			}
 
 			char titleid[17];
 			CheckTitleID(&titleid[0]);
