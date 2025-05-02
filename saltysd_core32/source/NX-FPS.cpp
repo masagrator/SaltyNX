@@ -102,8 +102,8 @@ Result readConfig(const char* path, uint8_t** output_buffer) {
 		free(buffer);
 		return 1;
 	}
-	if (LOCK::gen == 2) {
-		Result ret = LOCK::applyMasterWrite(patch_file, configSize, header_size - 4);
+	if (LOCK::masterWrite) {
+		Result ret = LOCK::applyMasterWrite(patch_file, header_size - 4);
 		if (R_FAILED(ret))  {
 			SaltySDCore_fclose(patch_file);
 			return ret;
@@ -286,7 +286,7 @@ namespace NX_FPS_Math {
 		if (deltatick2 > (systemtickfrequency / ((OpMode == 1) ? 30 : 1))) {
 			((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))(&starttick2);
 			if (!configRC && FPSlock) {
-				LOCK::applyPatch(configBuffer, configSize, FPSlock);
+				LOCK::applyPatch(configBuffer, FPSlock, (Shared -> displaySync));
 			}
 		}
 
