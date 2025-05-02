@@ -1,5 +1,8 @@
 #pragma once
 #define NOINLINE __attribute__ ((noinline))
+#include "tinyexpr/tinyexpr.h"
+#include <array>
+
 /* Design file how to build binary file for FPSLocker.
 
 1. Helper functions */
@@ -8,10 +11,12 @@ namespace LOCK {
 
 	uint32_t offset = 0;
 	bool blockDelayFPS = false;
-	uint8_t gen = 0;
+	uint8_t gen = 3;
 	bool MasterWriteApplied = false;
-	uint64_t DockedRefreshRateDelay = 4000000000;
 	double overwriteRefreshRate = 0;
+	uint64_t DockedRefreshRateDelay = 4000000000;
+	uint8_t masterWrite = 0;
+	uint32_t compiledSize = 0;
 
 	struct {
 		int64_t main_start;
@@ -132,31 +137,27 @@ namespace LOCK {
 ///2. File format and reading
 
 	bool isValid(uint8_t* buffer, size_t filesize) {
-		if (*(uint32_t*)buffer != 0x4B434F4C)
+		uint8_t MAGIC[4] = {'L', 'O', 'C', 'K'};
+		if (*(uint32_t*)buffer != *(uint32_t*)&MAGIC)
 			return false;
 		gen = buffer[4];
-		if (gen < 1 || gen > 2)
+		if (gen != 3)
 			return false;
-		uint16_t ALL_FPS = *(uint16_t*)(&(buffer[5]));
-		if (ALL_FPS > 1)
-			return false;
-		if (buffer[7] > 1)
+		masterWrite = buffer[5];
+		if (masterWrite > 1)
 			return false;
 		unsafeCheck = (bool)buffer[7];
-		uint8_t start_offset = 0x30;
-		if (gen == 2)
-			start_offset += 4;
-		if (ALL_FPS)
-			start_offset += 0x10;
+		uint8_t start_offset = 0xC;
+		if (masterWrite) start_offset += 4;
 		if (*(uint32_t*)(&(buffer[8])) != start_offset)
 			return false;
+		compiledSize = buffer[6] * buffer[6];
 		return true;
 
 	}
 
-	Result applyMasterWrite(FILE* file, size_t filesize) {
+	Result applyMasterWrite(FILE* file, size_t master_offset) {
 		uint32_t offset = 0;
-		if (gen != 2) return 0x311;
 
 		SaltySDCore_fseek(file, master_offset, 0);
 		SaltySDCore_fread(&offset, 4, 1, file);
@@ -221,19 +222,194 @@ namespace LOCK {
 		}
 	}
 
-	Result applyPatch(uint8_t* buffer, size_t filesize, uint8_t FPS, uint8_t refreshRate = 0) {
-		uint8_t orig_FPS = FPS;
-		bool setRefreshRate = false;
-		overwriteRefreshRate = 0;
-		FPS -= 15;
-		FPS /= 5;
-		if (refreshRate == orig_FPS && orig_FPS >= 40 && orig_FPS <= 55 && *(uint32_t*)(&buffer[8]) > 0x34) {
-			FPS += 5;
-			setRefreshRate = true;
+	Result writeExprTo(double value, uint8_t* buffer, uint16_t* offset, uint8_t value_type) {
+		switch(value_type) {
+			case 1:
+				buffer[*offset] = (uint8_t)value;
+				break;
+			case 2:
+				*(uint16_t*)(&buffer[*offset]) = (uint16_t)value;
+				break;
+			case 4:
+				*(uint32_t*)(&buffer[*offset]) = (uint32_t)value;
+				break;
+			case 8:
+				*(uint64_t*)(&buffer[*offset]) = (uint64_t)value;
+				break;
+			case 0x11:
+				*(int8_t*)(&buffer[*offset]) = (int8_t)value;
+				break;
+			case 0x12:
+				*(int16_t*)(&buffer[*offset]) = (int16_t)value;
+				break;
+			case 0x14:
+				*(int32_t*)(&buffer[*offset]) = (int32_t)value;
+				break;
+			case 0x18:
+				*(int64_t*)(&buffer[*offset]) = (int64_t)value;
+				break;
+			case 0x24:
+				*(float*)(&buffer[*offset]) = (float)value;
+				break;
+			case 0x28:
+			case 0x38:
+				*(double*)(&buffer[*offset]) = (double)value;
+				break;
+			default:
+				return 4;
 		}
-		FPS *= 4;
+		*offset += value_type % 0x10;
+		return 0;
+	}
+	
+	double TruncDec(double value, double truncator) {
+		uint64_t factor = pow(10, truncator);
+		return trunc(value*factor) / factor;
+	}
+
+	double NOINLINE evaluateExpression(const char* equation, double fps_target, double displaySync) {
+		if (displaySync == 0) {
+			displaySync = 60;
+		}
+		double FPS_TARGET = fps_target;
+		double FPS_LOCK_TARGET = fps_target;
+		if (fps_target >= displaySync) FPS_LOCK_TARGET += 2; 
+		double FRAMETIME_TARGET = 1000.0 / fps_target;
+		double VSYNC_TARGET = (fps_target <= 60) ? trunc(60 / fps_target) : 1.0;
+		double INTERVAL_TARGET = (fps_target <= displaySync) ? trunc(displaySync / fps_target) : 1.0;
+		te_variable vars[] = {
+			{"TruncDec", (const void*)TruncDec, TE_FUNCTION2},
+			{"FPS_TARGET", &FPS_TARGET, TE_VARIABLE},
+			{"FPS_LOCK_TARGET", &FPS_LOCK_TARGET, TE_VARIABLE},
+			{"FRAMETIME_TARGET", &FRAMETIME_TARGET, TE_VARIABLE},
+			{"VSYNC_TARGET", &VSYNC_TARGET, TE_VARIABLE},
+			{"INTERVAL_TARGET", &INTERVAL_TARGET, TE_VARIABLE}
+		};
+		te_expr *n = te_compile(equation, vars, std::size(vars), 0);
+		double evaluated_value = te_eval(n);
+		te_free(n);
+		return evaluated_value;
+	}
+
+	Result NOINLINE convertPatchToFPSTarget(uint8_t* out_buffer, uint8_t* in_buffer, uint8_t FPS, uint8_t refreshRate) {
+		uint32_t header_size = 0;
+		memcpy(&header_size, &in_buffer[8], 4);
+		memcpy(out_buffer, in_buffer, header_size);
+		offset = header_size;
+		uint16_t temp_offset = header_size;
+		while(true) {
+			uint8_t OPCODE = read8(in_buffer);
+			if (OPCODE == 1 || OPCODE == 0x81) {
+				bool evaluate = false;
+				if (OPCODE == 0x81) {
+					evaluate = true;
+					OPCODE = 1;
+				}
+				out_buffer[temp_offset++] = OPCODE;
+				uint8_t address_count = read8(in_buffer);
+				out_buffer[temp_offset++] = address_count;
+				out_buffer[temp_offset++] = read8(in_buffer);
+				for (size_t i = 1; i < address_count; i++) {
+					*(uint32_t*)&out_buffer[temp_offset] = read32(in_buffer);
+					temp_offset += 4;
+				}
+				uint8_t value_type = read8(in_buffer);
+				out_buffer[temp_offset++] = value_type;
+				uint8_t value_count = read8(in_buffer);
+				out_buffer[temp_offset++] = value_count;
+				if (!evaluate) for (size_t i = 0; i < value_count; i++) {
+					memcpy(&out_buffer[temp_offset], &in_buffer[offset], value_type % 0x10);
+					offset += value_type % 0x10;
+					temp_offset += value_type % 0x10;
+				}
+				else for (size_t i = 0; i < value_count; i++) {
+					double evaluated_value = evaluateExpression((const char*)&in_buffer[offset], (double)FPS, (double)refreshRate);
+					offset += strlen((const char*)&in_buffer[offset]) + 1;
+					writeExprTo(evaluated_value, out_buffer, &temp_offset, value_type);
+				}
+			}
+			else if (OPCODE == 2 || OPCODE == 0x82) {
+				bool evaluate = false;
+				if (OPCODE == 0x82) {
+					evaluate = true;
+					OPCODE = 2;
+				}
+				out_buffer[temp_offset++] = OPCODE;
+				uint8_t address_count = read8(in_buffer);
+				out_buffer[temp_offset++] = address_count;
+				out_buffer[temp_offset++] = read8(in_buffer); //compare address region
+				for (size_t i = 1; i < address_count; i++) {
+					*(uint32_t*)&out_buffer[temp_offset] = read32(in_buffer);
+					temp_offset += 4;
+				}
+				out_buffer[temp_offset++] = read8(in_buffer); //compare_type
+				uint8_t value_type = read8(in_buffer);
+				out_buffer[temp_offset++] = value_type;
+				memcpy(&out_buffer[temp_offset], &in_buffer[offset], value_type % 0x10);
+				temp_offset += value_type % 0x10;
+				offset += value_type % 0x10;
+				address_count = read8(in_buffer);
+				out_buffer[temp_offset++] = address_count;
+				out_buffer[temp_offset++] = read8(in_buffer); //address region
+				for (size_t i = 1; i < address_count; i++) {
+					*(uint32_t*)&out_buffer[temp_offset] = read32(in_buffer);
+					temp_offset += 4;
+				}
+				value_type = read8(in_buffer);
+				out_buffer[temp_offset++] = value_type;
+				uint8_t value_count = read8(in_buffer);
+				out_buffer[temp_offset++] = value_count;
+				if (!evaluate) for (size_t i = 0; i < value_count; i++) {
+					memcpy(&out_buffer[temp_offset], &in_buffer[offset], value_type % 0x10);
+					offset += value_type % 0x10;
+					temp_offset += value_type % 0x10;
+				}
+				else for (size_t i = 0; i < value_count; i++) {
+					double evaluated_value = evaluateExpression((const char*)&in_buffer[offset], (double)FPS, (double)refreshRate);
+					offset += strlen((const char*)&in_buffer[offset]) + 1;
+					writeExprTo(evaluated_value, out_buffer, &temp_offset, value_type);
+				}
+			}
+			else if (OPCODE == 3) {
+				out_buffer[temp_offset++] = OPCODE;
+				out_buffer[temp_offset++] = read8(in_buffer);
+			}
+			else if (OPCODE == 255) {
+				out_buffer[temp_offset++] = OPCODE;
+				break;
+			}
+			else return 0x2002;
+		}
+		return 0;
+	}
+
+	Result applyPatch(uint8_t* buffer, uint8_t FPS, uint8_t refreshRate = 60) {
+		overwriteRefreshRate = 0;
 		blockDelayFPS = false;
-		offset = *(uint32_t*)(&buffer[FPS+8]);
+		static uint8_t* new_buffer = 0;
+		static uint8_t lastFPS = 0;
+		static uint8_t lastRefreshRate = 0;
+		if (!refreshRate) refreshRate = 60;
+
+		if ((lastFPS != FPS) || (lastRefreshRate != refreshRate)) {
+			if (new_buffer != 0) {
+				free(new_buffer);
+			}
+			new_buffer = (uint8_t*)malloc(compiledSize);
+			if (!new_buffer)
+				return 0x3004;
+			if (R_FAILED(convertPatchToFPSTarget(new_buffer, buffer, FPS, refreshRate))) {
+				lastFPS = 0;
+				return 0x3002;
+			}
+			lastFPS = FPS;
+			lastRefreshRate = refreshRate;
+		}
+		if (!new_buffer) {
+			return 0x3003;
+		}
+		buffer = new_buffer;
+		offset = *(uint32_t*)(&buffer[0x8]);
 		while(true) {
 			/* OPCODE:
 				0	=	err
@@ -297,11 +473,13 @@ namespace LOCK {
 						}
 						break;
 					}
-					case 0x38:
+					case 0x38: {
 						for (uint8_t i = 0; i < loops; i++) {
 							overwriteRefreshRate = readDouble(buffer);
 							address += 8;
-						}						
+						}
+						break;
+					}		
 					default:
 						return 3;
 				}
@@ -444,7 +622,7 @@ namespace LOCK {
 						return 3;
 				}
 			}
-			else if (OPCODE == 3 && !setRefreshRate) {
+			else if (OPCODE == 3) {
 				switch(read8(buffer)) {
 					case 1:
 						blockDelayFPS = true;
@@ -454,7 +632,7 @@ namespace LOCK {
 				}
 			}
 			else if (OPCODE == -1) {
-				return -1;
+				return 0;
 			}
 			else return 255;
 		}
