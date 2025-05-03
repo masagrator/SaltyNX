@@ -823,8 +823,10 @@ Result handleServiceCmd(int cmd)
             SaltySD_printf("SaltySD: loading %s, size 0x%x\n", path, elf_size);
             
             elf_data = malloc(elf_size);
-            
-            fread(elf_data, elf_size, 1, f);
+            if (elf_data) {
+                fread(elf_data, elf_size, 1, f);
+            }
+            else SaltySD_printf("SaltySD: Not enough memory to load elf file! Aborting...\n");
         }
         free(path);
         
@@ -862,7 +864,7 @@ Result handleServiceCmd(int cmd)
         raw->new_addr = new_start;
         raw->new_size = new_size;
         
-        debug_log("SaltySD: new_addr to %lx, %x\n", new_start, ret);
+        if (R_SUCCEEDED(ret)) debug_log("SaltySD: new_addr to %lx, %x\n", new_start, ret);
 
         return 0;
     }
