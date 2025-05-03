@@ -186,6 +186,7 @@ struct NxFpsSharedBlock {
 	resolutionCalls renderCalls[8];
 	resolutionCalls viewportCalls[8];
 	bool forceOriginalRefreshRate;
+	bool dontForce60InDocked;
 } PACKED;
 
 NxFpsSharedBlock* Shared = 0;
@@ -295,7 +296,7 @@ namespace NX_FPS_Math {
 		new_fpslock = (LOCK::overwriteRefreshRate ? LOCK::overwriteRefreshRate : (Shared -> FPSlocked));
 		OpMode = ((_ZN2nn2oe16GetOperationModeEv)(Address_weaks.GetOperationMode))();
 		if (old_force != (Shared -> forceOriginalRefreshRate)) {
-			if (OpMode == 1)
+			if (OpMode == 1 && !(Shared -> dontForce60InDocked))
 				svcSleepThread(LOCK::DockedRefreshRateDelay);
 			old_force = (Shared -> forceOriginalRefreshRate);
 		}
@@ -361,6 +362,17 @@ namespace NX_FPS_Math {
 		(Shared -> FPSavg) = Stats.FPSavg;
 		(Shared -> pluginActive) = true;
 
+		if (!resolutionLookup && Shared -> renderCalls[0].calls == 0xFFFF) {
+			resolutionLookup = true;
+			Shared -> renderCalls[0].calls = 0;
+		}
+		if (resolutionLookup) {
+			memcpy(Shared -> renderCalls, m_resolutionRenderCalls, sizeof(m_resolutionRenderCalls));
+			memcpy(Shared -> viewportCalls, m_resolutionViewportCalls, sizeof(m_resolutionViewportCalls));
+			memset(&m_resolutionRenderCalls, 0, sizeof(m_resolutionRenderCalls));
+			memset(&m_resolutionViewportCalls, 0, sizeof(m_resolutionViewportCalls));
+		}
+
 	}
 }
 
@@ -425,10 +437,6 @@ namespace vk {
 	}
 
 	void CmdSetViewport(void* commandBuffer, uint32_t firstViewport, uint32_t viewportCount, const VkViewport* pViewports) {
-		if (!resolutionLookup && Shared -> renderCalls[0].calls == 0xFFFF) {
-			resolutionLookup = true;
-			Shared -> renderCalls[0].calls = 0;
-		}
 		if (resolutionLookup) for (uint i = firstViewport; i < viewportCount; i++) {
 			if (pViewports[i].height > 1.f && pViewports[i].width > 1.f && pViewports[i].x == 0.f && pViewports[i].y == 0.f) {
 				uint16_t width = (uint16_t)(pViewports[i].width);
@@ -454,10 +462,6 @@ namespace vk {
 	}
 
 	void CmdSetViewportWithCount(void* commandBuffer, uint32_t viewportCount, const VkViewport* pViewports) {
-		if (!resolutionLookup && Shared -> renderCalls[0].calls == 0xFFFF) {
-			resolutionLookup = true;
-			Shared -> renderCalls[0].calls = 0;
-		}
 		if (resolutionLookup) for (uint i = 0; i < viewportCount; i++) {
 			if (pViewports[i].height > 1.f && pViewports[i].width > 1.f && pViewports[i].x == 0.f && pViewports[i].y == 0.f) {
 				uint16_t width = (uint16_t)(pViewports[i].width);
@@ -629,11 +633,7 @@ namespace EGL {
 	}
 
 	void ViewportArrayvNV(uint firstViewport, uint viewportCount, const glViewportArray* pViewports) {
-		if (!resolutionLookup && Shared -> renderCalls[0].calls == 0xFFFF) {
-			resolutionLookup = true;
-			Shared -> renderCalls[0].calls = 0;
-		}
-		if (resolutionLookup) for (uint i = firstViewport; i < viewportCount; i++) {
+		if (resolutionLookup) for (uint i = firstViewport; i < firstViewport+viewportCount; i++) {
 			if (pViewports[i].height > 1.f && pViewports[i].width > 1.f && pViewports[i].x == 0.f && pViewports[i].y == 0.f) {
 				uint16_t width = (uint16_t)(pViewports[i].width);
 				uint16_t height = (uint16_t)(pViewports[i].height);
@@ -658,11 +658,7 @@ namespace EGL {
 	}
 
 	void ViewportArrayvOES(uint firstViewport, uint viewportCount, const glViewportArray* pViewports) {
-		if (!resolutionLookup && Shared -> renderCalls[0].calls == 0xFFFF) {
-			resolutionLookup = true;
-			Shared -> renderCalls[0].calls = 0;
-		}
-		if (resolutionLookup) for (uint i = firstViewport; i < viewportCount; i++) {
+		if (resolutionLookup) for (uint i = firstViewport; i < firstViewport+viewportCount; i++) {
 			if (pViewports[i].height > 1.f && pViewports[i].width > 1.f && pViewports[i].x == 0.f && pViewports[i].y == 0.f) {
 				uint16_t width = (uint16_t)(pViewports[i].width);
 				uint16_t height = (uint16_t)(pViewports[i].height);
@@ -709,10 +705,6 @@ namespace EGL {
 	}
 
 	void ViewportIndexedfvNV(uint i, const glViewportArray* pViewports) {
-		if (!resolutionLookup && Shared -> renderCalls[0].calls == 0xFFFF) {
-			resolutionLookup = true;
-			Shared -> renderCalls[0].calls = 0;
-		}
 		if (resolutionLookup) {
 			if (pViewports[i].height > 1.f && pViewports[i].width > 1.f && pViewports[i].x == 0.f && pViewports[i].y == 0.f) {
 				uint16_t width = (uint16_t)(pViewports[i].width);
@@ -760,10 +752,6 @@ namespace EGL {
 	}
 
 	void ViewportIndexedfvOES(uint i, const glViewportArray* pViewports) {
-		if (!resolutionLookup && Shared -> renderCalls[0].calls == 0xFFFF) {
-			resolutionLookup = true;
-			Shared -> renderCalls[0].calls = 0;
-		}
 		if (resolutionLookup) {
 			if (pViewports[i].height > 1.f && pViewports[i].width > 1.f && pViewports[i].x == 0.f && pViewports[i].y == 0.f) {
 				uint16_t width = (uint16_t)(pViewports[i].width);
@@ -808,6 +796,22 @@ namespace EGL {
 		else if (!strcmp(eglName, "glViewportArrayvOES")) {
 			Address_weaks.glViewportArrayvOES = ((eglGetProcAddress_0)(Address_weaks.eglGetProcAddress))(eglName);
 			return (uintptr_t)&ViewportArrayvOES;
+		}
+		else if (!strcmp(eglName, "glViewportIndexedfNV")) {
+			Address_weaks.glViewportIndexedfNV = ((eglGetProcAddress_0)(Address_weaks.eglGetProcAddress))(eglName);
+			return (uintptr_t)&ViewportIndexedfNV;
+		}
+		else if (!strcmp(eglName, "glViewportIndexedfOES")) {
+			Address_weaks.glViewportIndexedfOES = ((eglGetProcAddress_0)(Address_weaks.eglGetProcAddress))(eglName);
+			return (uintptr_t)&ViewportIndexedfOES;
+		}
+		else if (!strcmp(eglName, "glViewportIndexedfvNV")) {
+			Address_weaks.glViewportIndexedfvNV = ((eglGetProcAddress_0)(Address_weaks.eglGetProcAddress))(eglName);
+			return (uintptr_t)&ViewportIndexedfvNV;
+		}
+		else if (!strcmp(eglName, "glViewportIndexedfvOES")) {
+			Address_weaks.glViewportIndexedfvOES = ((eglGetProcAddress_0)(Address_weaks.eglGetProcAddress))(eglName);
+			return (uintptr_t)&ViewportIndexedfvOES;
 		}
 		return ((eglGetProcAddress_0)(Address_weaks.eglGetProcAddress))(eglName);
 	}
@@ -1027,22 +1031,11 @@ namespace NVN {
 	}
 
 	void* CommandBufferSetRenderTargets(const nvnCommandBuffer* cmdBuf, int numTextures, const NVNTexture** texture, const NVNTextureView** textureView, const NVNTexture* depthTexture, const NVNTextureView* depthView) {
-		if (!resolutionLookup && Shared -> renderCalls[0].calls == 0xFFFF) {
-			resolutionLookup = true;
-			Shared -> renderCalls[0].calls = 0;
-		}
 		if (resolutionLookup && depthTexture != NULL && texture != NULL) {
 			uint16_t depth_width = ((nvnTextureGetWidth_0)(Ptrs.nvnTextureGetWidth))(depthTexture);
 			uint16_t depth_height = ((nvnTextureGetHeight_0)(Ptrs.nvnTextureGetHeight))(depthTexture);
 			int depth_format = ((nvnTextureGetFormat_0)(Ptrs.nvnTextureGetFormat))(depthTexture);
 			if (depth_width > 1 && depth_height > 1 && (depth_format >= 51 && depth_format <= 54)) {
-				if (nvnPresentedTexture) {
-					memcpy(Shared -> renderCalls, m_resolutionRenderCalls, sizeof(m_resolutionRenderCalls));
-					memcpy(Shared -> viewportCalls, m_resolutionViewportCalls, sizeof(m_resolutionViewportCalls));
-					memset(&m_resolutionRenderCalls, 0, sizeof(m_resolutionRenderCalls));
-					memset(&m_resolutionViewportCalls, 0, sizeof(m_resolutionViewportCalls));
-					nvnPresentedTexture = false;
-				}
 				bool found = false;
 				int ratio = ((depth_width * 10) / (depth_height));
 				if (ratio < 12 || ratio > 18) {
