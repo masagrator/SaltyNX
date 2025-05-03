@@ -108,7 +108,7 @@ Result load_elf32_debug(Handle debug, uint64_t* start)
 	fseek(file, 0, 0);
 	elf_data = (uint8_t*)malloc(elf_size);
 	if (!elf_data) {
-		SaltySD_printf("There was not enough space for loading saltysd_bootstrap32_%sk.elf! Aborting...", (offset / 0x1000));
+		SaltySD_printf("There was not enough space for loading saltysd_bootstrap32_%dk.elf! Aborting...", (offset / 0x1000));
 		return -1;
 	}
 	fread(elf_data, elf_size, 1, file);
