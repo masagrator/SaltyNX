@@ -146,6 +146,7 @@ struct NxFpsSharedBlock {
 	resolutionCalls renderCalls[8];
 	resolutionCalls viewportCalls[8];
 	bool forceOriginalRefreshRate;
+	bool dontForce60InDocked;
 } PACKED;
 
 NxFpsSharedBlock* Shared = 0;
@@ -236,7 +237,7 @@ namespace NX_FPS_Math {
 		new_fpslock = (LOCK::overwriteRefreshRate ? LOCK::overwriteRefreshRate : (Shared -> FPSlocked));
 		OpMode = ((_ZN2nn2oe16GetOperationModeEv)(Address_weaks.GetOperationMode))();
 		if (old_force != (Shared -> forceOriginalRefreshRate)) {
-			if (OpMode == 1)
+			if (OpMode == 1 && !(Shared -> dontForce60InDocked))
 				svcSleepThread(LOCK::DockedRefreshRateDelay);
 			old_force = (Shared -> forceOriginalRefreshRate);
 		}
