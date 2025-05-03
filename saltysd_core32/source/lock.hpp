@@ -19,9 +19,9 @@ namespace LOCK {
 	uint32_t compiledSize = 0;
 
 	struct {
-		int64_t main_start;
-		uint64_t alias_start;
-		uint64_t heap_start;
+		uintptr_t main_start;
+		uintptr_t alias_start;
+		uintptr_t heap_start;
 	} mappings;
 
 	template <typename T>
@@ -80,14 +80,14 @@ namespace LOCK {
 	}
 
 	template <typename T>
-	void writeValue(T value, int64_t address) {
+	void writeValue(T value, uintptr_t address) {
 		if (*(T*)address != value)
 			*(T*)address = value;
 	}
 
 	bool unsafeCheck = false;
 
-	bool NOINLINE isAddressValid(int64_t address) {
+	bool NOINLINE isAddressValid(uintptr_t address) {
 		MemoryInfo memoryinfo = {0};
 		u32 pageinfo = 0;
 
@@ -102,10 +102,10 @@ namespace LOCK {
 		return false;
 	}
 
-	int64_t NOINLINE getAddress(uint8_t* buffer, uint8_t offsets_count) {
+	uintptr_t NOINLINE getAddress(uint8_t* buffer, uint8_t offsets_count) {
 		uint8_t region = read8(buffer);
 		offsets_count -= 1;
-		int64_t address = 0;
+		uintptr_t address = 0;
 		switch(region) {
 			case 1: {
 				address = mappings.main_start;
@@ -126,8 +126,8 @@ namespace LOCK {
 			int32_t temp_offset = (int32_t)read32(buffer);
 			address += temp_offset;
 			if (i+1 < offsets_count) {
-				if (!isAddressValid(*(int64_t*)address)) return -2;
-				address = *(uint64_t*)address;
+				if (!isAddressValid(*(int32_t*)address)) return -2;
+				address = *(uintptr_t*)address;
 			}
 		}
 		return address;
@@ -421,7 +421,7 @@ namespace LOCK {
 			int8_t OPCODE = read8(buffer);
 			if (OPCODE == 1) {
 				uint8_t offsets_count = read8(buffer);
-				int64_t address = getAddress(buffer, offsets_count);
+				uintptr_t address = getAddress(buffer, offsets_count);
 				if (address < 0) 
 					return 6;
 				/* value_type:
@@ -486,7 +486,7 @@ namespace LOCK {
 			}
 			else if (OPCODE == 2) {
 				uint8_t offsets_count = read8(buffer);
-				int64_t address = getAddress(buffer, offsets_count);
+				uintptr_t address = getAddress(buffer, offsets_count);
 				if (address < 0) 
 					return 6;
 
