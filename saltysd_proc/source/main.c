@@ -50,6 +50,7 @@ struct NxFpsSharedBlock {
 	struct resolutionCalls renderCalls[8];
 	struct resolutionCalls viewportCalls[8];
 	bool forceOriginalRefreshRate;
+    bool dontForce60InDocked;
 } NX_PACKED;
 
 struct NxFpsSharedBlock* nx_fps = 0;
@@ -1414,6 +1415,7 @@ int main(int argc, char *argv[])
         }
         uint32_t temp = 0;
         GetDisplayRefreshRate(&temp, true);
+        if (nx_fps) nx_fps -> dontForce60InDocked = dontForce60InDocked;
 
         // Detected new PID
         if (max != old_max && max > 0x80)
