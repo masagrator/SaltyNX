@@ -888,8 +888,6 @@ namespace NVN {
 		return ((nvnSyncWait_0)(Ptrs.nvnSyncWait))(_this, timeout_ns);
 	}
 
-	bool nvnPresentedTexture = false;
-
 	void PresentTexture(const void* _this, const NVNWindow* nvnWindow, const void* unk3) {
 
 		//Initialize time calculation;
@@ -901,7 +899,6 @@ namespace NVN {
 		
 		NX_FPS_Math::PreFrame();
 		((nvnQueuePresentTexture_0)(Ptrs.nvnQueuePresentTexture))(_this, nvnWindow, unk3);
-		nvnPresentedTexture = true;
 		NX_FPS_Math::PostFrame();
 
 		(Shared -> FPSmode) = (uint8_t)((nvnGetPresentInterval_0)(Ptrs.nvnWindowGetPresentInterval))(nvnWindow);
