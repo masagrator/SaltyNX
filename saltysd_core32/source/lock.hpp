@@ -126,7 +126,7 @@ namespace LOCK {
 			int32_t temp_offset = (int32_t)read32(buffer);
 			address += temp_offset;
 			if (i+1 < offsets_count) {
-				if (!isAddressValid(*(int32_t*)address)) return -2;
+				if (!isAddressValid(*(uintptr_t*)address)) return -2;
 				address = *(uintptr_t*)address;
 			}
 		}
