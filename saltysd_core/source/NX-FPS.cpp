@@ -443,7 +443,7 @@ namespace vk {
 	}
 
 	void CmdSetViewport(void* commandBuffer, uint32_t firstViewport, uint32_t viewportCount, const VkViewport* pViewports) {
-		if (resolutionLookup) for (uint i = firstViewport; i < viewportCount; i++) {
+		if (resolutionLookup) for (uint i = firstViewport; i < firstViewport+viewportCount; i++) {
 			if (pViewports[i].height > 1.f && pViewports[i].width > 1.f && pViewports[i].x == 0.f && pViewports[i].y == 0.f) {
 				uint16_t width = (uint16_t)(pViewports[i].width);
 				uint16_t height = (uint16_t)(pViewports[i].height);
