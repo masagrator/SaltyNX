@@ -990,7 +990,7 @@ namespace NVN {
 
 	//Sets resolutions and start point of passed to command buffer textures, they cannot be bigger than texture are originally
 	void* CommandBufferSetViewports(nvnCommandBuffer* cmdBuf, int start, int count, NVNViewport* viewports) {
-		if (resolutionLookup) for (int i = start; i < count; i++) {
+		if (resolutionLookup) for (int i = start; i < start+count; i++) {
 			if (viewports[i].height > 1.f && viewports[i].width > 1.f && viewports[i].x == 0.f && viewports[i].y == 0.f) {
 				uint16_t width = (uint16_t)(viewports[i].width);
 				uint16_t height = (uint16_t)(viewports[i].height);
