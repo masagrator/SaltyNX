@@ -21,6 +21,7 @@ static inline void SaltySD_printf(const char* format, ...)
 	
 	svcOutputDebugString(buffer, strlen(buffer));
 	
+	static bool previous_line_had_endline = false;
 	FILE* f = fopen("sdmc:/SaltySD/saltysd.log", "ab");
 	if (f)
 	{
@@ -28,12 +29,18 @@ static inline void SaltySD_printf(const char* format, ...)
 		if (!tick) {
 			tick = svcGetSystemTick();
 		}
-		else {
+		if (previous_line_had_endline) {
 			char timer[] = "[244444444:24:24] ";
 			uint64_t deltaTick = svcGetSystemTick() - tick;
 			uint64_t deltaSeconds = deltaTick / 19200000;
 			snprintf(timer, sizeof(timer), "[%02ld:%02ld:%02ld] ", (deltaSeconds/3600), ((deltaSeconds/60) % 60), deltaSeconds % 60);
 			fwrite(timer, strlen(timer), 1, f);
+		}
+		else {
+			if (buffer[strlen(buffer)-1] == '\n') {
+				previous_line_had_endline = true;
+			}
+			else previous_line_had_endline = false;
 		}
 		fwrite(buffer, strlen(buffer), 1, f);
 		fclose(f);
