@@ -233,13 +233,13 @@ void SaltySDCore_PatchSVCs()
 	static u8 orig_1_alt[] = {0x04, 0x00, 0x2D, 0xE5, 0x01, 0x00, 0x00, 0xEF}; //PUSH {r0}; SVC #0x1
 	static u8 orig_2_alt[] = {0x04, 0x00, 0x2D, 0xE5, 0x04, 0x00, 0x9D, 0xE5, 0x08, 0x30, 0x9D, 0xE5, 0x29, 0x00, 0x00, 0xEF}; //PUSH {R0}; LDR r0, [sp, #4]; LDR r3, [sp, #8]; SVC 0x29
 	static u8 patch[0x8] = {0x04, 0xF0, 0x1F, 0xE5, 0xDE, 0xAD, 0xBE, 0xEF}; // LDR pc, [pc, #-4]; 0xDEADBEEF
-	u32 dst_1 = SaltySDCore_findCode(orig_1, sizeof(orig_1));
-	u32 dst_2 = SaltySDCore_findCode(orig_2, sizeof(orig_2));
+	u32 dst_1 = SaltySDCore_findCodeEx(orig_1, sizeof(orig_1));
+	u32 dst_2 = SaltySDCore_findCodeEx(orig_2, sizeof(orig_2));
 	if (!dst_1) {
-		dst_1 = SaltySDCore_findCode(orig_1_alt, sizeof(orig_1_alt));
+		dst_1 = SaltySDCore_findCodeEx(orig_1_alt, sizeof(orig_1_alt));
 	}
 	if (!dst_2) {
-		dst_2 = SaltySDCore_findCode(orig_2_alt, sizeof(orig_2_alt));
+		dst_2 = SaltySDCore_findCodeEx(orig_2_alt, sizeof(orig_2_alt));
 	}
 	
 	if (!dst_1 || !dst_2)
