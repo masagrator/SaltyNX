@@ -78,6 +78,7 @@ bool cheatCheck = false;
 bool isDocked = false;
 bool dontForce60InDocked = false;
 bool matchLowestDocked = false;
+bool dmntchtActive = false;
 
 /// Edid2
 typedef struct {
@@ -1337,6 +1338,7 @@ int main(int argc, char *argv[])
     // Main service loop
     u64* pids = malloc(0x200 * sizeof(u64));
     u64 max = 0;
+    dmntchtActive = isServiceRunning("dmnt:cht");
     while (1)
     {
         s32 num;
@@ -1363,7 +1365,7 @@ int main(int argc, char *argv[])
                 }
             }
             if (!cheatCheck) {
-                if (!isCheatsFolderInstalled() || !isServiceRunning("dmnt:cht"))
+                if (!dmntchtActive || !isCheatsFolderInstalled())
                     cheatCheck = true;
                 else {
                     Handle debug_handle;
