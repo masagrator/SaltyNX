@@ -1340,10 +1340,11 @@ int main(int argc, char *argv[])
     while (1)
     {
         s32 num;
+        static s32 init_num = 0;
         svcGetProcessList(&num, pids, 0x200);
-
+        if (!init_num) init_num = num;
         u64 old_max = max;
-        for (int i = 0; i < num; i++)
+        for (int i = init_num; i < num; i++)
         {
             if (pids[i] > max)
             {
