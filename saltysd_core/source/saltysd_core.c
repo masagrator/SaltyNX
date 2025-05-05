@@ -81,6 +81,44 @@ u64 SaltySDCore_findCode(u8* code, size_t size)
 	return 0;
 }
 
+u64 SaltySDCore_findCodeEx(u8* code, size_t size)
+{
+	Result ret = 0;
+	u64 addr = SaltySDCore_getCodeStart();
+	u64 addr_size = SaltySDCore_getCodeSize();
+
+	while (1)
+	{
+		void* out = boyer_moore_search((void*)addr, addr_size, code, size);
+		if (out) return (u64)out;
+		
+		addr += addr_size;
+
+		while (1)
+		{
+			MemoryInfo info;
+			u32 pageinfo;
+			ret = svcQueryMemory(&info, &pageinfo, addr);
+			
+			if (info.perm != Perm_Rx)
+			{
+				addr = info.addr + info.size;
+			}
+			else
+			{
+				addr = info.addr;
+				addr_size = info.size;
+				break;
+			}
+			if (!addr || ret) break;
+		}
+		
+		if (!addr || ret) break;
+	}
+
+	return 0;
+}
+
 FILE* SaltySDCore_fopen(const char* filename, const char* mode)
 {
 	return fopen(filename, mode);
