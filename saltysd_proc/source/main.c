@@ -78,7 +78,6 @@ bool cheatCheck = false;
 bool isDocked = false;
 bool dontForce60InDocked = false;
 bool matchLowestDocked = false;
-bool dmntchtActive = false;
 
 /// Edid2
 typedef struct {
