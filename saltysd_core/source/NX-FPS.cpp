@@ -95,6 +95,7 @@ typedef void (*vkCmdSetViewport_0)(void* commandBuffer, uint32_t firstViewport, 
 typedef void (*vkCmdSetViewportWithCount_0)(void* commandBuffer, uint32_t viewportCount, const VkViewport* pViewports);
 typedef s32 (*vkCreateSwapchainKHR_0)(void* Device, const VkSwapchainCreateInfoKHR* pCreateInfo, const void* pAllocator, const void** pSwapchain);
 typedef s32 (*vkGetSwapchainImagesKHR_0)(void* Device, void* VkSwapchainKHR, uint32_t* pSwapchainImageCount, int** pSwapchainImages);
+typedef AppletFocusState (*GetCurrentFocusState_0)();
 
 struct {
 	uintptr_t nvnBootstrapLoader;
@@ -125,6 +126,28 @@ struct {
 	uintptr_t nvSwapchainGetInstanceProcAddr;
 	uintptr_t nvSwapchainGetDeviceProcAddr;
 	uintptr_t vkGetDeviceProcAddr;
+
+	uintptr_t nvnDeviceGetProcAddress;
+	uintptr_t nvnQueuePresentTexture;
+
+	uintptr_t nvnWindowSetPresentInterval;
+	uintptr_t nvnWindowGetPresentInterval;
+	uintptr_t nvnWindowBuilderSetTextures;
+	uintptr_t nvnWindowAcquireTexture;
+	uintptr_t nvnSyncWait;
+
+	uintptr_t nvnWindowSetNumActiveTextures;
+	uintptr_t nvnWindowInitialize;
+	uintptr_t nvnTextureGetWidth;
+	uintptr_t nvnTextureGetHeight;
+	uintptr_t nvnTextureGetFormat;
+	uintptr_t nvnCommandBufferSetRenderTargets;
+	uintptr_t nvnCommandBufferSetViewport;
+	uintptr_t nvnCommandBufferSetViewports;
+	uintptr_t nvnCommandBufferSetDepthRange;
+	uintptr_t vkGetSwapchainImagesKHR;
+	uintptr_t nvSwapchainGetSwapchainImagesKHR;
+	uintptr_t GetCurrentFocusState;
 } Address_weaks;
 
 struct nvnWindowBuilder {
@@ -202,32 +225,10 @@ struct NxFpsSharedBlock {
 	resolutionCalls viewportCalls[8];
 	bool forceOriginalRefreshRate;
 	bool dontForce60InDocked;
+	bool forceSuspend;
 } PACKED;
 
 NxFpsSharedBlock* Shared = 0;
-
-struct {
-	uintptr_t nvnDeviceGetProcAddress;
-	uintptr_t nvnQueuePresentTexture;
-
-	uintptr_t nvnWindowSetPresentInterval;
-	uintptr_t nvnWindowGetPresentInterval;
-	uintptr_t nvnWindowBuilderSetTextures;
-	uintptr_t nvnWindowAcquireTexture;
-	uintptr_t nvnSyncWait;
-
-	uintptr_t nvnWindowSetNumActiveTextures;
-	uintptr_t nvnWindowInitialize;
-	uintptr_t nvnTextureGetWidth;
-	uintptr_t nvnTextureGetHeight;
-	uintptr_t nvnTextureGetFormat;
-	uintptr_t nvnCommandBufferSetRenderTargets;
-	uintptr_t nvnCommandBufferSetViewport;
-	uintptr_t nvnCommandBufferSetViewports;
-	uintptr_t nvnCommandBufferSetDepthRange;
-	uintptr_t vkGetSwapchainImagesKHR;
-	uintptr_t nvSwapchainGetSwapchainImagesKHR;
-} Ptrs;
 
 struct {
 	uint8_t FPS = 0xFF;
@@ -368,6 +369,10 @@ namespace NX_FPS_Math {
 			if (!configRC && FPSlock) {
 				(Shared -> patchApplied) = 1;
 			}
+			if (Shared -> forceSuspend) {
+				while (((GetCurrentFocusState_0)(Address_weaks.GetCurrentFocusState))() == AppletFocusState_NotFocusedHomeSleep)
+					svcSleepThread(16000000);
+			}
 		}
 
 		if (LOCK::overwriteRefreshRate != 0) (Shared -> forceOriginalRefreshRate) = true;
@@ -496,7 +501,7 @@ namespace vk {
 			int32_t vulkanResult = ((vkCreateSwapchainKHR_0)(pointer))(Device, (const VkSwapchainCreateInfoKHR*)pCreateInfo, pAllocator, pSwapchain);
 			if (vulkanResult >= 0) {
 				uint32_t numBuffers = 0;
-				((vkGetSwapchainImagesKHR_0)(Ptrs.vkGetSwapchainImagesKHR))(Device, (void*)pSwapchain[0], &numBuffers, nullptr);
+				((vkGetSwapchainImagesKHR_0)(Address_weaks.vkGetSwapchainImagesKHR))(Device, (void*)pSwapchain[0], &numBuffers, nullptr);
 				(Shared -> Buffers) = numBuffers;
 			}
 			return vulkanResult;
@@ -525,8 +530,8 @@ namespace vk {
 				return (void*)&vk::CreateSwapchain;
 			}
 			if (!strcmp("vkGetSwapchainImagesKHR", vkFunction)) {
-				if (!Ptrs.vkGetSwapchainImagesKHR) Ptrs.vkGetSwapchainImagesKHR = address;
-				return (void*)Ptrs.vkGetSwapchainImagesKHR;
+				if (!Address_weaks.vkGetSwapchainImagesKHR) Address_weaks.vkGetSwapchainImagesKHR = address;
+				return (void*)Address_weaks.vkGetSwapchainImagesKHR;
 			}
 			return (void*)address;
 		}
@@ -546,8 +551,8 @@ namespace vk {
 				return (void*)&vk::CreateSwapchain;
 			}
 			if (!strcmp("vkGetSwapchainImagesKHR", vkFunction)) {
-				if (!Ptrs.vkGetSwapchainImagesKHR) Ptrs.vkGetSwapchainImagesKHR = address;
-				return (void*)Ptrs.vkGetSwapchainImagesKHR;
+				if (!Address_weaks.vkGetSwapchainImagesKHR) Address_weaks.vkGetSwapchainImagesKHR = address;
+				return (void*)Address_weaks.vkGetSwapchainImagesKHR;
 			}
 			if (!strcmp("vkCmdSetViewport", vkFunction)) {
 				if (!Address_weaks.vkCmdSetViewport) Address_weaks.vkCmdSetViewport = address;
@@ -829,7 +834,7 @@ namespace NVN {
 			}
 			(Shared -> ActiveBuffers) = windowBuilder -> numBufferedFrames;	
 		}
-		return ((nvnWindowInitialize_0)(Ptrs.nvnWindowInitialize))(nvnWindow, windowBuilder);
+		return ((nvnWindowInitialize_0)(Address_weaks.nvnWindowInitialize))(nvnWindow, windowBuilder);
 	}
 
 	void WindowBuilderSetTextures(const nvnWindowBuilder* nvnWindowBuilder, int numBufferedFrames, const NVNTexture** nvnTextures) {
@@ -838,7 +843,7 @@ namespace NVN {
 			numBufferedFrames = (Shared -> SetBuffers);
 		}
 		(Shared -> ActiveBuffers) = numBufferedFrames;
-		return ((nvnBuilderSetTextures_0)(Ptrs.nvnWindowBuilderSetTextures))(nvnWindowBuilder, numBufferedFrames, nvnTextures);
+		return ((nvnBuilderSetTextures_0)(Address_weaks.nvnWindowBuilderSetTextures))(nvnWindowBuilder, numBufferedFrames, nvnTextures);
 	}
 
 	void WindowSetNumActiveTextures(const NVNWindow* nvnWindow, int numBufferedFrames) {
@@ -847,20 +852,20 @@ namespace NVN {
 			numBufferedFrames = (Shared -> SetBuffers);
 		}
 		(Shared -> ActiveBuffers) = numBufferedFrames;
-		return ((nvnWindowSetNumActiveTextures_0)(Ptrs.nvnWindowSetNumActiveTextures))(nvnWindow, numBufferedFrames);
+		return ((nvnWindowSetNumActiveTextures_0)(Address_weaks.nvnWindowSetNumActiveTextures))(nvnWindow, numBufferedFrames);
 	}
 
 	void SetPresentInterval(const NVNWindow* nvnWindow, int mode) {
 		if (mode < 0) {
 			mode *= -1;
 			if ((Shared -> FPSmode) != mode) {
-				((nvnSetPresentInterval_0)(Ptrs.nvnWindowSetPresentInterval))(nvnWindow, mode);
+				((nvnSetPresentInterval_0)(Address_weaks.nvnWindowSetPresentInterval))(nvnWindow, mode);
 				(Shared -> FPSmode) = mode;
 			}
 			changedFPS = true;
 		}
 		else if (!changeFPS) {
-			((nvnSetPresentInterval_0)(Ptrs.nvnWindowSetPresentInterval))(nvnWindow, mode);
+			((nvnSetPresentInterval_0)(Address_weaks.nvnWindowSetPresentInterval))(nvnWindow, mode);
 			changedFPS = false;
 			(Shared -> FPSmode) = mode;
 		}
@@ -884,28 +889,28 @@ namespace NVN {
 			else if ((Shared -> ZeroSync) == ZeroSyncType_Soft) 
 				timeout_ns = 0;
 		}
-		return ((nvnSyncWait_0)(Ptrs.nvnSyncWait))(_this, timeout_ns);
+		return ((nvnSyncWait_0)(Address_weaks.nvnSyncWait))(_this, timeout_ns);
 	}
 
 	void PresentTexture(const void* _this, const NVNWindow* nvnWindow, int index) {
 
 		static int last_index = 0;
 		if (last_index == index) {
-			return ((nvnQueuePresentTexture_0)(Ptrs.nvnQueuePresentTexture))(_this, nvnWindow, index);
+			return ((nvnQueuePresentTexture_0)(Address_weaks.nvnQueuePresentTexture))(_this, nvnWindow, index);
 		}
 		//Initialize time calculation;
 		if (!NX_FPS_Math::starttick) {
 			NX_FPS_Math::starttick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
 			NX_FPS_Math::starttick2 = NX_FPS_Math::starttick;
-			(Shared -> FPSmode) = (uint8_t)((nvnGetPresentInterval_0)(Ptrs.nvnWindowGetPresentInterval))(nvnWindow);
+			(Shared -> FPSmode) = (uint8_t)((nvnGetPresentInterval_0)(Address_weaks.nvnWindowGetPresentInterval))(nvnWindow);
 		}
 		
 		NX_FPS_Math::PreFrame();
-		((nvnQueuePresentTexture_0)(Ptrs.nvnQueuePresentTexture))(_this, nvnWindow, index);
+		((nvnQueuePresentTexture_0)(Address_weaks.nvnQueuePresentTexture))(_this, nvnWindow, index);
 		NX_FPS_Math::PostFrame();
 		last_index = index;
 
-		(Shared -> FPSmode) = (uint8_t)((nvnGetPresentInterval_0)(Ptrs.nvnWindowGetPresentInterval))(nvnWindow);
+		(Shared -> FPSmode) = (uint8_t)((nvnGetPresentInterval_0)(Address_weaks.nvnWindowGetPresentInterval))(nvnWindow);
 
 		if (!NX_FPS_Math::new_fpslock) {
 			NX_FPS_Math::FPStiming = 0;
@@ -916,7 +921,7 @@ namespace NVN {
 			changeFPS = true;
 			NX_FPS_Math::FPSlock = (Shared -> FPSlocked);
 			if (NX_FPS_Math::new_fpslock <= ((Shared -> displaySync) ? ((Shared -> displaySync) / 4) : 15)) {
-				if (((nvnGetPresentInterval_0)(Ptrs.nvnWindowGetPresentInterval))(nvnWindow) != 4)
+				if (((nvnGetPresentInterval_0)(Address_weaks.nvnWindowGetPresentInterval))(nvnWindow) != 4)
 					NVN::SetPresentInterval(nvnWindow, -4);
 				if ((NX_FPS_Math::new_fpslock != ((Shared -> displaySync) ? ((Shared -> displaySync) / 4) : 15))
 				|| (Shared -> ZeroSync)) {
@@ -928,7 +933,7 @@ namespace NVN {
 				else NX_FPS_Math::FPStiming = 0;			
 			}
 			else if (NX_FPS_Math::new_fpslock <= ((Shared -> displaySync) ? ((Shared -> displaySync) / 3) : 20)) {
-				if (((nvnGetPresentInterval_0)(Ptrs.nvnWindowGetPresentInterval))(nvnWindow) != 3)
+				if (((nvnGetPresentInterval_0)(Address_weaks.nvnWindowGetPresentInterval))(nvnWindow) != 3)
 					NVN::SetPresentInterval(nvnWindow, -3);
 				if ((NX_FPS_Math::new_fpslock != ((Shared -> displaySync) ? ((Shared -> displaySync) / 3) : 20))
 				|| (Shared -> ZeroSync)) {
@@ -940,7 +945,7 @@ namespace NVN {
 				else NX_FPS_Math::FPStiming = 0;			
 			}
 			else if (NX_FPS_Math::new_fpslock <= ((Shared -> displaySync) ? ((Shared -> displaySync) / 2) : 30)) {
-				if (((nvnGetPresentInterval_0)(Ptrs.nvnWindowGetPresentInterval))(nvnWindow) != 2)
+				if (((nvnGetPresentInterval_0)(Address_weaks.nvnWindowGetPresentInterval))(nvnWindow) != 2)
 					NVN::SetPresentInterval(nvnWindow, -2);
 				if (NX_FPS_Math::new_fpslock != ((Shared -> displaySync) ? ((Shared -> displaySync) / 2) : 30)
 				|| (Shared -> ZeroSync)) {
@@ -952,7 +957,7 @@ namespace NVN {
 				else NX_FPS_Math::FPStiming = 0;			
 			}
 			else if (NX_FPS_Math::new_fpslock > ((Shared -> displaySync) ? ((Shared -> displaySync) / 2) : 30)) {
-				if (((nvnGetPresentInterval_0)(Ptrs.nvnWindowGetPresentInterval))(nvnWindow) != 1) {
+				if (((nvnGetPresentInterval_0)(Address_weaks.nvnWindowGetPresentInterval))(nvnWindow) != 1) {
 					NVN::SetPresentInterval(nvnWindow, -2); //This allows in game with glitched interval to unlock 60 FPS, f.e. WRC Generations
 					NVN::SetPresentInterval(nvnWindow, -1);
 				}
@@ -974,7 +979,7 @@ namespace NVN {
 		if (WindowSync != nvnSync) {
 			WindowSync = (void*)nvnSync;
 		}
-		void* ret = ((nvnWindowAcquireTexture_0)(Ptrs.nvnWindowAcquireTexture))(nvnWindow, nvnSync, index);
+		void* ret = ((nvnWindowAcquireTexture_0)(Address_weaks.nvnWindowAcquireTexture))(nvnWindow, nvnSync, index);
 		startFrameTick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
 		return ret;
 	}
@@ -989,83 +994,83 @@ namespace NVN {
 				NX_FPS_Math::addResToViewports(viewports[i].width, viewports[i].height);
 			}
 		}
-		return ((nvnCommandBufferSetViewports_0)(Ptrs.nvnCommandBufferSetViewports))(cmdBuf, start, count, viewports);
+		return ((nvnCommandBufferSetViewports_0)(Address_weaks.nvnCommandBufferSetViewports))(cmdBuf, start, count, viewports);
 	}
 
 	void* CommandBufferSetViewport(const nvnCommandBuffer* cmdBuf, int x, int y, int width, int height) {
 		if (resolutionLookup && height > 1 && width > 1 && !x && !y) {
 			NX_FPS_Math::addResToViewports(width, height);
 		}
-		return ((nvnCommandBufferSetViewport_0)(Ptrs.nvnCommandBufferSetViewport))(cmdBuf, x, y, width, height);
+		return ((nvnCommandBufferSetViewport_0)(Address_weaks.nvnCommandBufferSetViewport))(cmdBuf, x, y, width, height);
 	}
 
 	void* CommandBufferSetRenderTargets(const nvnCommandBuffer* cmdBuf, int numTextures, const NVNTexture** texture, const NVNTextureView** textureView, const NVNTexture* depthTexture, const NVNTextureView* depthView) {
 		if (resolutionLookup && depthTexture != NULL && texture != NULL) {
-			uint16_t depth_width = ((nvnTextureGetWidth_0)(Ptrs.nvnTextureGetWidth))(depthTexture);
-			uint16_t depth_height = ((nvnTextureGetHeight_0)(Ptrs.nvnTextureGetHeight))(depthTexture);
-			int depth_format = ((nvnTextureGetFormat_0)(Ptrs.nvnTextureGetFormat))(depthTexture);
+			uint16_t depth_width = ((nvnTextureGetWidth_0)(Address_weaks.nvnTextureGetWidth))(depthTexture);
+			uint16_t depth_height = ((nvnTextureGetHeight_0)(Address_weaks.nvnTextureGetHeight))(depthTexture);
+			int depth_format = ((nvnTextureGetFormat_0)(Address_weaks.nvnTextureGetFormat))(depthTexture);
 			if (depth_width > 1 && depth_height > 1 && (depth_format >= 51 && depth_format <= 54)) {
 				NX_FPS_Math::addResToRender(depth_width, depth_height);
 			}
 		}
-		return ((nvnCommandBufferSetRenderTargets_0)(Ptrs.nvnCommandBufferSetRenderTargets))(cmdBuf, numTextures, texture, textureView, depthTexture, depthView);
+		return ((nvnCommandBufferSetRenderTargets_0)(Address_weaks.nvnCommandBufferSetRenderTargets))(cmdBuf, numTextures, texture, textureView, depthTexture, depthView);
 	}
 
 	uintptr_t GetProcAddress0 (NVNDevice* nvnDevice, const char* nvnFunction) {
-		uintptr_t address = ((GetProcAddress)(Ptrs.nvnDeviceGetProcAddress))(nvnDevice, nvnFunction);
+		uintptr_t address = ((GetProcAddress)(Address_weaks.nvnDeviceGetProcAddress))(nvnDevice, nvnFunction);
 		if (!strcmp("nvnDeviceGetProcAddress", nvnFunction))
 			return (uintptr_t)&NVN::GetProcAddress0;
 		else if (!strcmp("nvnQueuePresentTexture", nvnFunction)) {
-			Ptrs.nvnQueuePresentTexture = address;
+			Address_weaks.nvnQueuePresentTexture = address;
 			return (uintptr_t)&NVN::PresentTexture;
 		}
 		else if (!strcmp("nvnWindowAcquireTexture", nvnFunction)) {
-			Ptrs.nvnWindowAcquireTexture = address;
+			Address_weaks.nvnWindowAcquireTexture = address;
 			return (uintptr_t)&NVN::AcquireTexture;
 		}
 		else if (!strcmp("nvnWindowSetPresentInterval", nvnFunction)) {
-			Ptrs.nvnWindowSetPresentInterval = address;
+			Address_weaks.nvnWindowSetPresentInterval = address;
 			return (uintptr_t)&NVN::SetPresentInterval;
 		}
 		else if (!strcmp("nvnWindowGetPresentInterval", nvnFunction)) {
-			Ptrs.nvnWindowGetPresentInterval = address;
+			Address_weaks.nvnWindowGetPresentInterval = address;
 		}
 		else if (!strcmp("nvnWindowSetNumActiveTextures", nvnFunction)) {
-			Ptrs.nvnWindowSetNumActiveTextures = address;
+			Address_weaks.nvnWindowSetNumActiveTextures = address;
 			return (uintptr_t)&NVN::WindowSetNumActiveTextures;
 		}
 		else if (!strcmp("nvnWindowBuilderSetTextures", nvnFunction)) {
-			Ptrs.nvnWindowBuilderSetTextures = address;
+			Address_weaks.nvnWindowBuilderSetTextures = address;
 			return (uintptr_t)&NVN::WindowBuilderSetTextures;
 		}
 		else if (!strcmp("nvnWindowInitialize", nvnFunction)) {
-			Ptrs.nvnWindowInitialize = address;
+			Address_weaks.nvnWindowInitialize = address;
 			return (uintptr_t)&NVN::WindowInitialize;
 		}
 		else if (!strcmp("nvnSyncWait", nvnFunction)) {
-			Ptrs.nvnSyncWait = address;
+			Address_weaks.nvnSyncWait = address;
 			return (uintptr_t)&NVN::SyncWait0;
 		}
 		else if (!strcmp("nvnCommandBufferSetRenderTargets", nvnFunction)) {
-			Ptrs.nvnCommandBufferSetRenderTargets = address;
+			Address_weaks.nvnCommandBufferSetRenderTargets = address;
 			return (uintptr_t)&NVN::CommandBufferSetRenderTargets;
 		}
 		else if (!strcmp("nvnCommandBufferSetViewport", nvnFunction)) {
-			Ptrs.nvnCommandBufferSetViewport = address;
+			Address_weaks.nvnCommandBufferSetViewport = address;
 			return (uintptr_t)&NVN::CommandBufferSetViewport;
 		}
 		else if (!strcmp("nvnCommandBufferSetViewports", nvnFunction)) {
-			Ptrs.nvnCommandBufferSetViewports = address;
+			Address_weaks.nvnCommandBufferSetViewports = address;
 			return (uintptr_t)&NVN::CommandBufferSetViewports;
 		}
 		else if (!strcmp("nvnTextureGetWidth", nvnFunction)) {
-			Ptrs.nvnTextureGetWidth = address;
+			Address_weaks.nvnTextureGetWidth = address;
 		}
 		else if (!strcmp("nvnTextureGetHeight", nvnFunction)) {
-			Ptrs.nvnTextureGetHeight = address;
+			Address_weaks.nvnTextureGetHeight = address;
 		}
 		else if (!strcmp("nvnTextureGetFormat", nvnFunction)) {
-			Ptrs.nvnTextureGetFormat = address;
+			Address_weaks.nvnTextureGetFormat = address;
 		}
 		return address;
 	}
@@ -1073,7 +1078,7 @@ namespace NVN {
 	uintptr_t BootstrapLoader_1(const char* nvnName) {
 		if (strcmp(nvnName, "nvnDeviceGetProcAddress") == 0) {
 			(Shared -> API) = 1;
-			Ptrs.nvnDeviceGetProcAddress = ((nvnBootstrapLoader_0)(Address_weaks.nvnBootstrapLoader))("nvnDeviceGetProcAddress");
+			Address_weaks.nvnDeviceGetProcAddress = ((nvnBootstrapLoader_0)(Address_weaks.nvnBootstrapLoader))("nvnDeviceGetProcAddress");
 			return (uintptr_t)&GetProcAddress0;
 		}
 		uintptr_t ptrret = ((nvnBootstrapLoader_0)(Address_weaks.nvnBootstrapLoader))(nvnName);
@@ -1119,9 +1124,10 @@ extern "C" {
 			Address_weaks.glViewportIndexedfvOES = SaltySDCore_FindSymbolBuiltin("glViewportIndexedfvOES");
 			Address_weaks.vkCreateSwapchainKHR = SaltySDCore_FindSymbolBuiltin("vkCreateSwapchainKHR");
 			Address_weaks.vkGetDeviceProcAddr = SaltySDCore_FindSymbolBuiltin("vkGetDeviceProcAddr");
-			Ptrs.vkGetSwapchainImagesKHR = SaltySDCore_FindSymbolBuiltin("vkGetSwapchainImagesKHR");
-			Ptrs.nvSwapchainGetSwapchainImagesKHR = SaltySDCore_FindSymbolBuiltin("_ZN11NvSwapchain21GetSwapchainImagesKHREP10VkDevice_TP16VkSwapchainKHR_TPjPP9VkImage_T");
+			Address_weaks.vkGetSwapchainImagesKHR = SaltySDCore_FindSymbolBuiltin("vkGetSwapchainImagesKHR");
+			Address_weaks.nvSwapchainGetSwapchainImagesKHR = SaltySDCore_FindSymbolBuiltin("_ZN11NvSwapchain21GetSwapchainImagesKHREP10VkDevice_TP16VkSwapchainKHR_TPjPP9VkImage_T");
 			Address_weaks.nvSwapchainCreateSwapchainKHR = SaltySDCore_FindSymbolBuiltin("_ZN11NvSwapchain18CreateSwapchainKHREP10VkDevice_TPK24VkSwapchainCreateInfoKHRPK21VkAllocationCallbacksPP16VkSwapchainKHR_T");
+			Address_weaks.GetCurrentFocusState = SaltySDCore_FindSymbolBuiltin("_ZN2nn2oe20GetCurrentFocusStateEv");			
 			SaltySDCore_ReplaceImport("nvnBootstrapLoader", (void*)NVN::BootstrapLoader_1);
 			SaltySDCore_ReplaceImport("eglSwapBuffers", (void*)EGL::Swap);
 			SaltySDCore_ReplaceImport("eglSwapInterval", (void*)EGL::Interval);
@@ -1171,6 +1177,8 @@ extern "C" {
 				(Shared -> ZeroSync) = temp;
 				if (SaltySDCore_fread(&temp, 1, 1, file_dat))
 					(Shared -> SetBuffers) = temp;
+				if (SaltySDCore_fread(&temp, 1, 1, file_dat))
+					(Shared -> forceSuspend) = (bool)temp;
 				SaltySDCore_fclose(file_dat);
 			}
 
