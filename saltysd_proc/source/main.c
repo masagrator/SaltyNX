@@ -51,6 +51,7 @@ struct NxFpsSharedBlock {
 	struct resolutionCalls viewportCalls[8];
 	bool forceOriginalRefreshRate;
     bool dontForce60InDocked;
+    bool forceSuspend;
 } NX_PACKED;
 
 struct NxFpsSharedBlock* nx_fps = 0;
