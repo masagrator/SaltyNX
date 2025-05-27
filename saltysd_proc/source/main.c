@@ -15,6 +15,7 @@
 #include "useful.h"
 #include "dmntcht.h"
 #include <math.h>
+#include <ctype.h>
 
 #define MODULE_SALTYSD 420
 #define	NVDISP_GET_MODE 0x80380204
@@ -79,19 +80,6 @@ bool cheatCheck = false;
 bool isDocked = false;
 bool dontForce60InDocked = false;
 bool matchLowestDocked = false;
-
-/// Edid2
-typedef struct {
-	SetSysEdid edid;
-	char reserved[0x100];
-} SetSysEdid2;
-
-Result setsysGetEdid2(Service* g_setsysSrv, SetSysEdid2 *out) {
-    return serviceDispatch(g_setsysSrv, 41,
-        .buffer_attrs = { SfBufferAttr_FixedSize | SfBufferAttr_HipcPointer | SfBufferAttr_Out },
-        .buffers = { { out, sizeof(*out) } },
-    );
-}
 
 void __libnx_initheap(void)
 {
@@ -213,50 +201,91 @@ void setDefaultDockedSettings() {
     matchLowestDocked = false;
 }
 
+void remove_spaces(char* str_trimmed, const char* str_untrimmed)
+{
+  while (str_untrimmed[0] != '\0')
+  {
+    if(!isspace((int)str_untrimmed[0]))
+    {
+      str_trimmed[0] = str_untrimmed[0];
+      str_trimmed++;
+    }
+    str_untrimmed++;
+  }
+  str_trimmed[0] = '\0';
+}
+
 void LoadDockedModeAllowedSave() {
-    SetSysEdid2 edid2 = {0};
+    SetSysEdid edid = {0};
     setDefaultDockedSettings();
-    if (R_FAILED(setsysGetEdid2(setsysGetServiceSession(), &edid2))) {
+    if (R_FAILED(setsysGetEdid(&edid))) {
         SaltySD_printf("SaltySD: Couldn't retrieve display EDID! Locking allowed refresh rates in docked mode to 50 and 60 Hz.\n");
         return;
     }
     char path[128] = "";
-    snprintf(path, sizeof(path), "sdmc:/SaltySD/plugins/FPSLocker/ExtDisplays/%08X.dat", crc32Calculate(&edid2.edid, sizeof(edid2.edid)));
+    int crc32 = crc32Calculate(&edid, sizeof(edid));
+    snprintf(path, sizeof(path), "sdmc:/SaltySD/plugins/FPSLocker/ExtDisplays/%08X.dat", crc32);
     FILE* file = fopen(path, "rb");
+    if (!file) {
+        file = fopen(path, "wb");
+        fwrite(&edid, sizeof(edid), 1, file);
+    }
+    fclose(file);
+    snprintf(path, sizeof(path), "sdmc:/SaltySD/plugins/FPSLocker/ExtDisplays/%08X.ini", crc32);
+    file = fopen(path, "r");
     if (file) {
-        u64 MAGIC = 0x00FFFFFFFFFFFF00;
-        u64 checkMAGIC = 0;
-        fread(&checkMAGIC, 8, 1, file);
-        if (checkMAGIC != MAGIC) {
-            fclose(file);
-            SaltySD_printf("SaltySD: File \"%s\" is invalid! Locking allowed refresh rates in docked mode to 50 and 60 Hz.\n", path);
+        SaltySD_printf("SaltySD: %s opened successfully!\n", &path[31]);
+        fseek(file, 0, 2);
+        size_t size = ftell(file);
+        fseek(file, 0, 0);
+        char* temp_string = malloc(size);
+        fread(temp_string, size, 1, file);
+        fclose(file);
+        remove_spaces(temp_string, temp_string);
+        if (memcmp(temp_string, "[Common]", 8)) {
+            SaltySD_printf("SaltySD: %s doesn't start with \"[Common]\"! Using default settings!\n", &path[31]);
             return;
         }
-
-        SaltySD_printf("SaltySD: File \"%s\" was loaded! Allowed refresh rates: 60", path);
-        fseek(file, 0x100, 0);
-        for (size_t i = 0; i < sizeof(DockedModeRefreshRateAllowed); i++) {
-            bool temp = false;
-            if (!fread(&temp, 1, 1, file))
-                break;
-            if (DockedModeRefreshRateAllowedValues[i] == 60)
-                continue;
-            DockedModeRefreshRateAllowed[i] = temp;
-            if (temp == true) {
-                SaltySD_printf(", %d", DockedModeRefreshRateAllowedValues[i]);
+        char* substring = strstr(temp_string, "refreshRateAllowed={");
+        if (substring == NULL) {
+            SaltySD_printf("SaltySD: %s doesn't have \"refreshRateAllowed\"! Using default settings!\n", &path[31]);
+            return;
+        }
+        char* rr_start = &substring[strlen("refreshRateAllowed={")];
+        substring = strstr(rr_start, "}");
+        if (substring == NULL) {
+            SaltySD_printf("SaltySD: %s \"refreshRateAllowed\" is malformed! Using default settings!\n", &path[31]);
+            return;
+        }
+        size_t amount = 1;
+        for (size_t i = 0; i < (substring - rr_start); i++) {
+            if (rr_start[i] == ',') amount++;
+        }
+        for (size_t i = 0; i < amount; i++) {
+            long value = strtol(rr_start, &rr_start, 10);
+            if ((i+1 == amount) && (rr_start[0] != '}')) return;
+            if ((i+1 < amount) && (rr_start[0] != ',')) return;
+            rr_start = &rr_start[1];
+            if (value < 40 || value > 240) continue;
+            for (size_t i = 0; i < sizeof(DockedModeRefreshRateAllowed); i++) {
+                if (value == DockedModeRefreshRateAllowedValues[i]) {
+                    DockedModeRefreshRateAllowed[i] = true;
+                    break;
+                }
             }
         }
-        SaltySD_printf(".\n");
-        fseek(file, 0x180, 0);
-        uint8_t temp = 2;
-        fread(&temp, 1, 1, file);
-        if (temp > 1) SaltySD_printf("SaltySD: File \"%s\" has invalid dontForce60InDocked value. Setting it to false.\n", path);
-        else dontForce60InDocked = (bool)temp;
-        temp = 2;
-        fread(&temp, 1, 1, file);
-        if (temp > 1) SaltySD_printf("SaltySD: File \"%s\" has invalid matchLowestDocked value. Setting it to false.\n", path);
-        else matchLowestDocked = (bool)temp;
-        fclose(file);
+        substring = strstr(temp_string, "allowPatchesToForce60InDocked=");
+        if (substring != NULL) {
+            substring = &substring[strlen("allowPatchesToForce60InDocked=")];
+            dontForce60InDocked = (bool)!strncasecmp(substring, "False", 5);
+        }
+        else SaltySD_printf("SaltySD: %s doesn't have \"allowPatchesToForce60InDocked\"! Setting to true!\n", &path[31]);
+        substring = strstr(temp_string, "matchLowestRefreshRate=");
+        if (substring != NULL) {
+            substring = &substring[strlen("matchLowestRefreshRate=")];
+            matchLowestDocked = (bool)!strncasecmp(substring, "True", 4);
+        }
+        else SaltySD_printf("SaltySD: %s doesn't have \"matchLowestRefreshRate\"! Setting to false!\n", &path[31]);
     }
     else {
         SaltySD_printf("SaltySD: File \"%s\" not found! Locking allowed refresh rates in docked mode to 50 and 60 Hz.\n", path);
