@@ -16,6 +16,7 @@
 #include "dmntcht.h"
 #include <math.h>
 #include <ctype.h>
+#include <sys/stat.h>
 
 #define MODULE_SALTYSD 420
 #define	NVDISP_GET_MODE 0x80380204
@@ -160,7 +161,7 @@ struct dockedTimings dockedTimings1080p[] =    {{88, 44, 148, 4, 5, 36, 99000}, 
                                                 {8, 32, 40, 25, 8, 6, 167850},    //75Hz CVT-RBv2
                                                 {8, 32, 40, 28, 8, 6, 179520},    //80Hz CVT-RBv2
                                                 {8, 32, 40, 33, 8, 6, 202860},    //90Hz CVT-RBv2
-                                                {8, 32, 40, 36, 8, 6, 214699},    //95Hz CVT-RBv2
+                                                {8, 32, 40, 36, 8, 6, 214700},    //95Hz CVT-RBv2
                                                 {528, 44, 148, 4, 5, 36, 297000}, //100Hz CEA-861
                                                 {8, 32, 40, 44, 8, 6, 250360},    //110Hz CVT-RBv2
                                                 {88, 44, 148, 4, 5, 36, 297000}}; //120Hz CEA-861
@@ -246,6 +247,12 @@ void remove_spaces(char* str_trimmed, const char* str_untrimmed)
   str_trimmed[0] = '\0';
 }
 
+bool file_exists(const char *filename)
+{
+    struct stat buffer;
+    return stat(filename, &buffer) == 0 ? true : false;
+}
+
 void LoadDockedModeAllowedSave() {
     SetSysEdid edid = {0};
     setDefaultDockedSettings();
@@ -256,14 +263,16 @@ void LoadDockedModeAllowedSave() {
     char path[128] = "";
     int crc32 = crc32Calculate(&edid, sizeof(edid));
     snprintf(path, sizeof(path), "sdmc:/SaltySD/plugins/FPSLocker/ExtDisplays/%08X.dat", crc32);
-    FILE* file = fopen(path, "rb");
-    if (!file) {
-        file = fopen(path, "wb");
-        fwrite(&edid, sizeof(edid), 1, file);
+    if (file_exists(path) == false) {
+        FILE* file = fopen(path, "wb");
+        if (file) {
+            fwrite(&edid, sizeof(edid), 1, file);
+            fclose(file);
+        }
+        else SaltySD_printf("SaltySD: Couldn't dump EDID to sdcard!\n", &path[31]);
     }
-    fclose(file);
     snprintf(path, sizeof(path), "sdmc:/SaltySD/plugins/FPSLocker/ExtDisplays/%08X.ini", crc32);
-    file = fopen(path, "r");
+    FILE* file = fopen(path, "r");
     if (file) {
         SaltySD_printf("SaltySD: %s opened successfully!\n", &path[31]);
         fseek(file, 0, 2);
@@ -351,7 +360,7 @@ bool SetDisplayRefreshRate(uint32_t new_refreshRate) {
             nvClose(fd);
             return false;
         }
-        if (!((DISPLAY_B.vActive == 720 && DISPLAY_B.hActive == 1280) || (DISPLAY_B.vActive == 1080 && DISPLAY_B.hActive == 1920)))
+        if (((DISPLAY_B.vActive == 720 && DISPLAY_B.hActive == 1280) || (DISPLAY_B.vActive == 1080 && DISPLAY_B.hActive == 1920)) == false)
             return false;
         uint32_t h_total = DISPLAY_B.hActive + DISPLAY_B.hFrontPorch + DISPLAY_B.hSyncWidth + DISPLAY_B.hBackPorch;
         uint32_t v_total = DISPLAY_B.vActive + DISPLAY_B.vFrontPorch + DISPLAY_B.vSyncWidth + DISPLAY_B.vBackPorch;
@@ -1497,15 +1506,21 @@ int main(int argc, char *argv[])
                     refreshRate = 0;
                 }
             }
-            else if (displaySync && (!isOLED || isDocked)) {
-                uint32_t temp_refreshRate = 0;
-                GetDisplayRefreshRate(&temp_refreshRate, true);
-                uint32_t check_refresh_rate = refreshRate;
-                if (nx_fps && nx_fps->forceOriginalRefreshRate && (!isDocked || (isDocked && !dontForce60InDocked))) {
-                    check_refresh_rate = 60;
+            else {
+                if (displaySync && (!isOLED || isDocked)) {
+                    uint32_t temp_refreshRate = 0;
+                    GetDisplayRefreshRate(&temp_refreshRate, true);
+                    uint32_t check_refresh_rate = refreshRate;
+                    if (nx_fps && nx_fps->forceOriginalRefreshRate && (!isDocked || (isDocked && !dontForce60InDocked))) {
+                        check_refresh_rate = 60;
+                    }
+                    if (temp_refreshRate != check_refresh_rate)
+                        SetDisplayRefreshRate(check_refresh_rate);
                 }
-                if (temp_refreshRate != check_refresh_rate)
-                    SetDisplayRefreshRate(check_refresh_rate);
+                if (!isDocked && nx_fps && nx_fps->FPSlocked > HandheldModeRefreshRateAllowed.max) {
+                    nx_fps->FPSlocked = HandheldModeRefreshRateAllowed.max;
+                    refreshRate = HandheldModeRefreshRateAllowed.max;
+                }
             }
         }
         uint32_t temp = 0;
