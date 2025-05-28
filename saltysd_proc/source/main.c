@@ -272,8 +272,8 @@ void LoadDockedModeAllowedSave() {
         else SaltySD_printf("SaltySD: Couldn't dump EDID to sdcard!\n", &path[31]);
     }
     snprintf(path, sizeof(path), "sdmc:/SaltySD/plugins/FPSLocker/ExtDisplays/%08X.ini", crc32);
-    FILE* file = fopen(path, "r");
-    if (file) {
+    if (file_exists(path) == true) {
+        FILE* file = fopen(path, "r");
         SaltySD_printf("SaltySD: %s opened successfully!\n", &path[31]);
         fseek(file, 0, 2);
         size_t size = ftell(file);
