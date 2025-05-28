@@ -127,15 +127,46 @@ bool DockedModeRefreshRateAllowed[]         = { false,  //40Hz
                                                 false,  //45Hz
                                                 true,   //50Hz
                                                 false,  //55Hz
-                                                true};  //60Hz
+                                                true,   //60Hz
+                                                false,  //70Hz
+                                                false,  //72Hz
+                                                false,  //75Hz
+                                                false,  //80Hz
+                                                false,  //90Hz
+                                                false,  //95Hz
+                                                false,  //100Hz
+                                                false,  //110Hz
+                                                false}; //120Hz
 
-uint8_t DockedModeRefreshRateAllowedValues[] = { 40,
-                                                 45,
-                                                 50,
-                                                 55,
-                                                 60};
+uint8_t DockedModeRefreshRateAllowedValues[] = {40, 45, 50, 55, 60, 70, 72, 75, 80, 90, 95, 100, 110, 120};
+
+struct dockedTimings {
+    uint16_t hFrontPorch;
+    uint8_t hSyncWidth;
+    uint8_t hBackPorch;
+    uint8_t vFrontPorch;
+    uint8_t vSyncWidth;
+    uint8_t vBackPorch;
+    uint32_t pixelClock_kHz;
+} NX_PACKED;
+
+struct dockedTimings dockedTimings1080p[] =    {{88, 44, 148, 4, 5, 36, 99000},   //40Hz, 60 Hz profile with tweaked pixel clock
+                                                {88, 44, 148, 4, 5, 36, 111375},  //45Hz, 60 Hz profile with tweaked pixel clock
+                                                {528, 44, 148, 4, 5, 36, 148500}, //50Hz CEA-861
+                                                {88, 44, 148, 4, 5, 36, 136125},  //55Hz, 60 Hz profile with tweaked pixel clock
+                                                {88, 44, 148, 4, 5, 36, 148500},  //60Hz CEA-861
+                                                {88, 44, 148, 4, 5, 36, 173250},  //70Hz, 60 Hz profile with tweaked pixel clock
+                                                {88, 44, 148, 4, 5, 36, 178200},  //72Hz, 60 Hz profile with tweaked pixel clock
+                                                {8, 32, 40, 25, 8, 6, 167850},    //75Hz CVT-RBv2
+                                                {8, 32, 40, 28, 8, 6, 179520},    //80Hz CVT-RBv2
+                                                {8, 32, 40, 33, 8, 6, 202860},    //90Hz CVT-RBv2
+                                                {8, 32, 40, 36, 8, 6, 214699},    //95Hz CVT-RBv2
+                                                {528, 44, 148, 4, 5, 36, 297000}, //100Hz CEA-861
+                                                {8, 32, 40, 44, 8, 6, 250360},    //110Hz CVT-RBv2
+                                                {88, 44, 148, 4, 5, 36, 297000}}; //120Hz CEA-861
 
 static_assert(sizeof(DockedModeRefreshRateAllowedValues) == sizeof(DockedModeRefreshRateAllowed));
+static_assert((sizeof(dockedTimings1080p) / sizeof(dockedTimings1080p[0])) == sizeof(DockedModeRefreshRateAllowedValues));
 
 struct MinMax {
     u8 min;
@@ -320,6 +351,8 @@ bool SetDisplayRefreshRate(uint32_t new_refreshRate) {
             nvClose(fd);
             return false;
         }
+        if (!((DISPLAY_B.vActive == 720 && DISPLAY_B.hActive == 1280) || (DISPLAY_B.vActive == 1080 && DISPLAY_B.hActive == 1920)))
+            return false;
         uint32_t h_total = DISPLAY_B.hActive + DISPLAY_B.hFrontPorch + DISPLAY_B.hSyncWidth + DISPLAY_B.hBackPorch;
         uint32_t v_total = DISPLAY_B.vActive + DISPLAY_B.vFrontPorch + DISPLAY_B.vSyncWidth + DISPLAY_B.vBackPorch;
         uint32_t refreshRateNow = ((DISPLAY_B.pclkKHz) * 1000 + 999) / (h_total * v_total);
@@ -361,8 +394,19 @@ bool SetDisplayRefreshRate(uint32_t new_refreshRate) {
         }
         
         if (itr >= 0 && itr < sizeof(DockedModeRefreshRateAllowed)) {
-            uint32_t clock = ((h_total * v_total) * DockedModeRefreshRateAllowedValues[itr]) / 1000;
-            DISPLAY_B.pclkKHz = clock;
+            if (DISPLAY_B.vActive == 720) {
+                uint32_t clock = ((h_total * v_total) * DockedModeRefreshRateAllowedValues[itr]) / 1000;
+                DISPLAY_B.pclkKHz = clock;
+            }
+            else {
+                DISPLAY_B.hFrontPorch = dockedTimings1080p[itr].hFrontPorch;
+                DISPLAY_B.hSyncWidth = dockedTimings1080p[itr].hSyncWidth;
+                DISPLAY_B.hBackPorch = dockedTimings1080p[itr].hBackPorch;
+                DISPLAY_B.vFrontPorch = dockedTimings1080p[itr].vFrontPorch;
+                DISPLAY_B.vSyncWidth = dockedTimings1080p[itr].vSyncWidth;
+                DISPLAY_B.vBackPorch = dockedTimings1080p[itr].vBackPorch;
+                DISPLAY_B.pclkKHz = dockedTimings1080p[itr].pixelClock_kHz;
+            }
             nvrc = nvIoctl(fd, NVDISP_VALIDATE_MODE, &DISPLAY_B);
             if (R_SUCCEEDED(nvrc)) {
                 nvrc = nvIoctl(fd, NVDISP_SET_MODE, &DISPLAY_B);
@@ -1178,7 +1222,16 @@ Result handleServiceCmd(int cmd)
             unsigned int Hz_50: 1;
             unsigned int Hz_55: 1;
             unsigned int Hz_60: 1;
-            unsigned int reserved: 27;
+            unsigned int Hz_70: 1;
+            unsigned int Hz_72: 1;
+            unsigned int Hz_75: 1;
+            unsigned int Hz_80: 1;
+            unsigned int Hz_90: 1;
+            unsigned int Hz_95: 1;
+            unsigned int Hz_100: 1;
+            unsigned int Hz_110: 1;
+            unsigned int Hz_120: 1;
+            unsigned int reserved: 18;
         } DockedRefreshRates;
 
         memcpy(&DockedRefreshRates, &(resp -> refreshRate), 4);
@@ -1187,6 +1240,15 @@ Result handleServiceCmd(int cmd)
         DockedModeRefreshRateAllowed[2] = DockedRefreshRates.Hz_50;
         DockedModeRefreshRateAllowed[3] = DockedRefreshRates.Hz_55;
         DockedModeRefreshRateAllowed[4] = true;
+        DockedModeRefreshRateAllowed[5] = DockedRefreshRates.Hz_70;
+        DockedModeRefreshRateAllowed[6] = DockedRefreshRates.Hz_72;
+        DockedModeRefreshRateAllowed[7] = DockedRefreshRates.Hz_75;
+        DockedModeRefreshRateAllowed[8] = DockedRefreshRates.Hz_80;
+        DockedModeRefreshRateAllowed[9] = DockedRefreshRates.Hz_90;
+        DockedModeRefreshRateAllowed[10] = DockedRefreshRates.Hz_95;
+        DockedModeRefreshRateAllowed[11] = DockedRefreshRates.Hz_100;
+        DockedModeRefreshRateAllowed[12] = DockedRefreshRates.Hz_110;
+        DockedModeRefreshRateAllowed[13] = DockedRefreshRates.Hz_120;
         SaltySD_printf("SaltySD: cmd 13 handler\n");
 
         ret = 0;
