@@ -20,9 +20,16 @@
 
 #define MODULE_SALTYSD 420
 #define	NVDISP_GET_MODE 0x80380204
+#define	NVDISP_GET_MODE2 0x803C021B
 #define	NVDISP_SET_MODE 0x40380205
+#define	NVDISP_SET_MODE2 0x403C021C
 #define NVDISP_VALIDATE_MODE 0xC038020A
+#define NVDISP_VALIDATE_MODE2 0xC03C021D
 #define DSI_CLOCK_HZ 234000000llu
+#define NVDISP_GET_MODE_DB 0xEBFC0215
+#define NVDISP_GET_MODE_DB2 0xEF20021E
+#define NVDISP_GET_AVI_INFOFRAME 0x80600210
+#define NVDISP_SET_AVI_INFOFRAME 0x40600211
 
 #define MIN(a,b) (((a)<(b))?(a):(b))
 #define MAX(a,b) (((a)>(b))?(a):(b))
@@ -48,12 +55,13 @@ struct NxFpsSharedBlock {
 	uint8_t SetBuffers;
 	uint8_t ActiveBuffers;
 	uint8_t SetActiveBuffers;
-	uint8_t displaySync;
+	bool displaySync;
 	struct resolutionCalls renderCalls[8];
 	struct resolutionCalls viewportCalls[8];
 	bool forceOriginalRefreshRate;
     bool dontForce60InDocked;
     bool forceSuspend;
+    uint8_t CurrentRefreshRate;
 } NX_PACKED;
 
 struct NxFpsSharedBlock* nx_fps = 0;
@@ -148,23 +156,26 @@ struct dockedTimings {
     uint8_t vFrontPorch;
     uint8_t vSyncWidth;
     uint8_t vBackPorch;
+    uint32_t vMode;
+    uint8_t unk1;
+    uint8_t VIC;
     uint32_t pixelClock_kHz;
 } NX_PACKED;
 
-struct dockedTimings dockedTimings1080p[] =    {{88, 44, 148, 4, 5, 36, 99000},   //40Hz, 60 Hz profile with tweaked pixel clock
-                                                {88, 44, 148, 4, 5, 36, 111375},  //45Hz, 60 Hz profile with tweaked pixel clock
-                                                {528, 44, 148, 4, 5, 36, 148500}, //50Hz CEA-861
-                                                {88, 44, 148, 4, 5, 36, 136125},  //55Hz, 60 Hz profile with tweaked pixel clock
-                                                {88, 44, 148, 4, 5, 36, 148500},  //60Hz CEA-861
-                                                {88, 44, 148, 4, 5, 36, 173250},  //70Hz, 60 Hz profile with tweaked pixel clock
-                                                {88, 44, 148, 4, 5, 36, 178200},  //72Hz, 60 Hz profile with tweaked pixel clock
-                                                {8, 32, 40, 25, 8, 6, 167850},    //75Hz CVT-RBv2
-                                                {8, 32, 40, 28, 8, 6, 179520},    //80Hz CVT-RBv2
-                                                {8, 32, 40, 33, 8, 6, 202860},    //90Hz CVT-RBv2
-                                                {8, 32, 40, 36, 8, 6, 214700},    //95Hz CVT-RBv2
-                                                {528, 44, 148, 4, 5, 36, 297000}, //100Hz CEA-861
-                                                {8, 32, 40, 44, 8, 6, 250360},    //110Hz CVT-RBv2
-                                                {88, 44, 148, 4, 5, 36, 297000}}; //120Hz CEA-861
+struct dockedTimings dockedTimings1080p[] =    {{88, 44, 148, 4, 5, 36, 0x200000, 0, 0, 99000},   //40Hz, 60 Hz profile with tweaked pixel clock
+                                                {88, 44, 148, 4, 5, 36, 0x200000, 0, 0, 111375},  //45Hz, 60 Hz profile with tweaked pixel clock
+                                                {528, 44, 148, 4, 5, 36, 0x200000, 0, 31, 148500}, //50Hz CEA-861
+                                                {88, 44, 148, 4, 5, 36, 0x200000, 0, 0, 136125},  //55Hz, 60 Hz profile with tweaked pixel clock
+                                                {88, 44, 148, 4, 5, 36, 0x200000, 0, 16, 148500},  //60Hz CEA-861
+                                                {88, 44, 148, 4, 5, 36, 0x200000, 0, 0, 173250},  //70Hz, 60 Hz profile with tweaked pixel clock
+                                                {88, 44, 148, 4, 5, 36, 0x200000, 0, 0, 178200},  //72Hz, 60 Hz profile with tweaked pixel clock
+                                                {8, 32, 40, 25, 8, 6, 0x200000, 0, 0, 167850},    //75Hz CVT-RBv2
+                                                {8, 32, 40, 28, 8, 6, 0x200000, 0, 0, 179520},    //80Hz CVT-RBv2
+                                                {8, 32, 40, 33, 8, 6, 0x200000, 0, 0, 202860},    //90Hz CVT-RBv2
+                                                {8, 32, 40, 36, 8, 6, 0x200000, 0, 0, 214700},    //95Hz CVT-RBv2
+                                                {528, 44, 148, 4, 5, 36, 0x400000, 0x80, 64, 297000}, //100Hz CEA-861
+                                                {8, 32, 40, 44, 8, 6, 0x200000, 0, 0, 250360},    //110Hz CVT-RBv2
+                                                {88, 44, 148, 4, 5, 36, 0x400000, 0x80, 63, 297000}}; //120Hz CEA-861
 
 static_assert(sizeof(DockedModeRefreshRateAllowedValues) == sizeof(DockedModeRefreshRateAllowed));
 static_assert((sizeof(dockedTimings1080p) / sizeof(dockedTimings1080p[0])) == sizeof(DockedModeRefreshRateAllowedValues));
@@ -220,8 +231,60 @@ struct nvdcMode {
     unsigned int hRefToSync; //always 1
     unsigned int vRefToSync; //always 1
     unsigned int pclkKHz;
-    unsigned int bitsPerPixel; //always 0
-    unsigned int vmode; //always 0
+    unsigned int bitsPerPixel;
+    unsigned int vmode;
+    unsigned int sync;
+};
+
+struct nvdcMode2 {
+    unsigned int unk0;
+    unsigned int hActive;
+    unsigned int vActive;
+    unsigned int hSyncWidth;
+    unsigned int vSyncWidth;
+    unsigned int hFrontPorch;
+    unsigned int vFrontPorch;
+    unsigned int hBackPorch;
+    unsigned int vBackPorch;
+    unsigned int pclkKHz;
+    unsigned int bitsPerPixel;
+    unsigned int vmode;
+    unsigned int sync;
+    unsigned int unk1;
+    unsigned int reserved;
+};
+
+struct nvdcModeDB {
+    struct nvdcMode modes[201];
+    unsigned int modes_num;
+};
+
+struct nvdcModeDB2 {
+    struct nvdcMode2 modes[201];
+    unsigned int modes_num;
+};
+
+struct AviInfoframe {
+    unsigned int csum;
+    unsigned int scan;
+    unsigned int bar_valid;
+    unsigned int act_fmt_valid;
+    unsigned int rgb_ycc;
+    unsigned int act_format;
+    unsigned int aspect_ratio;
+    unsigned int colorimetry;
+    unsigned int scaling;
+    unsigned int rgb_quant;
+    unsigned int ext_colorimetry;
+    unsigned int it_content;
+    unsigned int video_format;
+    unsigned int pix_rep;
+    unsigned int it_content_type;
+    unsigned int ycc_quant;
+    unsigned int top_bar_end_line_low_byte, top_bar_end_line_high_byte;
+    unsigned int bot_bar_start_line_low_byte, bot_bar_start_line_high_byte;
+    unsigned int left_bar_end_pixel_low_byte, left_bar_end_pixel_high_byte;
+    unsigned int right_bar_start_pixel_low_byte, right_bar_start_pixel_high_byte;
 };
 
 void setDefaultDockedSettings() {
@@ -349,10 +412,10 @@ bool SetDisplayRefreshRate(uint32_t new_refreshRate) {
         if (R_FAILED(nvOpen(&fd, "/dev/nvdisp-disp1"))) {
             return false;
         }
-        struct nvdcMode DISPLAY_B = {0};
-        Result nvrc = nvIoctl(fd, NVDISP_GET_MODE, &DISPLAY_B);
+        struct nvdcMode2 DISPLAY_B = {0};
+        Result nvrc = nvIoctl(fd, NVDISP_GET_MODE2, &DISPLAY_B);
         if (R_FAILED(nvrc)) {
-            SaltySD_printf("SaltySD: NVDISP_GET_MODE failed! rc: 0x%x\n", nvrc);
+            SaltySD_printf("SaltySD: NVDISP_GET_MODE2 failed! rc: 0x%x\n", nvrc);
             nvClose(fd);
             return false;
         }
@@ -397,7 +460,7 @@ bool SetDisplayRefreshRate(uint32_t new_refreshRate) {
             else itr++;
         }
         if (refreshRateNow == DockedModeRefreshRateAllowedValues[itr]) {
-            if (nx_fps) nx_fps->displaySync = DockedModeRefreshRateAllowedValues[itr];
+            if (nx_fps) nx_fps->CurrentRefreshRate = DockedModeRefreshRateAllowedValues[itr];
             nvClose(fd);
             return true;
         }
@@ -415,14 +478,28 @@ bool SetDisplayRefreshRate(uint32_t new_refreshRate) {
                 DISPLAY_B.vSyncWidth = dockedTimings1080p[itr].vSyncWidth;
                 DISPLAY_B.vBackPorch = dockedTimings1080p[itr].vBackPorch;
                 DISPLAY_B.pclkKHz = dockedTimings1080p[itr].pixelClock_kHz;
+                DISPLAY_B.vmode = dockedTimings1080p[itr].vMode;
+                DISPLAY_B.sync = 3;
+                DISPLAY_B.bitsPerPixel = 24;
             }
-            nvrc = nvIoctl(fd, NVDISP_VALIDATE_MODE, &DISPLAY_B);
+            nvrc = nvIoctl(fd, NVDISP_VALIDATE_MODE2, &DISPLAY_B);
             if (R_SUCCEEDED(nvrc)) {
-                nvrc = nvIoctl(fd, NVDISP_SET_MODE, &DISPLAY_B);
-                if (R_FAILED(nvrc)) SaltySD_printf("SaltySD: NVDISP_SET_MODE failed! rc: 0x%x\n", nvrc);
-                else if (nx_fps) nx_fps->displaySync = DockedModeRefreshRateAllowedValues[itr];
+                nvrc = nvIoctl(fd, NVDISP_SET_MODE2, &DISPLAY_B);
+                if (R_FAILED(nvrc)) SaltySD_printf("SaltySD: NVDISP_SET_MODE2 failed! rc: 0x%x\n", nvrc);
+                else if (nx_fps) nx_fps->CurrentRefreshRate = DockedModeRefreshRateAllowedValues[itr];
+                if (DISPLAY_B.vActive == 1080) {
+                    struct AviInfoframe frame = {0};
+                    nvrc = nvIoctl(fd, NVDISP_GET_AVI_INFOFRAME, &frame);
+                    if (R_FAILED(nvrc)) SaltySD_printf("SaltySD: NVDISP_GET_AVI_INFOFRAME failed! rc: 0x%x\n", nvrc);
+                    else {
+                        frame.video_format = dockedTimings1080p[itr].VIC;
+                        nvrc = nvIoctl(fd, NVDISP_SET_AVI_INFOFRAME, &frame);
+                        if (R_FAILED(nvrc)) SaltySD_printf("SaltySD: NVDISP_SET_AVI_INFOFRAME failed! rc: 0x%x\n", nvrc);
+                        else if (nx_fps) nx_fps->CurrentRefreshRate = DockedModeRefreshRateAllowedValues[itr];
+                    }
+                }
             }
-            else SaltySD_printf("SaltySD: NVDISP_VALIDATE_MODE failed! rc: 0x%x, pclkKHz: %d, Hz: %d\n", nvrc, clock, DockedModeRefreshRateAllowedValues[itr]);
+            else SaltySD_printf("SaltySD: NVDISP_VALIDATE_MODE2 failed! rc: 0x%x, pclkKHz: %d, Hz: %d\n", nvrc, clock, DockedModeRefreshRateAllowedValues[itr]);
         }
         nvClose(fd);
         return true;
@@ -455,7 +532,7 @@ bool SetDisplayRefreshRate(uint32_t new_refreshRate) {
     uint16_t refreshRateNow = pixelClock / (DSI_CLOCK_HZ / 60);
 
     if (refreshRateNow == new_refreshRate) {
-        if (nx_fps) nx_fps->displaySync = new_refreshRate;
+        if (nx_fps) nx_fps->CurrentRefreshRate = new_refreshRate;
         return true;
     }
 
@@ -470,7 +547,7 @@ bool SetDisplayRefreshRate(uint32_t new_refreshRate) {
 
     memcpy((void*)(clkVirtAddr + 0xD0), &base, 4);
     memcpy((void*)(clkVirtAddr + 0xDC), &misc, 4);
-    if (nx_fps) nx_fps->displaySync = new_refreshRate;
+    if (nx_fps) nx_fps->CurrentRefreshRate = new_refreshRate;
     return true;
 }
 
@@ -515,8 +592,8 @@ bool GetDisplayRefreshRate(uint32_t* out_refreshRate, bool internal) {
         }
         uint32_t fd = 0;
         if (R_SUCCEEDED(nvOpen(&fd, "/dev/nvdisp-disp1"))) {
-            struct nvdcMode DISPLAY_B = {0};
-            if (R_SUCCEEDED(nvIoctl(fd, NVDISP_GET_MODE, &DISPLAY_B))) {
+            struct nvdcMode2 DISPLAY_B = {0};
+            if (R_SUCCEEDED(nvIoctl(fd, NVDISP_GET_MODE2, &DISPLAY_B))) {
                 if (!DISPLAY_B.pclkKHz) {
                     nvClose(fd);
                     return false;
@@ -550,6 +627,8 @@ bool GetDisplayRefreshRate(uint32_t* out_refreshRate, bool internal) {
     *out_refreshRate = value;
     if (sh_addr) 
         *(uint8_t*)(sh_addr + 1) = (uint8_t)value;
+    if (nx_fps)
+        nx_fps -> CurrentRefreshRate = (uint8_t)value;
     return true;
 }
 
@@ -1511,6 +1590,7 @@ int main(int argc, char *argv[])
                     uint32_t temp_refreshRate = 0;
                     GetDisplayRefreshRate(&temp_refreshRate, true);
                     uint32_t check_refresh_rate = refreshRate;
+                    if (nx_fps && nx_fps->FPSlocked) check_refresh_rate = nx_fps->FPSlocked;
                     if (nx_fps && nx_fps->forceOriginalRefreshRate && (!isDocked || (isDocked && !dontForce60InDocked))) {
                         check_refresh_rate = 60;
                     }
