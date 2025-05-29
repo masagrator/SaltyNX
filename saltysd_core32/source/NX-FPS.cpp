@@ -186,12 +186,13 @@ struct NxFpsSharedBlock {
 	uint8_t SetBuffers;
 	uint8_t ActiveBuffers;
 	uint8_t SetActiveBuffers;
-	uint8_t displaySync;
+	bool displaySync;
 	resolutionCalls renderCalls[8];
 	resolutionCalls viewportCalls[8];
 	bool forceOriginalRefreshRate;
 	bool dontForce60InDocked;
 	bool forceSuspend;
+	uint8_t currentRefreshRate;
 } PACKED;
 
 NxFpsSharedBlock* Shared = 0;
@@ -266,7 +267,7 @@ namespace NX_FPS_Math {
 			old_force = (Shared -> forceOriginalRefreshRate);
 		}
 
-		if ((FPStiming && !LOCK::blockDelayFPS && (!new_fpslock || (new_fpslock && !(Shared -> displaySync)) || new_fpslock < (Shared -> displaySync)))) {
+		if ((FPStiming && !LOCK::blockDelayFPS && (new_fpslock && new_fpslock < (Shared -> currentRefreshRate)))) {
 			uint64_t tick = 0;
 			((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))(&tick);
 			if ((int64_t)(tick - frameend) < (FPStiming + (range * 20))) {
@@ -311,7 +312,7 @@ namespace NX_FPS_Math {
 		if (deltatick2 > (systemtickfrequency / ((*sharedOperationMode == 1) ? 30 : 1))) {
 			((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))(&starttick2);
 			if (!configRC && FPSlock) {
-				LOCK::applyPatch(configBuffer, FPSlock, (Shared -> displaySync));
+				LOCK::applyPatch(configBuffer, FPSlock, (Shared -> currentRefreshRate));
 			}
 		}
 
@@ -407,7 +408,7 @@ namespace vk {
 		else if (LOCK::overwriteRefreshRate > 0 && (Shared -> FPSlocked)) {
 			changeFPS = true;
 			NX_FPS_Math::FPSlock = (Shared -> FPSlocked);
-			if (NX_FPS_Math::new_fpslock != ((Shared -> displaySync) ? (Shared -> displaySync) : 60))
+			if (NX_FPS_Math::new_fpslock != ((Shared -> currentRefreshRate) ? (Shared -> currentRefreshRate) : 60))
 				NX_FPS_Math::FPStiming = (systemtickfrequency/NX_FPS_Math::new_fpslock) - 6000;
 			else NX_FPS_Math::FPStiming = 0;
 		}
@@ -436,7 +437,7 @@ namespace vk {
 		else if (LOCK::overwriteRefreshRate > 0 && (Shared -> FPSlocked)) {
 			changeFPS = true;
 			NX_FPS_Math::FPSlock = (Shared -> FPSlocked);
-			if (NX_FPS_Math::new_fpslock != ((Shared -> displaySync) ? (Shared -> displaySync) : 60))
+			if (NX_FPS_Math::new_fpslock != ((Shared -> currentRefreshRate) ? (Shared -> currentRefreshRate) : 60))
 				NX_FPS_Math::FPStiming = (systemtickfrequency/NX_FPS_Math::new_fpslock) - 6000;
 			else NX_FPS_Math::FPStiming = 0;
 		}
@@ -516,48 +517,48 @@ namespace EGL {
 		else if (Shared -> FPSlocked || LOCK::overwriteRefreshRate > 0) {
 			changeFPS = true;
 			NX_FPS_Math::FPSlock = (Shared -> FPSlocked);
-			if (NX_FPS_Math::new_fpslock <= ((Shared -> displaySync) ? ((Shared -> displaySync) / 4) : 15)) {
+			if (NX_FPS_Math::new_fpslock <= ((Shared -> currentRefreshRate) ? ((Shared -> currentRefreshRate) / 4) : 15)) {
 				if ((Shared -> FPSmode) != 4)
 					Interval(EGLDisplay, -4);
-				if ((NX_FPS_Math::new_fpslock != ((Shared -> displaySync) ? ((Shared -> displaySync) / 4) : 15))
+				if ((NX_FPS_Math::new_fpslock != ((Shared -> currentRefreshRate) ? ((Shared -> currentRefreshRate) / 4) : 15))
 				|| (Shared -> ZeroSync)) {
-					if (NX_FPS_Math::new_fpslock == ((Shared -> displaySync) ? ((Shared -> displaySync) / 4) : 15)) {
+					if (NX_FPS_Math::new_fpslock == ((Shared -> currentRefreshRate) ? ((Shared -> currentRefreshRate) / 4) : 15)) {
 						NX_FPS_Math::FPStiming = (systemtickfrequency/NX_FPS_Math::new_fpslock) - 8000;
 					}
 					else NX_FPS_Math::FPStiming = (systemtickfrequency/NX_FPS_Math::new_fpslock) - 6000;
 				}
 				else NX_FPS_Math::FPStiming = 0;			
 			}
-			else if (NX_FPS_Math::new_fpslock <= ((Shared -> displaySync) ? ((Shared -> displaySync) / 3) : 20)) {
+			else if (NX_FPS_Math::new_fpslock <= ((Shared -> currentRefreshRate) ? ((Shared -> currentRefreshRate) / 3) : 20)) {
 				if ((Shared -> FPSmode) != 3)
 					Interval(EGLDisplay, -3);
-				if ((NX_FPS_Math::new_fpslock != ((Shared -> displaySync) ? ((Shared -> displaySync) / 3) : 20))
+				if ((NX_FPS_Math::new_fpslock != ((Shared -> currentRefreshRate) ? ((Shared -> currentRefreshRate) / 3) : 20))
 				|| (Shared -> ZeroSync)) {
-					if (NX_FPS_Math::new_fpslock == ((Shared -> displaySync) ? ((Shared -> displaySync) / 3) : 20)) {
+					if (NX_FPS_Math::new_fpslock == ((Shared -> currentRefreshRate) ? ((Shared -> currentRefreshRate) / 3) : 20)) {
 						NX_FPS_Math::FPStiming = (systemtickfrequency/NX_FPS_Math::new_fpslock) - 8000;
 					}
 					else NX_FPS_Math::FPStiming = (systemtickfrequency/NX_FPS_Math::new_fpslock) - 6000;
 				}
 				else NX_FPS_Math::FPStiming = 0;			
 			}
-			else if (NX_FPS_Math::new_fpslock <= ((Shared -> displaySync) ? ((Shared -> displaySync) / 2) : 30)) {
+			else if (NX_FPS_Math::new_fpslock <= ((Shared -> currentRefreshRate) ? ((Shared -> currentRefreshRate) / 2) : 30)) {
 				if ((Shared -> FPSmode) != 2)
 					Interval(EGLDisplay, -2);
-				if (NX_FPS_Math::new_fpslock != ((Shared -> displaySync) ? ((Shared -> displaySync) / 2) : 30)
+				if (NX_FPS_Math::new_fpslock != ((Shared -> currentRefreshRate) ? ((Shared -> currentRefreshRate) / 2) : 30)
 				|| (Shared -> ZeroSync)) {
-					if (NX_FPS_Math::new_fpslock == ((Shared -> displaySync) ? ((Shared -> displaySync) / 2) : 30)) {
+					if (NX_FPS_Math::new_fpslock == ((Shared -> currentRefreshRate) ? ((Shared -> currentRefreshRate) / 2) : 30)) {
 						NX_FPS_Math::FPStiming = (systemtickfrequency/NX_FPS_Math::new_fpslock) - 8000;
 					}
 					else NX_FPS_Math::FPStiming = (systemtickfrequency/NX_FPS_Math::new_fpslock) - 6000;
 				}
 				else NX_FPS_Math::FPStiming = 0;			
 			}
-			else if (NX_FPS_Math::new_fpslock > ((Shared -> displaySync) ? ((Shared -> displaySync) / 2) : 30)) {
+			else if (NX_FPS_Math::new_fpslock > ((Shared -> currentRefreshRate) ? ((Shared -> currentRefreshRate) / 2) : 30)) {
 				if ((Shared -> FPSmode) != 1)
 					Interval(EGLDisplay, -1);
-				if ((NX_FPS_Math::new_fpslock != ((Shared -> displaySync) ? (Shared -> displaySync) : 60))
+				if ((NX_FPS_Math::new_fpslock != ((Shared -> currentRefreshRate) ? (Shared -> currentRefreshRate) : 60))
 				|| (Shared -> ZeroSync)) {
-					if (NX_FPS_Math::new_fpslock == ((Shared -> displaySync) ? (Shared -> displaySync) : 60)) {
+					if (NX_FPS_Math::new_fpslock == ((Shared -> currentRefreshRate) ? (Shared -> currentRefreshRate) : 60)) {
 						NX_FPS_Math::FPStiming = (systemtickfrequency/NX_FPS_Math::new_fpslock) - 8000;
 					}
 					else NX_FPS_Math::FPStiming = (systemtickfrequency/NX_FPS_Math::new_fpslock) - 6000;
@@ -794,51 +795,51 @@ namespace NVN {
 		else if (Shared -> FPSlocked || LOCK::overwriteRefreshRate > 0) {
 			changeFPS = true;
 			NX_FPS_Math::FPSlock = (Shared -> FPSlocked);
-			if (NX_FPS_Math::new_fpslock <= ((Shared -> displaySync) ? ((Shared -> displaySync) / 4) : 15)) {
+			if (NX_FPS_Math::new_fpslock <= ((Shared -> currentRefreshRate) ? ((Shared -> currentRefreshRate) / 4) : 15)) {
 				if (((nvnGetPresentInterval_0)(Address_weaks.nvnWindowGetPresentInterval))(nvnWindow) != 4)
 					NVN::SetPresentInterval(nvnWindow, -4);
-				if ((NX_FPS_Math::new_fpslock != ((Shared -> displaySync) ? ((Shared -> displaySync) / 4) : 15))
+				if ((NX_FPS_Math::new_fpslock != ((Shared -> currentRefreshRate) ? ((Shared -> currentRefreshRate) / 4) : 15))
 				|| (Shared -> ZeroSync)) {
 					NX_FPS_Math::FPStiming = (systemtickfrequency/NX_FPS_Math::new_fpslock) - 6000;
-					if (NX_FPS_Math::new_fpslock == ((Shared -> displaySync) ? ((Shared -> displaySync) / 4) : 15)) {
+					if (NX_FPS_Math::new_fpslock == ((Shared -> currentRefreshRate) ? ((Shared -> currentRefreshRate) / 4) : 15)) {
 						NX_FPS_Math::FPStiming -= 2000;
 					}
 				}
 				else NX_FPS_Math::FPStiming = 0;			
 			}
-			else if (NX_FPS_Math::new_fpslock <= ((Shared -> displaySync) ? ((Shared -> displaySync) / 3) : 20)) {
+			else if (NX_FPS_Math::new_fpslock <= ((Shared -> currentRefreshRate) ? ((Shared -> currentRefreshRate) / 3) : 20)) {
 				if (((nvnGetPresentInterval_0)(Address_weaks.nvnWindowGetPresentInterval))(nvnWindow) != 3)
 					NVN::SetPresentInterval(nvnWindow, -3);
-				if ((NX_FPS_Math::new_fpslock != ((Shared -> displaySync) ? ((Shared -> displaySync) / 3) : 20))
+				if ((NX_FPS_Math::new_fpslock != ((Shared -> currentRefreshRate) ? ((Shared -> currentRefreshRate) / 3) : 20))
 				|| (Shared -> ZeroSync)) {
 					NX_FPS_Math::FPStiming = (systemtickfrequency/NX_FPS_Math::new_fpslock) - 6000;
-					if (NX_FPS_Math::new_fpslock == ((Shared -> displaySync) ? ((Shared -> displaySync) / 3) : 20)) {
+					if (NX_FPS_Math::new_fpslock == ((Shared -> currentRefreshRate) ? ((Shared -> currentRefreshRate) / 3) : 20)) {
 						NX_FPS_Math::FPStiming -= 2000;
 					}
 				}
 				else NX_FPS_Math::FPStiming = 0;			
 			}
-			else if (NX_FPS_Math::new_fpslock <= ((Shared -> displaySync) ? ((Shared -> displaySync) / 2) : 30)) {
+			else if (NX_FPS_Math::new_fpslock <= ((Shared -> currentRefreshRate) ? ((Shared -> currentRefreshRate) / 2) : 30)) {
 				if (((nvnGetPresentInterval_0)(Address_weaks.nvnWindowGetPresentInterval))(nvnWindow) != 2)
 					NVN::SetPresentInterval(nvnWindow, -2);
-				if (NX_FPS_Math::new_fpslock != ((Shared -> displaySync) ? ((Shared -> displaySync) / 2) : 30)
+				if (NX_FPS_Math::new_fpslock != ((Shared -> currentRefreshRate) ? ((Shared -> currentRefreshRate) / 2) : 30)
 				|| (Shared -> ZeroSync)) {
 					NX_FPS_Math::FPStiming = (systemtickfrequency/NX_FPS_Math::new_fpslock) - 6000;
-					if (NX_FPS_Math::new_fpslock == ((Shared -> displaySync) ? ((Shared -> displaySync) / 2) : 30)) {
+					if (NX_FPS_Math::new_fpslock == ((Shared -> currentRefreshRate) ? ((Shared -> currentRefreshRate) / 2) : 30)) {
 						NX_FPS_Math::FPStiming -= 2000;
 					}
 				}
 				else NX_FPS_Math::FPStiming = 0;			
 			}
-			else if (NX_FPS_Math::new_fpslock > ((Shared -> displaySync) ? ((Shared -> displaySync) / 2) : 30)) {
+			else if (NX_FPS_Math::new_fpslock > ((Shared -> currentRefreshRate) ? ((Shared -> currentRefreshRate) / 2) : 30)) {
 				if (((nvnGetPresentInterval_0)(Address_weaks.nvnWindowGetPresentInterval))(nvnWindow) != 1) {
 					NVN::SetPresentInterval(nvnWindow, -2); //This allows in game with glitched interval to unlock 60 FPS, f.e. WRC Generations
 					NVN::SetPresentInterval(nvnWindow, -1);
 				}
-				if ((NX_FPS_Math::new_fpslock != ((Shared -> displaySync) ? (Shared -> displaySync) : 60))
+				if ((NX_FPS_Math::new_fpslock != ((Shared -> currentRefreshRate) ? (Shared -> currentRefreshRate) : 60))
 				|| (Shared -> ZeroSync)) {
 					NX_FPS_Math::FPStiming = (systemtickfrequency/NX_FPS_Math::new_fpslock) - 6000;
-					if (NX_FPS_Math::new_fpslock == ((Shared -> displaySync) ? (Shared -> displaySync) : 60)) {
+					if (NX_FPS_Math::new_fpslock == ((Shared -> currentRefreshRate) ? (Shared -> currentRefreshRate) : 60)) {
 						NX_FPS_Math::FPStiming -= 2000;
 					}
 				}
@@ -1033,7 +1034,7 @@ extern "C" {
 					if  (sync_file) {
 						SaltySDCore_fclose(sync_file);
 						SaltySD_SetDisplayRefreshRate(temp);
-						(Shared -> displaySync) = temp;
+						(Shared -> displaySync) = true;
 					}
 				}
 				SaltySDCore_fread(&temp, 1, 1, file_dat);
