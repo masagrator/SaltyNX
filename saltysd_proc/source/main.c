@@ -433,7 +433,7 @@ void remove_spaces(char* str_trimmed, const char* str_untrimmed)
   str_trimmed[0] = '\0';
 }
 
-bool file_exists(const char *filename)
+bool file_or_directory_exists(const char *filename)
 {
     struct stat buffer;
     return stat(filename, &buffer) == 0 ? true : false;
@@ -449,7 +449,7 @@ void LoadDockedModeAllowedSave() {
     char path[128] = "";
     int crc32 = crc32Calculate(&edid, sizeof(edid));
     snprintf(path, sizeof(path), "sdmc:/SaltySD/plugins/FPSLocker/ExtDisplays/%08X.dat", crc32);
-    if (file_exists(path) == false) {
+    if (file_or_directory_exists(path) == false) {
         FILE* file = fopen(path, "wb");
         if (file) {
             fwrite(&edid, sizeof(edid), 1, file);
@@ -458,7 +458,7 @@ void LoadDockedModeAllowedSave() {
         else SaltySD_printf("SaltySD: Couldn't dump EDID to sdcard!\n", &path[31]);
     }
     snprintf(path, sizeof(path), "sdmc:/SaltySD/plugins/FPSLocker/ExtDisplays/%08X.ini", crc32);
-    if (file_exists(path) == true) {
+    if (file_or_directory_exists(path) == true) {
         FILE* file = fopen(path, "r");
         SaltySD_printf("SaltySD: %s opened successfully!\n", &path[31]);
         fseek(file, 0, 2);
@@ -1638,6 +1638,11 @@ int main(int argc, char *argv[])
 
     if (!isLite) {
         ABORT_IF_FAILED(nvInitialize(), 6);
+        if (file_or_directory_exists("sdmc:/SaltySD/plugins/FPSLocker/ExtDisplays") == false) {
+            mkdir("sdmc:/SaltySD/plugins", 69);
+            mkdir("sdmc:/SaltySD/plugins/FPSLocker", 420);
+            mkdir("sdmc:/SaltySD/plugins/FPSLocker/ExtDisplays", 2137);
+        }
     }
     
     ABORT_IF_FAILED(ldrDmntInitialize(), 7);
