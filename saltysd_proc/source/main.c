@@ -385,10 +385,10 @@ __attribute__((noinline)) void correctOledGamma(uint32_t refresh_rate) {
     last_refresh_rate = refresh_rate;
 }
 
-void getDockedHighestRefreshRate() {
+void getDockedHighestRefreshRate(uint32_t fd_in) {
     uint8_t highestRefreshRate = 60;
-    uint32_t fd = 0;
-    if (R_FAILED(nvOpen(&fd, "/dev/nvdisp-disp1"))) {
+    uint32_t fd = fd_in;
+    if (!fd && R_FAILED(nvOpen(&fd, "/dev/nvdisp-disp1"))) {
         SaltySD_printf("SaltySD: Couldn't open /dev/nvdisp-disp1! Blocking to 60 Hz.\n");
         dockedHighestRefreshRate = 60;
         return;
@@ -405,17 +405,20 @@ void getDockedHighestRefreshRate() {
             if (highestRefreshRate < (uint8_t)refreshRate) highestRefreshRate = (uint8_t)refreshRate;
         }
     }
-    else SaltySD_printf("SaltySD: NVDISP_GET_MODE_DB2 for /dev/nvdisp-disp1 returned error 0x%x!\n", nvrc);
+    else {
+        SaltySD_printf("SaltySD: NVDISP_GET_MODE_DB2 for /dev/nvdisp-disp1 returned error 0x%x!\n", nvrc);
+        dockedHighestRefreshRate = 60;
+    }
     if (highestRefreshRate > DockedModeRefreshRateAllowedValues[sizeof(DockedModeRefreshRateAllowedValues) - 1]) 
         highestRefreshRate = DockedModeRefreshRateAllowedValues[sizeof(DockedModeRefreshRateAllowedValues) - 1];
     struct dpaux_read_0x100 dpaux = {6, 0x100, 0x10};
     nvrc = nvIoctl(fd, NVDISP_GET_PANEL_DATA, &dpaux);
-    if (R_SUCCEEDED(nvrc)) {
+    if (R_SUCCEEDED(nvrc) && DB2.modes[0].vActive == 1920 && DB2.modes[0].hActive == 1080) {
         if (highestRefreshRate > 75 && dpaux.set.link_rate < 20) highestRefreshRate = 75;
         dockedLinkRate = dpaux.set.link_rate;
     }
     else SaltySD_printf("SaltySD: NVDISP_GET_PANEL_DATA for /dev/nvdisp-disp1 returned error 0x%x!\n", nvrc);
-    nvClose(fd);
+    if (!fd_in) nvClose(fd);
     dockedHighestRefreshRate = highestRefreshRate;
 }
 
@@ -878,7 +881,7 @@ bool GetDisplayRefreshRate(uint32_t* out_refreshRate, bool internal) {
                     nvClose(fd);
                     if (R_SUCCEEDED(nvrc)) {
                         LoadDockedModeAllowedSave();
-                        getDockedHighestRefreshRate();
+                        getDockedHighestRefreshRate(0);
                         canChangeRefreshRateDocked = true;
                     }
                     else {
@@ -890,11 +893,16 @@ bool GetDisplayRefreshRate(uint32_t* out_refreshRate, bool internal) {
             }
             uint32_t fd = 0;
             if (R_SUCCEEDED(nvOpen(&fd, "/dev/nvdisp-disp1"))) {
+                static uint32_t last_vActive = 0;
                 struct nvdcMode2 DISPLAY_B = {0};
                 if (R_SUCCEEDED(nvIoctl(fd, NVDISP_GET_MODE2, &DISPLAY_B))) {
                     if (!DISPLAY_B.pclkKHz) {
                         nvClose(fd);
                         return false;
+                    }
+                    if (last_vActive != DISPLAY_B.vActive) {
+                        last_vActive = DISPLAY_B.vActive;
+                        getDockedHighestRefreshRate(fd);
                     }
                     uint32_t h_total = DISPLAY_B.hActive + DISPLAY_B.hFrontPorch + DISPLAY_B.hSyncWidth + DISPLAY_B.hBackPorch;
                     uint32_t v_total = DISPLAY_B.vActive + DISPLAY_B.vFrontPorch + DISPLAY_B.vSyncWidth + DISPLAY_B.vBackPorch;
