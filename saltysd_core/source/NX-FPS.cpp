@@ -69,14 +69,8 @@ typedef bool (*eglSwapBuffers_0)(const void* EGLDisplay, const void* EGLSurface)
 typedef bool (*eglSwapInterval_0)(const void* EGLDisplay, int interval);
 typedef void (*glViewport_0)(int x, int y, uint width, uint height);
 typedef void (*glViewportArrayv_0)(uint firstViewport, uint viewportCount, const glViewportArray* pViewports);
-typedef void (*glViewportArrayvNV_0)(uint firstViewport, uint viewportCount, const glViewportArray* pViewports);
-typedef void (*glViewportArrayvOES_0)(uint firstViewport, uint viewportCount, const glViewportArray* pViewports);
 typedef void (*glViewportIndexedf_0)(uint index, float x, float y, float width, float height);
 typedef void (*glViewportIndexedfv_0)(uint index, const glViewportArray* pViewports);
-typedef void (*glViewportIndexedfNV_0)(uint index, float x, float y, float width, float height);
-typedef void (*glViewportIndexedfvNV_0)(uint index, const glViewportArray* pViewports);
-typedef void (*glViewportIndexedfOES_0)(uint index, float x, float y, float width, float height);
-typedef void (*glViewportIndexedfvOES_0)(uint index, const glViewportArray* pViewports);
 typedef s32 (*vkQueuePresentKHR_0)(const void* vkQueue, const void* VkPresentInfoKHR);
 typedef u64 (*_ZN2nn2os17ConvertToTimeSpanENS0_4TickE_0)(u64 tick);
 typedef u64 (*_ZN2nn2os13GetSystemTickEv_0)();
