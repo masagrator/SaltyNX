@@ -413,9 +413,9 @@ void getDockedHighestRefreshRate(uint32_t fd_in) {
         highestRefreshRate = DockedModeRefreshRateAllowedValues[sizeof(DockedModeRefreshRateAllowedValues) - 1];
     struct dpaux_read_0x100 dpaux = {6, 0x100, 0x10};
     nvrc = nvIoctl(fd, NVDISP_GET_PANEL_DATA, &dpaux);
-    if (R_SUCCEEDED(nvrc) && DB2.modes[0].vActive == 1920 && DB2.modes[0].hActive == 1080) {
-        if (highestRefreshRate > 75 && dpaux.set.link_rate < 20) highestRefreshRate = 75;
+    if (R_SUCCEEDED(nvrc)) {
         dockedLinkRate = dpaux.set.link_rate;
+        if (DB2.modes[0].vActive == 1920 && DB2.modes[0].hActive == 1080 && highestRefreshRate > 75 && dpaux.set.link_rate < 20) highestRefreshRate = 75;
     }
     else SaltySD_printf("SaltySD: NVDISP_GET_PANEL_DATA for /dev/nvdisp-disp1 returned error 0x%x!\n", nvrc);
     if (!fd_in) nvClose(fd);
