@@ -463,22 +463,28 @@ void LoadDockedModeAllowedSave() {
         size_t size = ftell(file);
         fseek(file, 0, 0);
         char* temp_string = malloc(size);
+        if (!temp_string) {
+            SaltySD_printf("SaltySD: Allocation failure! Memory leak. Get ready for crash.\n");
+        }
         fread(temp_string, size, 1, file);
         fclose(file);
         remove_spaces(temp_string, temp_string);
         if (memcmp(temp_string, "[Common]", 8)) {
             SaltySD_printf("SaltySD: %s doesn't start with \"[Common]\"! Using default settings!\n", &path[31]);
+            free(temp_string);
             return;
         }
         char* substring = strstr(temp_string, "refreshRateAllowed={");
         if (substring == NULL) {
             SaltySD_printf("SaltySD: %s doesn't have \"refreshRateAllowed\"! Using default settings!\n", &path[31]);
+            free(temp_string);
             return;
         }
         char* rr_start = &substring[strlen("refreshRateAllowed={")];
         substring = strstr(rr_start, "}");
         if (substring == NULL) {
             SaltySD_printf("SaltySD: %s \"refreshRateAllowed\" is malformed! Using default settings!\n", &path[31]);
+            free(temp_string);
             return;
         }
         size_t amount = 1;
@@ -510,6 +516,7 @@ void LoadDockedModeAllowedSave() {
             matchLowestDocked = (bool)!strncasecmp(substring, "True", 4);
         }
         else SaltySD_printf("SaltySD: %s doesn't have \"matchLowestRefreshRate\"! Setting to false!\n", &path[31]);
+        free(temp_string);
     }
     else {
         SaltySD_printf("SaltySD: File \"%s\" not found! Locking allowed refresh rates in docked mode to 50 and 60 Hz.\n", path);
