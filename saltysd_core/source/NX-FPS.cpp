@@ -253,7 +253,6 @@ typedef void* (*nvnSyncWait_0)(const void* _this, uint64_t timeout_ns);
 void* WindowSync = 0;
 uint64_t startFrameTick = 0;
 
-uint64_t fileTimeInTicks = 0;
 size_t fileBytesRead = 0;
 
 enum {
