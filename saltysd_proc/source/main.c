@@ -434,6 +434,8 @@ void setDefaultDockedSettings() {
 void LoadDockedModeAllowedSave() {
     SetSysEdid edid = {0};
     setDefaultDockedSettings();
+    if (isLite)
+        return;
     if (R_FAILED(setsysGetEdid(&edid))) {
         SaltySD_printf("SaltySD: Couldn't retrieve display EDID! Locking allowed refresh rates in docked mode to 50 and 60 Hz.\n");
         return;
@@ -452,7 +454,10 @@ void LoadDockedModeAllowedSave() {
     snprintf(path, sizeof(path), "sdmc:/SaltySD/plugins/FPSLocker/ExtDisplays/%08X.ini", crc32);
     if (file_or_directory_exists(path) == true) {
         FILE* file = fopen(path, "r");
-        SaltySD_printf("SaltySD: %s opened successfully!\n", &path[31]);
+        if (!file) {
+            SaltySD_printf("SaltySD: %s opening failed (file already opened?). Locking allowed refresh rates in docked mode to 50 and 60 Hz.\n", &path[31]);
+            return;
+        }
         fseek(file, 0, 2);
         size_t size = ftell(file);
         fseek(file, 0, 0);
