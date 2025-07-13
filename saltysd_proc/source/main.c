@@ -80,6 +80,7 @@ size_t reservedSharedMemory = 0;
 uint64_t clkVirtAddr = 0;
 uint64_t dsiVirtAddr = 0;
 bool displaySync = false;
+bool displaySyncDocked = false;
 uint8_t refreshRate = 0;
 s64 lastAppPID = -1;
 bool isOLED = false;
@@ -666,7 +667,7 @@ bool setNvDispDockedRefreshRate(uint32_t new_refreshRate) {
     }
     bool increase = refreshRateNow < DockedModeRefreshRateAllowedValues[itr];
     while(itr >= 0 && itr < sizeof(DockedModeRefreshRateAllowed) && DockedModeRefreshRateAllowed[itr] != true) {
-        if (!displaySync) {
+        if (!displaySyncDocked) {
             if (increase) itr++;
             else itr--;
         }
@@ -1732,6 +1733,31 @@ Result handleServiceCmd(int cmd)
 
         return 0;
     }
+    else if (cmd == 18) // SetDisplaySyncDocked
+    {
+        IpcParsedCommand r = {0};
+        ipcParse(&r);
+
+        struct {
+            u64 magic;
+            u64 cmd_id;
+            u64 value;
+            u64 reserved;
+        } *resp = r.Raw;
+
+        displaySyncDocked = (bool)(resp -> value);
+        if (displaySyncDocked) {
+            FILE* file = fopen("sdmc:/SaltySD/flags/displaysyncdocked.flag", "wb");
+            fclose(file);
+            SaltySD_printf("SaltySD: cmd 18 handler -> %d\n", displaySyncDocked);
+        }
+        else {
+            remove("sdmc:/SaltySD/flags/displaysyncdocked.flag");
+            SaltySD_printf("SaltySD: cmd 18 handler -> %d\n", displaySyncDocked);
+        }
+
+        ret = 0;
+    }
     else
     {
         ret = 0xEE01;
@@ -1883,6 +1909,9 @@ int main(int argc, char *argv[])
     if (file_or_directory_exists("sdmc:/SaltySD/flags/displaysync.flag")) {
         displaySync = true;
     }
+    if (file_or_directory_exists("sdmc:/SaltySD/flags/displaysyncdocked.flag")) {
+        displaySyncDocked = true;
+    }
 
     // Start our port
     // For some reason, we only have one session maximum (0 reslimit handle related?)	
@@ -1971,7 +2000,7 @@ int main(int argc, char *argv[])
                 if (shmemGetAddr(&_sharedMemory)) {
                     memset(shmemGetAddr(&_sharedMemory), 0, 0x1000);
                 }
-                if (displaySync) {
+                if ((!isDocked && displaySync) || (isDocked && displaySyncDocked)) {
                     uint32_t temp_refreshRate = 0;
                     if (GetDisplayRefreshRate(&temp_refreshRate, true) && temp_refreshRate != 60)
                         SetDisplayRefreshRate(60);
@@ -1979,7 +2008,7 @@ int main(int argc, char *argv[])
                 }
             }
             else {
-                if (displaySync) {
+                if ((!isDocked && displaySync) || (isDocked && displaySyncDocked)) {
                     uint32_t temp_refreshRate = 0;
                     GetDisplayRefreshRate(&temp_refreshRate, true);
                     uint32_t check_refresh_rate = refreshRate;
