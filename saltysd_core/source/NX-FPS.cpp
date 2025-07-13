@@ -219,7 +219,7 @@ struct NxFpsSharedBlock {
 	uint8_t SetBuffers;
 	uint8_t ActiveBuffers;
 	uint8_t SetActiveBuffers;
-	bool displaySync;
+	uint8_t displaySync;
 	resolutionCalls renderCalls[8];
 	resolutionCalls viewportCalls[8];
 	bool forceOriginalRefreshRate;
@@ -1201,9 +1201,17 @@ extern "C" {
 					FILE* sync_file = SaltySDCore_fopen("sdmc:/SaltySD/flags/displaysync.flag", "rb");
 					if  (sync_file) {
 						SaltySDCore_fclose(sync_file);
-						SaltySD_SetDisplayRefreshRate(temp);
-						(Shared -> displaySync) = true;
+						SaltySD_SetDisplaySync(true);
+						(Shared -> displaySync) = 1;
 					}
+					else SaltySD_SetDisplaySync(false);
+					sync_file = SaltySDCore_fopen("sdmc:/SaltySD/flags/displaysyncdocked.flag", "rb");
+					if  (sync_file) {
+						SaltySDCore_fclose(sync_file);
+						SaltySD_SetDisplaySyncDocked(true);
+						(Shared -> displaySync) |= 2;
+					}
+					else SaltySD_SetDisplaySyncDocked(false);
 				}
 				SaltySDCore_fread(&temp, 1, 1, file_dat);
 				(Shared -> ZeroSync) = temp;
