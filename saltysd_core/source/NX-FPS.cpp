@@ -91,6 +91,7 @@ typedef void (*vkCmdSetViewportWithCount_0)(void* commandBuffer, uint32_t viewpo
 typedef s32 (*vkCreateSwapchainKHR_0)(void* Device, const VkSwapchainCreateInfoKHR* pCreateInfo, const void* pAllocator, const void** pSwapchain);
 typedef s32 (*vkGetSwapchainImagesKHR_0)(void* Device, void* VkSwapchainKHR, uint32_t* pSwapchainImageCount, int** pSwapchainImages);
 typedef AppletFocusState (*GetCurrentFocusState_0)();
+typedef u32 (*FileAccessorRead_0)(void* fileHandle, size_t* bytesRead, size_t position, void* buffer, size_t readBytes, unsigned int* ReadOption);
 
 struct {
 	uintptr_t nvnBootstrapLoader;
@@ -143,7 +144,9 @@ struct {
 	uintptr_t nvnCommandBufferSetDepthRange;
 	uintptr_t vkGetSwapchainImagesKHR;
 	uintptr_t nvSwapchainGetSwapchainImagesKHR;
+
 	uintptr_t GetCurrentFocusState;
+	uintptr_t FileAccessorRead;
 } Address_weaks;
 
 struct nvnWindowBuilder {
@@ -216,13 +219,14 @@ struct NxFpsSharedBlock {
 	uint8_t SetBuffers;
 	uint8_t ActiveBuffers;
 	uint8_t SetActiveBuffers;
-	bool displaySync;
+	uint8_t displaySync;
 	resolutionCalls renderCalls[8];
 	resolutionCalls viewportCalls[8];
 	bool forceOriginalRefreshRate;
 	bool dontForce60InDocked;
 	bool forceSuspend;
 	uint8_t currentRefreshRate;
+	float readSpeedPerSecond;
 } PACKED;
 
 NxFpsSharedBlock* Shared = 0;
@@ -248,6 +252,8 @@ typedef int (*nvnGetPresentInterval_0)(const NVNWindow* nvnWindow);
 typedef void* (*nvnSyncWait_0)(const void* _this, uint64_t timeout_ns);
 void* WindowSync = 0;
 uint64_t startFrameTick = 0;
+
+size_t fileBytesRead = 0;
 
 enum {
 	ZeroSyncType_None,
@@ -359,6 +365,13 @@ namespace NX_FPS_Math {
 			}
 		}
 		if (deltatick > systemtickfrequency) {
+			if (Address_weaks.FileAccessorRead) {
+				float seconds = (float)((_ZN2nn2os17ConvertToTimeSpanENS0_4TickE_0)(Address_weaks.ConvertToTimeSpan))(deltatick) / 1000000000.f;
+				float readSpeedPerSecond = (float)fileBytesRead / seconds;
+				fileBytesRead = 0;
+				if (readSpeedPerSecond == 0.f && Shared -> readSpeedPerSecond != 0.f) readSpeedPerSecond = 1;
+				Shared -> readSpeedPerSecond = readSpeedPerSecond;
+			}
 			starttick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
 			Stats.FPS = FPS_temp - 1;
 			FPS_temp = 0;
@@ -1084,6 +1097,17 @@ namespace NVN {
 	}
 }
 
+namespace nn {
+	Result FileAccessorRead(void* fileHandle, size_t* bytesRead, size_t position, void* buffer, size_t readBytes, unsigned int* ReadOption) {
+		size_t bytesRead_impl = 0;
+		if (!bytesRead)
+			bytesRead = &bytesRead_impl;
+		Result ret = ((FileAccessorRead_0)(Address_weaks.FileAccessorRead))(fileHandle, bytesRead, position, buffer, readBytes, ReadOption);
+		fileBytesRead += *bytesRead;
+		return ret;
+	}
+}
+
 extern "C" {
 
 	void NX_FPS(SharedMemory* _sharedmemory, uint32_t* _sharedOperationMode) {
@@ -1126,7 +1150,8 @@ extern "C" {
 			Address_weaks.vkGetSwapchainImagesKHR = SaltySDCore_FindSymbolBuiltin("vkGetSwapchainImagesKHR");
 			Address_weaks.nvSwapchainGetSwapchainImagesKHR = SaltySDCore_FindSymbolBuiltin("_ZN11NvSwapchain21GetSwapchainImagesKHREP10VkDevice_TP16VkSwapchainKHR_TPjPP9VkImage_T");
 			Address_weaks.nvSwapchainCreateSwapchainKHR = SaltySDCore_FindSymbolBuiltin("_ZN11NvSwapchain18CreateSwapchainKHREP10VkDevice_TPK24VkSwapchainCreateInfoKHRPK21VkAllocationCallbacksPP16VkSwapchainKHR_T");
-			Address_weaks.GetCurrentFocusState = SaltySDCore_FindSymbolBuiltin("_ZN2nn2oe20GetCurrentFocusStateEv");			
+			Address_weaks.GetCurrentFocusState = SaltySDCore_FindSymbolBuiltin("_ZN2nn2oe20GetCurrentFocusStateEv");
+			//For 32-bit it's different
 			SaltySDCore_ReplaceImport("nvnBootstrapLoader", (void*)NVN::BootstrapLoader_1);
 			SaltySDCore_ReplaceImport("eglSwapBuffers", (void*)EGL::Swap);
 			SaltySDCore_ReplaceImport("eglSwapInterval", (void*)EGL::Interval);
@@ -1152,6 +1177,13 @@ extern "C" {
 				//Minecraft is using nn::ro::LookupSymbol to search for Vulkan functions
 				SaltySDCore_ReplaceImport("_ZN2nn2ro12LookupSymbolEPmPKc", (void*)vk::LookupSymbol);
 			}
+			FILE* readFlag = SaltySDCore_fopen("sdmc:/SaltySD/flags/filestats.flag", "rb");
+			if (readFlag) {
+				SaltySDCore_fclose(readFlag);
+				//For 32-bit it's different
+				Address_weaks.FileAccessorRead = SaltySDCore_FindSymbolBuiltin("_ZN2nn2fs6detail12FileAccessor4ReadEPmlPvmRKNS0_10ReadOptionE");		
+				SaltySDCore_ReplaceImport("_ZN2nn2fs6detail12FileAccessor4ReadEPmlPvmRKNS0_10ReadOptionE", (void*)nn::FileAccessorRead);
+			}
 			
 			systemtickfrequency = ((_ZN2nn2os22GetSystemTickFrequencyEv_0)(Address_weaks.GetSystemTickFrequency))();
 			char titleid[17];
@@ -1169,9 +1201,17 @@ extern "C" {
 					FILE* sync_file = SaltySDCore_fopen("sdmc:/SaltySD/flags/displaysync.flag", "rb");
 					if  (sync_file) {
 						SaltySDCore_fclose(sync_file);
-						SaltySD_SetDisplayRefreshRate(temp);
-						(Shared -> displaySync) = true;
+						SaltySD_SetDisplaySync(true);
+						(Shared -> displaySync) = 1;
 					}
+					else SaltySD_SetDisplaySync(false);
+					sync_file = SaltySDCore_fopen("sdmc:/SaltySD/flags/displaysyncdocked.flag", "rb");
+					if  (sync_file) {
+						SaltySDCore_fclose(sync_file);
+						SaltySD_SetDisplaySyncDocked(true);
+						(Shared -> displaySync) |= 2;
+					}
+					else SaltySD_SetDisplaySyncDocked(false);
 				}
 				SaltySDCore_fread(&temp, 1, 1, file_dat);
 				(Shared -> ZeroSync) = temp;

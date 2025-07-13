@@ -501,7 +501,7 @@ u64 SaltySD_GetBID()
 	return 0;
 }
 
-Result SaltySD_SetDisplayRefreshRate(uint8_t refreshRate)
+Result SaltySD_SetDisplaySyncDocked(bool isTrue)
 {
 	Result ret = 0;
 
@@ -513,15 +513,15 @@ Result SaltySD_SetDisplayRefreshRate(uint8_t refreshRate)
 	struct input {
 		u64 magic;
 		u64 cmd_id;
-		u64 refreshRate;
+		u64 value;
 		u64 reserved;
 	} *raw;
 
 	raw = ipcPrepareHeader(&c, sizeof(*raw));
 
 	raw->magic = SFCI_MAGIC;
-	raw->cmd_id = 11;
-	raw->refreshRate = refreshRate;
+	raw->cmd_id = 18;
+	raw->value = isTrue;
 
 	ret = ipcDispatch(saltysd);
 
@@ -533,7 +533,47 @@ Result SaltySD_SetDisplayRefreshRate(uint8_t refreshRate)
 			u64 magic;
 			u64 result;
 			u64 reserved[2];
-		} *resp = r.Raw;
+		} *resp = (struct output*)r.Raw;
+
+		ret = resp->result;
+	}
+	
+	return ret;
+}
+
+Result SaltySD_SetDisplaySync(bool isTrue)
+{
+	Result ret = 0;
+
+	// Send a command
+	IpcCommand c;
+	ipcInitialize(&c);
+	ipcSendPid(&c);
+
+	struct input {
+		u64 magic;
+		u64 cmd_id;
+		u64 value;
+		u64 reserved;
+	} *raw;
+
+	raw = ipcPrepareHeader(&c, sizeof(*raw));
+
+	raw->magic = SFCI_MAGIC;
+	raw->cmd_id = 12;
+	raw->value = isTrue;
+
+	ret = ipcDispatch(saltysd);
+
+	if (R_SUCCEEDED(ret)) {
+		IpcParsedCommand r;
+		ipcParse(&r);
+
+		struct output {
+			u64 magic;
+			u64 result;
+			u64 reserved[2];
+		} *resp = (struct output*)r.Raw;
 
 		ret = resp->result;
 	}

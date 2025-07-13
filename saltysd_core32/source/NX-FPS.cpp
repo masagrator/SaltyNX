@@ -75,6 +75,7 @@ typedef u32 (*nvnTextureGetFormat_0)(NVNTexture* texture);
 typedef void* (*_vkGetInstanceProcAddr_0)(void* instance, const char* vkFunction);
 typedef void* (*vkGetDeviceProcAddr_0)(void* device, const char* vkFunction);
 typedef AppletFocusState (*GetCurrentFocusState_0)();
+typedef u32 (*FileAccessorRead_0)(void* fileHandle, size_t* bytesRead, size_t position, void* buffer, size_t readBytes, unsigned int* ReadOption);
 
 struct {
 	uintptr_t nvnBootstrapLoader;
@@ -118,7 +119,9 @@ struct {
 	uintptr_t nvnCommandBufferSetViewports;
 	uintptr_t nvnCommandBufferSetDepthRange;
 	uintptr_t vkGetDeviceProcAddr;
+
 	uintptr_t GetCurrentFocusState;
+	uintptr_t FileAccessorRead;
 } Address_weaks;
 
 struct nvnWindowBuilder {
@@ -188,13 +191,14 @@ struct NxFpsSharedBlock {
 	uint8_t SetBuffers;
 	uint8_t ActiveBuffers;
 	uint8_t SetActiveBuffers;
-	bool displaySync;
+	uint8_t displaySync;
 	resolutionCalls renderCalls[8];
 	resolutionCalls viewportCalls[8];
 	bool forceOriginalRefreshRate;
 	bool dontForce60InDocked;
 	bool forceSuspend;
 	uint8_t currentRefreshRate;
+	float readSpeedPerSecond;
 } PACKED;
 
 NxFpsSharedBlock* Shared = 0;
@@ -220,6 +224,8 @@ typedef int (*nvnGetPresentInterval_0)(const NVNWindow* nvnWindow);
 typedef void* (*nvnSyncWait_0)(const void* _this, uint64_t timeout_ns);
 void* WindowSync = 0;
 uint64_t startFrameTick = 0;
+
+size_t fileBytesRead = 0;
 
 enum {
 	ZeroSyncType_None,
@@ -319,6 +325,13 @@ namespace NX_FPS_Math {
 		}
 
 		if (deltatick > systemtickfrequency) {
+			if (Address_weaks.FileAccessorRead) {
+				float seconds = (float)((_ZN2nn2os17ConvertToTimeSpanENS0_4TickE_0)(Address_weaks.ConvertToTimeSpan))(deltatick) / 1000000000.f;
+				float readSpeedPerSecond = (float)fileBytesRead / seconds;
+				fileBytesRead = 0;
+				if (readSpeedPerSecond == 0.f && Shared -> readSpeedPerSecond != 0.f) readSpeedPerSecond = 1;
+				Shared -> readSpeedPerSecond = readSpeedPerSecond;
+			}
 			((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))(&starttick);
 			Stats.FPS = FPS_temp - 1;
 			FPS_temp = 0;
@@ -969,6 +982,17 @@ namespace NVN {
 	}
 }
 
+namespace nn {
+	Result FileAccessorRead(void* fileHandle, size_t* bytesRead, size_t position, void* buffer, size_t readBytes, unsigned int* ReadOption) {
+		size_t bytesRead_impl = 0;
+		if (!bytesRead)
+			bytesRead = &bytesRead_impl;
+		Result ret = ((FileAccessorRead_0)(Address_weaks.FileAccessorRead))(fileHandle, bytesRead, position, buffer, readBytes, ReadOption);
+		fileBytesRead += *bytesRead;
+		return ret;
+	}
+}
+
 extern "C" {
 
 	void NX_FPS(SharedMemory* _sharedmemory, uint32_t* _sharedOperationMode) {
@@ -1022,6 +1046,13 @@ extern "C" {
 			SaltySDCore_ReplaceImport("vkQueuePresentKHR", (void*)vk::QueuePresent);
 			SaltySDCore_ReplaceImport("_ZN11NvSwapchain15QueuePresentKHREP9VkQueue_TPK16VkPresentInfoKHR", (void*)vk::nvSwapchain::QueuePresent);
 			SaltySDCore_ReplaceImport("vkGetInstanceProcAddr", (void*)vk::GetInstanceProcAddr);
+			FILE* readFlag = SaltySDCore_fopen("sdmc:/SaltySD/flags/filestats.flag", "rb");
+			if (readFlag) {
+				SaltySDCore_fclose(readFlag);
+				//For 32-bit it's different
+				Address_weaks.FileAccessorRead = SaltySDCore_FindSymbolBuiltin("_ZN2nn2fs6detail12FileAccessor4ReadEPjxPvjRKNS0_10ReadOptionE");		
+				SaltySDCore_ReplaceImport("_ZN2nn2fs6detail12FileAccessor4ReadEPjxPvjRKNS0_10ReadOptionE", (void*)nn::FileAccessorRead);
+			}
 			
 			((_ZN2nn2os22GetSystemTickFrequencyEv_0)(Address_weaks.GetSystemTickFrequency))(&systemtickfrequency);
 
@@ -1038,9 +1069,17 @@ extern "C" {
 					FILE* sync_file = SaltySDCore_fopen("sdmc:/SaltySD/flags/displaysync.flag", "rb");
 					if  (sync_file) {
 						SaltySDCore_fclose(sync_file);
-						SaltySD_SetDisplayRefreshRate(temp);
-						(Shared -> displaySync) = true;
+						SaltySD_SetDisplaySync(true);
+						(Shared -> displaySync) = 1;
 					}
+					else SaltySD_SetDisplaySync(false);
+					sync_file = SaltySDCore_fopen("sdmc:/SaltySD/flags/displaysyncdocked.flag", "rb");
+					if  (sync_file) {
+						SaltySDCore_fclose(sync_file);
+						SaltySD_SetDisplaySyncDocked(true);
+						(Shared -> displaySync) |= 2;
+					}
+					else SaltySD_SetDisplaySyncDocked(false);
 				}
 				SaltySDCore_fread(&temp, 1, 1, file_dat);
 				(Shared -> ZeroSync) = temp;
