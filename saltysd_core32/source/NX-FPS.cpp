@@ -199,6 +199,7 @@ struct NxFpsSharedBlock {
 	bool forceSuspend;
 	uint8_t currentRefreshRate;
 	float readSpeedPerSecond;
+	uint8_t FPSlockedDocked;
 } PACKED;
 
 NxFpsSharedBlock* Shared = 0;
@@ -268,7 +269,7 @@ namespace NX_FPS_Math {
 	int32_t new_fpslock = 0;
 
 	void PreFrame() {
-		new_fpslock = (LOCK::overwriteRefreshRate ? LOCK::overwriteRefreshRate : (Shared -> FPSlocked));
+		new_fpslock = (LOCK::overwriteRefreshRate ? LOCK::overwriteRefreshRate : ((*sharedOperationMode == 1) ? (Shared -> FPSlockedDocked) : (Shared -> FPSlocked)));
 		if (old_force != (Shared -> forceOriginalRefreshRate)) {
 			if (*sharedOperationMode == 1 && !(Shared -> dontForce60InDocked))
 				svcSleepThread(LOCK::DockedRefreshRateDelay);
@@ -415,14 +416,14 @@ namespace vk {
 		int32_t vulkanResult = ((_ZN11NvSwapchain15QueuePresentKHREP9VkQueue_TPK16VkPresentInfoKHR_0)(Address_weaks.nvSwapchainQueuePresentKHR))(VkQueue_T, VkPresentInfoKHR);
 		if (vulkanResult >= 0) NX_FPS_Math::PostFrame();
 
-		if ((Shared -> FPSlocked) == 0 && LOCK::overwriteRefreshRate == 0) {
+		if (((*sharedOperationMode == 1) ? (Shared -> FPSlockedDocked) : (Shared -> FPSlocked)) == 0 && LOCK::overwriteRefreshRate == 0) {
 			NX_FPS_Math::FPStiming = 0;
 			NX_FPS_Math::FPSlock = 0;
 			changeFPS = false;
 		}
-		else if (LOCK::overwriteRefreshRate > 0 && (Shared -> FPSlocked)) {
+		else if (LOCK::overwriteRefreshRate > 0 && ((*sharedOperationMode == 1) ? (Shared -> FPSlockedDocked) : (Shared -> FPSlocked))) {
 			changeFPS = true;
-			NX_FPS_Math::FPSlock = (Shared -> FPSlocked);
+			NX_FPS_Math::FPSlock = ((*sharedOperationMode == 1) ? (Shared -> FPSlockedDocked) : (Shared -> FPSlocked));
 			if (NX_FPS_Math::new_fpslock != ((Shared -> currentRefreshRate) ? (Shared -> currentRefreshRate) : 60))
 				NX_FPS_Math::FPStiming = (systemtickfrequency/NX_FPS_Math::new_fpslock) - 6000;
 			else NX_FPS_Math::FPStiming = 0;
@@ -444,14 +445,14 @@ namespace vk {
 		int32_t vulkanResult = ((vkQueuePresentKHR_0)(Address_weaks.vkQueuePresentKHR))(VkQueue, VkPresentInfoKHR);
 		if (vulkanResult >= 0) NX_FPS_Math::PostFrame();
 
-		if ((Shared -> FPSlocked) == 0 && LOCK::overwriteRefreshRate == 0) {
+		if (((*sharedOperationMode == 1) ? (Shared -> FPSlockedDocked) : (Shared -> FPSlocked)) == 0 && LOCK::overwriteRefreshRate == 0) {
 			NX_FPS_Math::FPStiming = 0;
 			NX_FPS_Math::FPSlock = 0;
 			changeFPS = false;
 		}
-		else if (LOCK::overwriteRefreshRate > 0 && (Shared -> FPSlocked)) {
+		else if (LOCK::overwriteRefreshRate > 0 && ((*sharedOperationMode == 1) ? (Shared -> FPSlockedDocked) : (Shared -> FPSlocked))) {
 			changeFPS = true;
-			NX_FPS_Math::FPSlock = (Shared -> FPSlocked);
+			NX_FPS_Math::FPSlock = ((*sharedOperationMode == 1) ? (Shared -> FPSlockedDocked) : (Shared -> FPSlocked));
 			if (NX_FPS_Math::new_fpslock != ((Shared -> currentRefreshRate) ? (Shared -> currentRefreshRate) : 60))
 				NX_FPS_Math::FPStiming = (systemtickfrequency/NX_FPS_Math::new_fpslock) - 6000;
 			else NX_FPS_Math::FPStiming = 0;
@@ -524,14 +525,14 @@ namespace EGL {
 		bool result = ((eglSwapBuffers_0)(Address_weaks.eglSwapBuffers))(EGLDisplay, EGLSurface);
 		if (result == true) NX_FPS_Math::PostFrame();
 
-		if ((Shared -> FPSlocked) == 0 && LOCK::overwriteRefreshRate == 0) {
+		if (((*sharedOperationMode == 1) ? (Shared -> FPSlockedDocked) : (Shared -> FPSlocked)) == 0 && LOCK::overwriteRefreshRate == 0) {
 			NX_FPS_Math::FPStiming = 0;
 			NX_FPS_Math::FPSlock = 0;
 			changeFPS = false;
 		}
 		else if (Shared -> FPSlocked || LOCK::overwriteRefreshRate > 0) {
 			changeFPS = true;
-			NX_FPS_Math::FPSlock = (Shared -> FPSlocked);
+			NX_FPS_Math::FPSlock = ((*sharedOperationMode == 1) ? (Shared -> FPSlockedDocked) : (Shared -> FPSlocked));
 			if (NX_FPS_Math::new_fpslock <= ((Shared -> currentRefreshRate) ? ((Shared -> currentRefreshRate) / 4) : 15)) {
 				if ((Shared -> FPSmode) != 4)
 					Interval(EGLDisplay, -4);
@@ -769,7 +770,7 @@ namespace NVN {
 			if ((Shared -> ZeroSync) == ZeroSyncType_Semi) {
 				u64 FrameTarget = (systemtickfrequency/60) - 8000;
 				s64 new_timeout = (FrameTarget - (endFrameTick - startFrameTick)) - (systemtickfrequency / 1000);
-				if ((Shared -> FPSlocked) == 60) {
+				if (((*sharedOperationMode == 1) ? (Shared -> FPSlockedDocked) : (Shared -> FPSlocked)) == 60) {
 					new_timeout = (systemtickfrequency/101) - (endFrameTick - startFrameTick);
 				}
 				if (new_timeout > 0) {
@@ -802,14 +803,14 @@ namespace NVN {
 
 		(Shared -> FPSmode) = (uint8_t)((nvnGetPresentInterval_0)(Address_weaks.nvnWindowGetPresentInterval))(nvnWindow);
 
-		if ((Shared -> FPSlocked) == 0 && LOCK::overwriteRefreshRate == 0) {
+		if (((*sharedOperationMode == 1) ? (Shared -> FPSlockedDocked) : (Shared -> FPSlocked)) == 0 && LOCK::overwriteRefreshRate == 0) {
 			NX_FPS_Math::FPStiming = 0;
 			NX_FPS_Math::FPSlock = 0;
 			changeFPS = false;
 		}
 		else if (Shared -> FPSlocked || LOCK::overwriteRefreshRate > 0) {
 			changeFPS = true;
-			NX_FPS_Math::FPSlock = (Shared -> FPSlocked);
+			NX_FPS_Math::FPSlock = ((*sharedOperationMode == 1) ? (Shared -> FPSlockedDocked) : (Shared -> FPSlocked));
 			if (NX_FPS_Math::new_fpslock <= ((Shared -> currentRefreshRate) ? ((Shared -> currentRefreshRate) / 4) : 15)) {
 				if (((nvnGetPresentInterval_0)(Address_weaks.nvnWindowGetPresentInterval))(nvnWindow) != 4)
 					NVN::SetPresentInterval(nvnWindow, -4);
@@ -1065,6 +1066,7 @@ extern "C" {
 				uint8_t temp = 0;
 				SaltySDCore_fread(&temp, 1, 1, file_dat);
 				(Shared -> FPSlocked) = temp;
+				(Shared -> FPSlockedDocked) = temp;
 				if (temp >= 40 && temp <= 120) {
 					FILE* sync_file = SaltySDCore_fopen("sdmc:/SaltySD/flags/displaysync.flag", "rb");
 					if  (sync_file) {
@@ -1087,6 +1089,8 @@ extern "C" {
 					(Shared -> SetBuffers) = temp;
 				if (SaltySDCore_fread(&temp, 1, 1, file_dat))
 					(Shared -> forceSuspend) = (bool)temp;
+				if (SaltySDCore_fread(&temp, 1, 1, file_dat))
+					(Shared -> FPSlockedDocked) = temp;
 				SaltySDCore_fclose(file_dat);
 			}
 
