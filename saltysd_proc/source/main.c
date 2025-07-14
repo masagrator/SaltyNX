@@ -53,13 +53,15 @@ struct NxFpsSharedBlock {
 	uint8_t SetBuffers;
 	uint8_t ActiveBuffers;
 	uint8_t SetActiveBuffers;
-	bool displaySync;
+	uint8_t displaySync;
 	struct resolutionCalls renderCalls[8];
 	struct resolutionCalls viewportCalls[8];
 	bool forceOriginalRefreshRate;
-    bool dontForce60InDocked;
-    bool forceSuspend;
-    uint8_t CurrentRefreshRate;
+	bool dontForce60InDocked;
+	bool forceSuspend;
+	uint8_t currentRefreshRate;
+	float readSpeedPerSecond;
+	uint8_t FPSlockedDocked;
 } NX_PACKED;
 
 struct NxFpsSharedBlock* nx_fps = 0;
@@ -423,6 +425,15 @@ void getDockedHighestRefreshRate(uint32_t fd_in) {
     dockedHighestRefreshRate = highestRefreshRate;
 }
 
+uint8_t getDockedHighestRefreshRateAllowed() {
+    size_t itr = 4;
+    for (size_t i = 5; i < sizeof(DockedModeRefreshRateAllowed); i++) {
+        if (DockedModeRefreshRateAllowed[i] == true)
+            itr = 5;
+    }
+    return DockedModeRefreshRateAllowedValues[itr];
+}
+
 void setDefaultDockedSettings() {
     for (size_t i = 0; i < sizeof(DockedModeRefreshRateAllowed); i++) {
         if (DockedModeRefreshRateAllowedValues[i] == 50 || DockedModeRefreshRateAllowedValues[i] == 60) DockedModeRefreshRateAllowed[i] = true;
@@ -585,7 +596,7 @@ bool setPLLDHandheldRefreshRate(uint32_t new_refreshRate) {
     uint16_t refreshRateNow = pixelClock / (DSI_CLOCK_HZ / 60);
 
     if (refreshRateNow == new_refreshRate) {
-        if (nx_fps) nx_fps->CurrentRefreshRate = new_refreshRate;
+        if (nx_fps) nx_fps->currentRefreshRate = new_refreshRate;
         return true;
     }
 
@@ -681,7 +692,7 @@ bool setNvDispDockedRefreshRate(uint32_t new_refreshRate) {
         else itr++;
     }
     if (refreshRateNow == DockedModeRefreshRateAllowedValues[itr]) {
-        if (nx_fps) nx_fps->CurrentRefreshRate = DockedModeRefreshRateAllowedValues[itr];
+        if (nx_fps) nx_fps->currentRefreshRate = DockedModeRefreshRateAllowedValues[itr];
         nvClose(fd);
         return true;
     }
@@ -708,7 +719,7 @@ bool setNvDispDockedRefreshRate(uint32_t new_refreshRate) {
         if (R_SUCCEEDED(nvrc)) {
             nvrc = nvIoctl(fd, NVDISP_SET_MODE2, &DISPLAY_B);
             if (R_FAILED(nvrc)) SaltySD_printf("SaltySD: NVDISP_SET_MODE2 failed! rc: 0x%x\n", nvrc);
-            else if (nx_fps) nx_fps->CurrentRefreshRate = DockedModeRefreshRateAllowedValues[itr];
+            else if (nx_fps) nx_fps->currentRefreshRate = DockedModeRefreshRateAllowedValues[itr];
         }
         else SaltySD_printf("SaltySD: NVDISP_VALIDATE_MODE2 failed! rc: 0x%x, pclkKHz: %d, Hz: %d\n", nvrc, clock, DockedModeRefreshRateAllowedValues[itr]);
     }
@@ -795,7 +806,7 @@ bool setNvDispHandheldRefreshRate(uint32_t new_refreshRate) {
             nvrc = nvIoctl(fd, NVDISP_SET_MODE2, &DISPLAY_B);
         }
         if (R_FAILED(nvrc)) SaltySD_printf("SaltySD: NVDISP_SET_MODE2 failed! rc: 0x%x\n", nvrc);
-        else if (nx_fps) nx_fps->CurrentRefreshRate = new_refreshRate;
+        else if (nx_fps) nx_fps->currentRefreshRate = new_refreshRate;
     }
     else SaltySD_printf("SaltySD: NVDISP_VALIDATE_MODE2 failed! rc: 0x%x, pclkKHz: %d, Hz: %d\n", nvrc, DISPLAY_B.pclkKHz, new_refreshRate);
     nvClose(fd);
@@ -834,7 +845,7 @@ bool SetDisplayRefreshRate(uint32_t new_refreshRate) {
         else return_immediately = !setNvDispDockedRefreshRate(new_refreshRate);
         if (return_immediately) return false;
     }
-    if (nx_fps) nx_fps->CurrentRefreshRate = new_refreshRate;
+    if (nx_fps) nx_fps->currentRefreshRate = new_refreshRate;
     return true;
 }
 
@@ -948,7 +959,7 @@ bool GetDisplayRefreshRate(uint32_t* out_refreshRate, bool internal) {
     if (sh_addr) 
         *(uint8_t*)(sh_addr + 1) = (uint8_t)value;
     if (nx_fps)
-        nx_fps -> CurrentRefreshRate = (uint8_t)value;
+        nx_fps -> currentRefreshRate = (uint8_t)value;
     return true;
 }
 
@@ -2019,7 +2030,7 @@ int main(int argc, char *argv[])
                     uint32_t temp_refreshRate = 0;
                     GetDisplayRefreshRate(&temp_refreshRate, true);
                     uint32_t check_refresh_rate = refreshRate;
-                    if (nx_fps && nx_fps->FPSlocked) check_refresh_rate = nx_fps->FPSlocked;
+                    if (nx_fps && (isDocked ? nx_fps->FPSlockedDocked : nx_fps->FPSlocked)) check_refresh_rate = (isDocked ? nx_fps->FPSlockedDocked : nx_fps->FPSlocked);
                     if (nx_fps && nx_fps->forceOriginalRefreshRate && (!isDocked || (isDocked && !dontForce60InDocked))) {
                         check_refresh_rate = 60;
                     }
@@ -2029,6 +2040,13 @@ int main(int argc, char *argv[])
                 if (!isDocked && nx_fps && nx_fps->FPSlocked > HandheldModeRefreshRateAllowed.max) {
                     nx_fps->FPSlocked = HandheldModeRefreshRateAllowed.max;
                     refreshRate = HandheldModeRefreshRateAllowed.max;
+                }
+                else if (isDocked && nx_fps) {
+                    uint8_t highestrr = getDockedHighestRefreshRateAllowed();
+                    if (nx_fps->FPSlockedDocked > highestrr) {
+                        nx_fps->FPSlockedDocked = highestrr;
+                        refreshRate = highestrr;
+                    }
                 }
             }
         }
