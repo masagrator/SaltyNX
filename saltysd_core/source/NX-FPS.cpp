@@ -1178,13 +1178,13 @@ extern "C" {
 				//Minecraft is using nn::ro::LookupSymbol to search for Vulkan functions
 				SaltySDCore_ReplaceImport("_ZN2nn2ro12LookupSymbolEPmPKc", (void*)vk::LookupSymbol);
 			}
-			FILE* readFlag = SaltySDCore_fopen("sdmc:/SaltySD/flags/filestats.flag", "rb");
-			if (readFlag) {
-				SaltySDCore_fclose(readFlag);
+			FILE* readFlag = SaltySDCore_fopen("sdmc:/SaltySD/flags/blockfilestats.flag", "rb");
+			if (!readFlag) {
 				//For 32-bit it's different
 				Address_weaks.FileAccessorRead = SaltySDCore_FindSymbolBuiltin("_ZN2nn2fs6detail12FileAccessor4ReadEPmlPvmRKNS0_10ReadOptionE");		
 				SaltySDCore_ReplaceImport("_ZN2nn2fs6detail12FileAccessor4ReadEPmlPvmRKNS0_10ReadOptionE", (void*)nn::FileAccessorRead);
 			}
+			else SaltySDCore_fclose(readFlag);
 			
 			systemtickfrequency = ((_ZN2nn2os22GetSystemTickFrequencyEv_0)(Address_weaks.GetSystemTickFrequency))();
 			char titleid[17];
