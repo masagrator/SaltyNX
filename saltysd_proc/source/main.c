@@ -429,7 +429,7 @@ uint8_t getDockedHighestRefreshRateAllowed() {
     size_t itr = 4;
     for (size_t i = 5; i < sizeof(DockedModeRefreshRateAllowed); i++) {
         if (DockedModeRefreshRateAllowed[i] == true)
-            itr = 5;
+            itr = i;
     }
     return DockedModeRefreshRateAllowedValues[itr];
 }
