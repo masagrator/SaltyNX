@@ -426,7 +426,7 @@ void getDockedHighestRefreshRate(uint32_t fd_in) {
 }
 
 uint8_t getDockedHighestRefreshRateAllowed() {
-    for (size_t i = (sizeof(DockedModeRefreshRateAllowed) - 1); i > 4; i++) {
+    for (size_t i = (sizeof(DockedModeRefreshRateAllowed) - 1); i > 4; i--) {
         if (DockedModeRefreshRateAllowed[i] == true)
             return DockedModeRefreshRateAllowedValues[i];
     }
