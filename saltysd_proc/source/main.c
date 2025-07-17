@@ -156,7 +156,7 @@ bool DockedModeRefreshRateAllowed[]         = { false,  //40Hz
                                                 false,  //110Hz
                                                 false}; //120Hz
 
-uint8_t DockedModeRefreshRateAllowedValues[] = {40, 45, 50, 55, 60, 70, 72, 75, 80, 90, 95, 100, 110, 120};
+const uint8_t DockedModeRefreshRateAllowedValues[] = {40, 45, 50, 55, 60, 70, 72, 75, 80, 90, 95, 100, 110, 120};
 
 struct dockedTimings {
     uint16_t hFrontPorch;
@@ -426,12 +426,11 @@ void getDockedHighestRefreshRate(uint32_t fd_in) {
 }
 
 uint8_t getDockedHighestRefreshRateAllowed() {
-    size_t itr = 4;
-    for (size_t i = 5; i < sizeof(DockedModeRefreshRateAllowed); i++) {
+    for (size_t i = (sizeof(DockedModeRefreshRateAllowed) - 1); i > 4; i++) {
         if (DockedModeRefreshRateAllowed[i] == true)
-            itr = i;
+            return DockedModeRefreshRateAllowedValues[i];
     }
-    return DockedModeRefreshRateAllowedValues[itr];
+    return 60;
 }
 
 void setDefaultDockedSettings() {
