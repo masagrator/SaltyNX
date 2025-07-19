@@ -297,12 +297,13 @@ int main(int argc, char *argv[])
 	strtod_ptr = SaltySDCore_FindSymbolBuiltin("strtod");
 	
 	SaltySD_Init();
+	
+	ret = SaltySD_GetSDCard(&sdcard);
+	if (ret) goto fail;
+
+	SaltySDCore_printf("SaltySD Core32 " APP_VERSION ": restoring code...\n");
 
 	ret = SaltySD_Restore();
-	if (ret) goto fail;
-	
-
-	ret = SaltySD_GetSDCard(&sdcard);
 	if (ret) goto fail;
 
 	SaltySDCore_PatchSVCs();
