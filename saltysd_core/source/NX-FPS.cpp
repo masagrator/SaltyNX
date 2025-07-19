@@ -241,7 +241,7 @@ struct {
 #ifndef SWITCH
 	uint64_t systemtickfrequency = 19200000;
 #else
-	const uint64_t systemtickfrequency = 19200000;
+	#define systemtickfrequency 19200000
 #endif
 typedef void (*nvnQueuePresentTexture_0)(const void* _this, const void* unk2_1, int index);
 typedef uintptr_t (*GetProcAddress)(const void* unk1_a, const char * nvnFunction_a);
