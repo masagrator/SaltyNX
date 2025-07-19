@@ -210,7 +210,11 @@ struct {
 	bool FPSmode = 0;
 } Stats;
 
-uint64_t systemtickfrequency = 19200000;
+#ifndef SWITCH
+	uint64_t systemtickfrequency = 19200000;
+#else
+	#define systemtickfrequency 19200000
+#endif
 typedef void (*nvnQueuePresentTexture_0)(const void* _this, const void* unk2_1, const int index);
 typedef uintptr_t (*GetProcAddress)(const void* unk1_a, const char * nvnFunction_a);
 
@@ -1055,7 +1059,9 @@ extern "C" {
 			}
 			else SaltySDCore_fclose(readFlag);
 			
+			#ifndef SWITCH
 			((_ZN2nn2os22GetSystemTickFrequencyEv_0)(Address_weaks.GetSystemTickFrequency))(&systemtickfrequency);
+			#endif
 
 			uint64_t titleid = 0;
 			svcGetInfo(&titleid, InfoType_TitleId, CUR_PROCESS_HANDLE, 0);	
