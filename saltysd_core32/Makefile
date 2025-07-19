@@ -29,6 +29,8 @@ include $(DEVKITPRO)/devkitARM/base_rules
 #	 - icon.jpg
 #	 - <libnx folder>/default_icon.jpg
 #---------------------------------------------------------------------------------
+include $(TOPDIR)/../version.mk
+
 TARGET		:=	saltysd_core32
 BUILD		:=	build
 SOURCES		:=	source source/tinyexpr
@@ -46,7 +48,7 @@ CFLAGS			:=	-Wall -Wno-pointer-to-int-cast -O2 \
 					-ffast-math -ffunction-sections \
 					$(ARCH) $(DEFINES)
 
-CFLAGS			+=	$(INCLUDE) -DSWITCH
+CFLAGS			+=	$(INCLUDE) -DSWITCH -DAPP_VERSION=\"$(VERSION)\"
 
 CXXFLAGS		:= $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++23
 
