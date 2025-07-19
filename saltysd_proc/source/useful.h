@@ -93,7 +93,7 @@ static inline void SaltySD_printf(const char* format, ...)
 			char timer[] = "[244444444:24:24] ";
 			uint64_t deltaTick = svcGetSystemTick() - tick;
 			uint64_t deltaSeconds = deltaTick / systemtickfrequency;
-			snprintf(timer, sizeof(timer), "[%02ld:%02ld:%02ld] ", (deltaSeconds/3600), ((deltaSeconds/60) % 60), deltaSeconds % 60);
+			snprintf(timer, sizeof(timer), "[%02ld:%02ld:%02ld] ", (deltaSeconds/3600) % 1000000000, ((deltaSeconds/60) % 60), deltaSeconds % 60);
 			fwrite(timer, strlen(timer), 1, f);
 		}
 		if (buffer[strlen(buffer)-1] == '\n') {

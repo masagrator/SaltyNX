@@ -34,7 +34,7 @@ Service* dmntchtGetServiceSession(void) {
 }
 
 Result dmntchtHasCheatProcess(bool *out) {
-    u8 tmp;
+    u8 tmp = 0;
     Result rc = serviceDispatchOut(&g_dmntchtSrv, 65000, tmp);
     if (R_SUCCEEDED(rc) && out) *out = tmp & 1;
     return rc;

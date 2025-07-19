@@ -5,8 +5,6 @@
 #include "fs_dev.h"
 
 #include <stdlib.h>
-#include <string.h>
-#include <stdio.h>
 #include <dirent.h>
 #include "svc_extra.h"
 
@@ -15,9 +13,6 @@
 #include "loadelf.h"
 #include "useful.h"
 #include "dmntcht.h"
-#include <math.h>
-#include <ctype.h>
-#include <sys/stat.h>
 
 #define MODULE_SALTYSD 420
 #define NVDISP_PANEL_GET_VENDOR_ID 0xC003021A
