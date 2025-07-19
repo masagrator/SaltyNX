@@ -1009,7 +1009,7 @@ int main(int argc, char *argv[])
     }
     serviceClose_old(&toget);
     smExit_old();
-    SaltySD_printf("SaltySD: got SD card.\n");
+    SaltySD_printf("SaltySD " APP_VERSION ": got SD card.\n");
 
     ABORT_IF_FAILED(smInitialize(), 5);
     ABORT_IF_FAILED(setsysInitialize(), 10);
