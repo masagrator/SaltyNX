@@ -791,6 +791,8 @@ Result handleServiceCmd(int cmd)
             unsigned int reserved: 18;
         } DockedRefreshRates;
 
+        static_assert(sizeof(DockedRefreshRates) == 4);
+
         memcpy(&DockedRefreshRates, &(resp -> refreshRate), 4);
         DockedModeRefreshRateAllowed[0] = DockedRefreshRates.Hz_40;
         DockedModeRefreshRateAllowed[1] = DockedRefreshRates.Hz_45;
@@ -936,6 +938,8 @@ Result handleServiceCmd(int cmd)
     return ret;
 }
 
+LEvent hijack_force_exit_thread = {0};
+
 void serviceThread(void* buf)
 {
     Result ret;
@@ -958,7 +962,7 @@ void serviceThread(void* buf)
             Handle replySession = 0;
             while (1)
             {
-                ret = svcReplyAndReceive(&handle_index, &session, 1, replySession, UINT64_MAX);
+                ret = svcReplyAndReceive(&handle_index, &session, 1, replySession, 10000000000);
                 
                 if (should_terminate) break;
                 

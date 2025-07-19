@@ -40,9 +40,9 @@ struct dockedTimings {
     uint8_t vBackPorch;
     uint8_t VIC;
     uint32_t pixelClock_kHz;
-} NX_PACKED;
+};
 
-struct dockedTimings dockedTimings1080p[] =    {{8, 32, 40, 7, 8, 6, 0, 88080},        //40Hz CVT-RBv2
+constexpr dockedTimings dockedTimings1080p[] =  {{8, 32, 40, 7, 8, 6, 0, 88080},        //40Hz CVT-RBv2
                                                 {8, 32, 40, 9, 8, 6, 0, 99270},        //45Hz CVT-RBv2
                                                 {528, 44, 148, 4, 5, 36, 31, 148500},  //50Hz CEA-861
                                                 {8, 32, 40, 15, 8, 6, 0, 121990},      //55Hz CVT-RBv2
@@ -67,13 +67,13 @@ struct handheldTimings {
     uint16_t vFrontPorch;
     uint8_t vBackPorch;
     uint32_t pixelClock_kHz;
-} NX_PACKED;
+};
 
-struct handheldTimings handheldTimingsRETRO[] = {{72, 136, 72, 1, 660, 9, 78000},
-                                                {72, 136, 72, 1, 443, 9, 77985},
-                                                {72, 136, 72, 1, 270, 9, 78000},
-                                                {72, 136, 72, 1, 128, 9, 77990},
-                                                {72, 136, 72, 1, 10, 9, 78000}};
+constexpr handheldTimings handheldTimingsRETRO[] = {{72, 136, 72, 1, 660, 9, 78000},
+                                                    {72, 136, 72, 1, 443, 9, 77985},
+                                                    {72, 136, 72, 1, 270, 9, 78000},
+                                                    {72, 136, 72, 1, 128, 9, 77990},
+                                                    {72, 136, 72, 1, 10, 9, 78000}};
 
 struct MinMax {
     u8 min;
