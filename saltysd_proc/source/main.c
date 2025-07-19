@@ -241,7 +241,7 @@ void hijack_pid(u64 pid)
     if (lastAppPID == -1) {
         already_hijacking = false;
     }
-    
+
     if (already_hijacking)
     {
         SaltySD_printf("SaltySD: PID %llx spawned before last hijack finished bootstrapping! Ignoring...\n", pid);
@@ -966,7 +966,7 @@ void serviceThread(void* buf)
             Handle replySession = 0;
             while (1)
             {
-                ret = svcReplyAndReceive(&handle_index, &session, 1, replySession, 10000000000);
+                ret = svcReplyAndReceive(&handle_index, &session, 1, replySession, UINT64_MAX);
                 
                 if (should_terminate) break;
                 
