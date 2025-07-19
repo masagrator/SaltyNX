@@ -52,14 +52,7 @@ bool cheatCheck = false;
 bool isDocked = false;
 bool dontForce60InDocked = false;
 bool matchLowestDocked = false;
-uint8_t dockedHighestRefreshRate = 60;
-uint8_t dockedLinkRate = 10;
-bool isRetroSUPER = false;
-bool isPossiblySpoofedRetro = false;
-bool wasRetroSuperTurnedOff = false;
 uint64_t systemtickfrequency = 0;
-extern bool DockedModeRefreshRateAllowed[];
-extern struct MinMax HandheldModeRefreshRateAllowed;
 
 void __libnx_initheap(void)
 {

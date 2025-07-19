@@ -12,10 +12,14 @@
 #define NVDISP_SET_AVI_INFOFRAME 0x40600211
 #define NVDISP_GET_PANEL_DATA 0xC01C0226
 
+uint8_t dockedHighestRefreshRate = 60;
+uint8_t dockedLinkRate = 10;
+bool isRetroSUPER = false;
+bool isPossiblySpoofedRetro = false;
+bool wasRetroSuperTurnedOff = false;
+
 extern uint64_t dsiVirtAddr;
 extern bool isDocked;
-extern uint8_t dockedHighestRefreshRate;
-extern uint8_t dockedLinkRate;
 extern bool dontForce60InDocked;
 extern bool matchLowestDocked;
 extern bool isLite;
@@ -23,9 +27,6 @@ extern uint64_t clkVirtAddr;
 extern struct NxFpsSharedBlock* nx_fps;
 extern bool displaySync;
 extern bool displaySyncDocked;
-extern bool isRetroSUPER;
-extern bool isPossiblySpoofedRetro;
-extern bool wasRetroSuperTurnedOff;
 extern SharedMemory _sharedMemory;
 
 constexpr uint8_t DockedModeRefreshRateAllowedValues[] = {40, 45, 50, 55, 60, 70, 72, 75, 80, 90, 95, 100, 110, 120};
