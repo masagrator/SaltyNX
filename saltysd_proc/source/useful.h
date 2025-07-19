@@ -44,7 +44,11 @@ struct NxFpsSharedBlock {
 	uint8_t FPSlockedDocked;
 } NX_PACKED;
 
-extern uint64_t systemtickfrequency;
+#ifndef SWITCH
+	extern uint64_t systemtickfrequency;
+#else 
+    #define systemtickfrequency 19200000
+#endif
 
 static inline void remove_spaces(char* str_trimmed, const char* str_untrimmed)
 {

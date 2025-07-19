@@ -52,7 +52,11 @@ bool cheatCheck = false;
 bool isDocked = false;
 bool dontForce60InDocked = false;
 bool matchLowestDocked = false;
-uint64_t systemtickfrequency = 0;
+#ifndef SWITCH
+    uint64_t systemtickfrequency = 0;
+#else 
+    #define systemtickfrequency 19200000
+#endif
 
 void __libnx_initheap(void)
 {
@@ -996,7 +1000,9 @@ void serviceThread(void* buf)
 
 int main(int argc, char *argv[])
 {
-	systemtickfrequency = armGetSystemTickFreq();
+    #ifndef SWITCH
+	    systemtickfrequency = armGetSystemTickFreq();
+    #endif
     ABORT_IF_FAILED(smInitialize_old(), 0);
     Service_old toget;
     ABORT_IF_FAILED(smGetService_old(&toget, "fsp-srv"), 1);
