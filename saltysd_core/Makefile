@@ -29,6 +29,8 @@ include $(TOPDIR)/../libnx_min/nx/switch_rules
 #	 - icon.jpg
 #	 - <libnx folder>/default_icon.jpg
 #---------------------------------------------------------------------------------
+include $(TOPDIR)/../version.mk
+
 TARGET		:=	saltysd_core
 BUILD		:=	build
 SOURCES		:=	source source/tinyexpr
@@ -42,10 +44,10 @@ EXEFS_SRC	:=	exefs_src
 ARCH	    :=	-march=armv8-a -mtune=cortex-a57 -mtp=soft -fPIE -fno-plt
 
 CFLAGS	:=	-Wall -O2 \
-			-ffast-math -ffunction-sections \
+			-ffast-math -ffunction-sections -fdata-sections \
 			$(ARCH) $(DEFINES)
 
-CFLAGS	+=	$(INCLUDE) -DSWITCH
+CFLAGS	+=	$(INCLUDE) -DSWITCH -DAPP_VERSION=\"$(VERSION)\"
 
 CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++23
 
