@@ -28,23 +28,8 @@ extern bool isPossiblySpoofedRetro;
 extern bool wasRetroSuperTurnedOff;
 extern SharedMemory _sharedMemory;
 
-
-bool DockedModeRefreshRateAllowed[]         = { false,  //40Hz
-                                                false,  //45Hz
-                                                true,   //50Hz
-                                                false,  //55Hz
-                                                true,   //60Hz
-                                                false,  //70Hz
-                                                false,  //72Hz
-                                                false,  //75Hz
-                                                false,  //80Hz
-                                                false,  //90Hz
-                                                false,  //95Hz
-                                                false,  //100Hz
-                                                false,  //110Hz
-                                                false}; //120Hz
-
 constexpr uint8_t DockedModeRefreshRateAllowedValues[] = {40, 45, 50, 55, 60, 70, 72, 75, 80, 90, 95, 100, 110, 120};
+bool DockedModeRefreshRateAllowed[sizeof(DockedModeRefreshRateAllowedValues)] = {0};
 
 struct dockedTimings {
     uint16_t hFrontPorch;
@@ -72,8 +57,7 @@ struct dockedTimings dockedTimings1080p[] =    {{8, 32, 40, 7, 8, 6, 0, 88080}, 
                                                 {8, 32, 40, 44, 8, 6, 0, 250360},      //110Hz CVT-RBv2
                                                 {88, 44, 148, 4, 5, 36, 63, 297000}};  //120Hz CEA-861
 
-static_assert(sizeof(DockedModeRefreshRateAllowedValues) == sizeof(DockedModeRefreshRateAllowed));
-static_assert((sizeof(dockedTimings1080p) / sizeof(dockedTimings1080p[0])) == sizeof(DockedModeRefreshRateAllowedValues));
+static_assert((sizeof(dockedTimings1080p) / sizeof(dockedTimings1080p[0])) == sizeof(DockedModeRefreshRateAllowed));
 
 struct handheldTimings {
     uint8_t hSyncWidth;
