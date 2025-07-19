@@ -5,8 +5,66 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <sys/stat.h>
+#ifdef __cplusplus
+	#include <cctype>
+#else
+	#include <ctype.h>
+#endif
+
+struct resolutionCalls {
+	uint16_t width;
+	uint16_t height;
+	uint16_t calls;
+};
+
+struct NxFpsSharedBlock {
+	uint32_t MAGIC;
+	uint8_t FPS;
+	float FPSavg;
+	bool pluginActive;
+	uint8_t FPSlocked;
+	uint8_t FPSmode;
+	uint8_t ZeroSync;
+	uint8_t patchApplied;
+	uint8_t API;
+	uint32_t FPSticks[10];
+	uint8_t Buffers;
+	uint8_t SetBuffers;
+	uint8_t ActiveBuffers;
+	uint8_t SetActiveBuffers;
+	uint8_t displaySync;
+	struct resolutionCalls renderCalls[8];
+	struct resolutionCalls viewportCalls[8];
+	bool forceOriginalRefreshRate;
+	bool dontForce60InDocked;
+	bool forceSuspend;
+	uint8_t currentRefreshRate;
+	float readSpeedPerSecond;
+	uint8_t FPSlockedDocked;
+} NX_PACKED;
 
 extern uint64_t systemtickfrequency;
+
+static inline void remove_spaces(char* str_trimmed, const char* str_untrimmed)
+{
+  while (str_untrimmed[0] != '\0')
+  {
+    if(!isspace((int)str_untrimmed[0]))
+    {
+      str_trimmed[0] = str_untrimmed[0];
+      str_trimmed++;
+    }
+    str_untrimmed++;
+  }
+  str_trimmed[0] = '\0';
+}
+
+static inline bool file_or_directory_exists(const char *filename)
+{
+    struct stat buffer;
+    return stat(filename, &buffer) == 0 ? true : false;
+}
 
 static inline void SaltySD_printf(const char* format, ...)
 {
