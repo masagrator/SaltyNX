@@ -935,8 +935,6 @@ Result handleServiceCmd(int cmd)
     return ret;
 }
 
-LEvent hijack_force_exit_thread = {0};
-
 void serviceThread(void* buf)
 {
     Result ret;
