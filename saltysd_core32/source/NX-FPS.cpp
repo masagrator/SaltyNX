@@ -921,56 +921,56 @@ namespace NVN {
 		if (!strcmp("nvnDeviceGetProcAddress", nvnFunction))
 			return (uintptr_t)&NVN::GetProcAddress0;
 		else if (!strcmp("nvnQueuePresentTexture", nvnFunction)) {
-			Address_weaks.nvnQueuePresentTexture = address;
+			if (!Address_weaks.nvnQueuePresentTexture) Address_weaks.nvnQueuePresentTexture = address;
 			return (uintptr_t)&NVN::PresentTexture;
 		}
 		else if (!strcmp("nvnWindowAcquireTexture", nvnFunction)) {
-			Address_weaks.nvnWindowAcquireTexture = address;
+			if (!Address_weaks.nvnWindowAcquireTexture) Address_weaks.nvnWindowAcquireTexture = address;
 			return (uintptr_t)&NVN::AcquireTexture;
 		}
 		else if (!strcmp("nvnWindowSetPresentInterval", nvnFunction)) {
-			Address_weaks.nvnWindowSetPresentInterval = address;
+			if (!Address_weaks.nvnWindowSetPresentInterval) Address_weaks.nvnWindowSetPresentInterval = address;
 			return (uintptr_t)&NVN::SetPresentInterval;
 		}
 		else if (!strcmp("nvnWindowGetPresentInterval", nvnFunction)) {
-			Address_weaks.nvnWindowGetPresentInterval = address;
+			if (!Address_weaks.nvnWindowGetPresentInterval) Address_weaks.nvnWindowGetPresentInterval = address;
 		}
 		else if (!strcmp("nvnWindowSetNumActiveTextures", nvnFunction)) {
-			Address_weaks.nvnWindowSetNumActiveTextures = address;
+			if (!Address_weaks.nvnWindowSetNumActiveTextures) Address_weaks.nvnWindowSetNumActiveTextures = address;
 			return (uintptr_t)&NVN::WindowSetNumActiveTextures;
 		}
 		else if (!strcmp("nvnWindowBuilderSetTextures", nvnFunction)) {
-			Address_weaks.nvnWindowBuilderSetTextures = address;
+			if (!Address_weaks.nvnWindowBuilderSetTextures) Address_weaks.nvnWindowBuilderSetTextures = address;
 			return (uintptr_t)&NVN::WindowBuilderSetTextures;
 		}
 		else if (!strcmp("nvnWindowInitialize", nvnFunction)) {
-			Address_weaks.nvnWindowInitialize = address;
+			if (!Address_weaks.nvnWindowInitialize) Address_weaks.nvnWindowInitialize = address;
 			return (uintptr_t)&NVN::WindowInitialize;
 		}
 		else if (!strcmp("nvnSyncWait", nvnFunction)) {
-			Address_weaks.nvnSyncWait = address;
+			if (!Address_weaks.nvnSyncWait) Address_weaks.nvnSyncWait = address;
 			return (uintptr_t)&NVN::SyncWait0;
 		}
 		else if (!strcmp("nvnCommandBufferSetRenderTargets", nvnFunction)) {
-			Address_weaks.nvnCommandBufferSetRenderTargets = address;
+			if (!Address_weaks.nvnCommandBufferSetRenderTargets) Address_weaks.nvnCommandBufferSetRenderTargets = address;
 			return (uintptr_t)&NVN::CommandBufferSetRenderTargets;
 		}
 		else if (!strcmp("nvnCommandBufferSetViewport", nvnFunction)) {
-			Address_weaks.nvnCommandBufferSetViewport = address;
+			if (!Address_weaks.nvnCommandBufferSetViewport) Address_weaks.nvnCommandBufferSetViewport = address;
 			return (uintptr_t)&NVN::CommandBufferSetViewport;
 		}
 		else if (!strcmp("nvnCommandBufferSetViewports", nvnFunction)) {
-			Address_weaks.nvnCommandBufferSetViewports = address;
+			if (!Address_weaks.nvnCommandBufferSetViewports) Address_weaks.nvnCommandBufferSetViewports = address;
 			return (uintptr_t)&NVN::CommandBufferSetViewports;
 		}
 		else if (!strcmp("nvnTextureGetWidth", nvnFunction)) {
-			Address_weaks.nvnTextureGetWidth = address;
+			if (!Address_weaks.nvnTextureGetWidth) Address_weaks.nvnTextureGetWidth = address;
 		}
 		else if (!strcmp("nvnTextureGetHeight", nvnFunction)) {
-			Address_weaks.nvnTextureGetHeight = address;
+			if (!Address_weaks.nvnTextureGetHeight) Address_weaks.nvnTextureGetHeight = address;
 		}
 		else if (!strcmp("nvnTextureGetFormat", nvnFunction)) {
-			Address_weaks.nvnTextureGetFormat = address;
+			if (!Address_weaks.nvnTextureGetFormat) Address_weaks.nvnTextureGetFormat = address;
 		}
 		return address;
 	}
@@ -979,7 +979,7 @@ namespace NVN {
 	uintptr_t BootstrapLoader_1(const char* nvnName) {
 		if (strcmp(nvnName, "nvnDeviceGetProcAddress") == 0) {
 			(Shared -> API) = 1;
-			Address_weaks.nvnDeviceGetProcAddress = ((nvnBootstrapLoader_0)(Address_weaks.nvnBootstrapLoader))("nvnDeviceGetProcAddress");
+			if (!Address_weaks.nvnDeviceGetProcAddress) Address_weaks.nvnDeviceGetProcAddress = ((nvnBootstrapLoader_0)(Address_weaks.nvnBootstrapLoader))("nvnDeviceGetProcAddress");
 			return (uintptr_t)&NVN::GetProcAddress0;
 		}
 		uintptr_t ptrret = ((nvnBootstrapLoader_0)(Address_weaks.nvnBootstrapLoader))(nvnName);
