@@ -301,6 +301,28 @@ inline uint64_t getMainAddress() {
 	return 0;
 }
 
+namespace Utils {
+	inline uint64_t _getSystemTick() {
+		#ifndef SWITCH
+			return ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
+		#else
+			return armGetSystemTick();
+		#endif
+	}
+
+	inline uint64_t _convertToTimeSpan(uint64_t tick) {
+		#ifndef SWITCH
+			return ((_ZN2nn2os17ConvertToTimeSpanENS0_4TickE_0)(Address_weaks.ConvertToTimeSpan))(tick);
+		#else
+			return armTicksToNs(tick);
+		#endif		
+	}
+
+	inline AppletFocusState _getCurrentFocusState() {
+		return ((GetCurrentFocusState_0)(Address_weaks.GetCurrentFocusState))();
+	}
+}
+
 namespace NX_FPS_Math {
 	uint8_t FPS_temp = 0;
 	uint64_t starttick = 0;
@@ -326,10 +348,10 @@ namespace NX_FPS_Math {
 
 		if ((FPStiming && !LOCK::blockDelayFPS && (new_fpslock && new_fpslock < (Shared -> currentRefreshRate)))) {
 			int32_t FPSTiming_internal = FPStiming + (range * 32);
-			if ((int32_t)(((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))() - frameend) < FPSTiming_internal) {
+			if ((int32_t)(Utils::_getSystemTick() - frameend) < FPSTiming_internal) {
 				FPSlock_delayed = true;
 			}
-			while ((int32_t)(((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))() - frameend) < FPSTiming_internal) {
+			while ((int32_t)(Utils::_getSystemTick() - frameend) < FPSTiming_internal) {
 				svcSleepThread(-2);
 				svcSleepThread(10000);
 			}
@@ -337,7 +359,7 @@ namespace NX_FPS_Math {
 	}
 
 	void PostFrame() {
-		uint64_t endtick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
+		uint64_t endtick = Utils::_getSystemTick();
 		uint64_t framedelta = endtick - frameend;
 
 		Shared -> FPSticks[FPStickItr++] = framedelta;
@@ -364,7 +386,7 @@ namespace NX_FPS_Math {
 		uint64_t deltatick = endtick - starttick;
 		uint64_t deltatick2 = endtick - starttick2;
 		if (deltatick2 > (systemtickfrequency / ((*sharedOperationMode == 1) ? 30 : 1))) {
-			starttick2 = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
+			starttick2 = Utils::_getSystemTick();
 			LOCK::overwriteRefreshRate = 0;
 			if (!configRC && FPSlock) {
 				LOCK::applyPatch(configBuffer, FPSlock, (Shared -> currentRefreshRate));
@@ -372,7 +394,7 @@ namespace NX_FPS_Math {
 		}
 		if (deltatick > systemtickfrequency) {
 			if (Address_weaks.FileAccessorRead) {
-				float seconds = (float)((_ZN2nn2os17ConvertToTimeSpanENS0_4TickE_0)(Address_weaks.ConvertToTimeSpan))(deltatick) / 1000000000.f;
+				float seconds = (float)Utils::_convertToTimeSpan(deltatick) / 1000000000.f;
 				float readSpeedPerSecond = (float)fileBytesRead / seconds;
 				fileBytesRead = 0;
 				if (readSpeedPerSecond == 0.f && Shared -> readSpeedPerSecond != 0.f) readSpeedPerSecond = 1;
@@ -381,7 +403,7 @@ namespace NX_FPS_Math {
 			Stats.FPS = FPS_temp - 1;
 			(Shared -> FPS) = Stats.FPS;
 			if (deltatick > (systemtickfrequency * 2)) {
-				starttick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
+				starttick = Utils::_getSystemTick();
 				FPS_temp = 0;
 			}
 			else {
@@ -392,7 +414,7 @@ namespace NX_FPS_Math {
 				(Shared -> patchApplied) = 1;
 			}
 			if (Shared -> forceSuspend) {
-				while (((GetCurrentFocusState_0)(Address_weaks.GetCurrentFocusState))() == AppletFocusState_NotFocusedHomeSleep)
+				while (Utils::_getCurrentFocusState() == AppletFocusState_NotFocusedHomeSleep)
 					svcSleepThread(16000000);
 			}
 		}
@@ -486,7 +508,7 @@ namespace vk {
 
 			if (!NX_FPS_Math::starttick) {
 				(Shared -> API) = 3;
-				NX_FPS_Math::starttick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
+				NX_FPS_Math::starttick = Utils::_getSystemTick();
 				NX_FPS_Math::starttick2 = NX_FPS_Math::starttick;
 			}
 			
@@ -661,7 +683,7 @@ namespace EGL {
 
 		if (!NX_FPS_Math::starttick) {
 			(Shared -> API) = 2;
-			NX_FPS_Math::starttick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
+			NX_FPS_Math::starttick = Utils::_getSystemTick();
 			NX_FPS_Math::starttick2 = NX_FPS_Math::starttick;
 		}
 
@@ -889,7 +911,7 @@ namespace NVN {
 	}
 
 	void* SyncWait0(const void* _this, uint64_t timeout_ns) {
-		uint64_t endFrameTick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
+		uint64_t endFrameTick = Utils::_getSystemTick();
 		if (_this == WindowSync && (Shared -> ActiveBuffers) == 2) {
 			if ((Shared -> ZeroSync) == ZeroSyncType_Semi) {
 				u64 FrameTarget = (systemtickfrequency/60) - 8000;
@@ -898,7 +920,7 @@ namespace NVN {
 					new_timeout = (systemtickfrequency/101) - (endFrameTick - startFrameTick);
 				}
 				if (new_timeout > 0) {
-					timeout_ns = ((_ZN2nn2os17ConvertToTimeSpanENS0_4TickE_0)(Address_weaks.ConvertToTimeSpan))(new_timeout);
+					timeout_ns = Utils::_convertToTimeSpan(new_timeout);
 				}
 				else timeout_ns = 0;
 			}
@@ -912,7 +934,7 @@ namespace NVN {
 
 		//Initialize time calculation;
 		if (!NX_FPS_Math::starttick) {
-			NX_FPS_Math::starttick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
+			NX_FPS_Math::starttick = Utils::_getSystemTick();
 			NX_FPS_Math::starttick2 = NX_FPS_Math::starttick;
 			(Shared -> FPSmode) = (uint8_t)((nvnGetPresentInterval_0)(Address_weaks.nvnWindowGetPresentInterval))(nvnWindow);
 		}
@@ -990,7 +1012,7 @@ namespace NVN {
 			WindowSync = (void*)nvnSync;
 		}
 		void* ret = ((nvnWindowAcquireTexture_0)(Address_weaks.nvnWindowAcquireTexture))(nvnWindow, nvnSync, index);
-		startFrameTick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
+		startFrameTick = Utils::_getSystemTick();
 		return ret;
 	}
 
