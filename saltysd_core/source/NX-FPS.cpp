@@ -74,7 +74,9 @@ typedef void (*glViewportIndexedfv_0)(uint index, const glViewportArray* pViewpo
 typedef s32 (*vkQueuePresentKHR_0)(const void* vkQueue, const void* VkPresentInfoKHR);
 typedef u64 (*_ZN2nn2os17ConvertToTimeSpanENS0_4TickE_0)(u64 tick);
 typedef u64 (*_ZN2nn2os13GetSystemTickEv_0)();
+typedef void (*_ZN2nn2os13GetSystemTickEv_1)(u64* tick);
 typedef u64 (*_ZN2nn2os22GetSystemTickFrequencyEv_0)();
+typedef void (*_ZN2nn2os22GetSystemTickFrequencyEv_1)(u64* tickfrequency);
 typedef u64 (*eglGetProcAddress_0)(const char* eglName);
 typedef void* (*nvnCommandBufferSetRenderTargets_0)(const void* cmdBuf, int numTextures, const NVNTexture** texture, const NVNTextureView** textureView, const NVNTexture* depth, const NVNTextureView* depthView);
 typedef void* (*nvnCommandBufferSetViewport_0)(const void* cmdBuf, int x, int y, int width, int height);
@@ -285,11 +287,11 @@ inline void CheckTitleID(char* buffer) {
     ltoa(titid, buffer, 16);
 }
 
-inline uint64_t getMainAddress() {
+inline uintptr_t getMainAddress() {
 	MemoryInfo memoryinfo = {0};
 	u32 pageinfo = 0;
 
-	uint64_t base_address = SaltySDCore_getCodeStart() + 0x4000;
+	uintptr_t base_address = SaltySDCore_getCodeStart() + 0x4000;
 	for (size_t i = 0; i < 3; i++) {
 		Result rc = svcQueryMemory(&memoryinfo, &pageinfo, base_address);
 		if (R_FAILED(rc)) return 0;
@@ -303,18 +305,26 @@ inline uint64_t getMainAddress() {
 
 namespace Utils {
 	inline uint64_t _getSystemTick() {
-		#ifndef SWITCH
-			return ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
-		#else
+		#ifdef SWITCH
 			return armGetSystemTick();
+		#elif SWITCH32
+			uint64_t tick = 0;
+			((_ZN2nn2os13GetSystemTickEv_1)(Address_weaks.GetSystemTick))(&tick);
+			return tick;
+		#else
+			return ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
 		#endif
 	}
 
 	inline uint64_t _convertToTimeSpan(uint64_t tick) {
-		#ifndef SWITCH
-			return ((_ZN2nn2os17ConvertToTimeSpanENS0_4TickE_0)(Address_weaks.ConvertToTimeSpan))(tick);
-		#else
+		#ifdef SWITCH
 			return armTicksToNs(tick);
+		#elif SWITCH32
+			uint64_t tickfrequency = 0;
+			((_ZN2nn2os17ConvertToTimeSpanENS0_4TickE_1)(Address_weaks.ConvertToTimeSpan))(&tickfrequency);
+			return tickfrequency;
+		#else
+			return ((_ZN2nn2os17ConvertToTimeSpanENS0_4TickE_0)(Address_weaks.ConvertToTimeSpan))(tick);
 		#endif		
 	}
 
@@ -347,11 +357,11 @@ namespace NX_FPS_Math {
 		}
 
 		if ((FPStiming && !LOCK::blockDelayFPS && (new_fpslock && new_fpslock < (Shared -> currentRefreshRate)))) {
-			int32_t FPSTiming_internal = FPStiming + (range * 32);
-			if ((int32_t)(Utils::_getSystemTick() - frameend) < FPSTiming_internal) {
+			int64_t FPSTiming_internal = FPStiming + (range * 32);
+			if ((int64_t)(Utils::_getSystemTick() - frameend) < FPSTiming_internal) {
 				FPSlock_delayed = true;
 			}
-			while ((int32_t)(Utils::_getSystemTick() - frameend) < FPSTiming_internal) {
+			while ((int64_t)(Utils::_getSystemTick() - frameend) < FPSTiming_internal) {
 				svcSleepThread(-2);
 				svcSleepThread(10000);
 			}
