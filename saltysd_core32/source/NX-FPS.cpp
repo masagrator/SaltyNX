@@ -845,12 +845,9 @@ namespace NVN {
 			(Shared -> FPSmode) = (uint8_t)((nvnGetPresentInterval_0)(Address_weaks.nvnWindowGetPresentInterval))(nvnWindow);
 		}
 		
-		static int last_index = 0;
-
-		if (last_index != index) NX_FPS_Math::PreFrame();
+		NX_FPS_Math::PreFrame();
 		((nvnQueuePresentTexture_0)(Address_weaks.nvnQueuePresentTexture))(_this, nvnWindow, index);
-		if (last_index != index) NX_FPS_Math::PostFrame();
-		last_index = index;
+		NX_FPS_Math::PostFrame();
 
 		(Shared -> FPSmode) = (uint8_t)((nvnGetPresentInterval_0)(Address_weaks.nvnWindowGetPresentInterval))(nvnWindow);
 
