@@ -337,10 +337,16 @@ namespace NX_FPS_Math {
 				if (readSpeedPerSecond == 0.f && Shared -> readSpeedPerSecond != 0.f) readSpeedPerSecond = 1;
 				Shared -> readSpeedPerSecond = readSpeedPerSecond;
 			}
-			((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))(&starttick);
 			Stats.FPS = FPS_temp - 1;
-			FPS_temp = 0;
 			(Shared -> FPS) = Stats.FPS;
+			if (deltatick > (systemtickfrequency * 2)) {
+				((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))(&starttick);
+				FPS_temp = 0;
+			}
+			else {
+				starttick += systemtickfrequency;
+				FPS_temp = 1;
+			}
 			if (!configRC && FPSlock) {
 				(Shared -> patchApplied) = 1;
 			}
@@ -371,7 +377,7 @@ namespace NX_FPS_Math {
 			uint16_t width = (uint16_t)m_width;
 			uint16_t height = (uint16_t)m_height;
 			for (size_t i = 0; i < 8; i++) {
-				if (width == m_resolutionViewportCalls[i].width) {
+				if ((width == m_resolutionViewportCalls[i].width) && (height == m_resolutionViewportCalls[i].height)) {
 					m_resolutionViewportCalls[i].calls++;
 					break;
 				}
@@ -381,7 +387,7 @@ namespace NX_FPS_Math {
 					m_resolutionViewportCalls[i].calls = 1;
 					break;
 				}
-			}			
+			}		
 		}		
 	}
 
@@ -391,7 +397,7 @@ namespace NX_FPS_Math {
 			uint16_t width = (uint16_t)m_width;
 			uint16_t height = (uint16_t)m_height;
 			for (size_t i = 0; i < 8; i++) {
-				if (width == m_resolutionRenderCalls[i].width) {
+				if ((width == m_resolutionRenderCalls[i].width) && (height == m_resolutionRenderCalls[i].height)) {
 					m_resolutionRenderCalls[i].calls++;
 					break;
 				}
@@ -401,7 +407,7 @@ namespace NX_FPS_Math {
 					m_resolutionRenderCalls[i].calls = 1;
 					break;
 				}
-			}			
+			}	
 		}		
 	}
 }
