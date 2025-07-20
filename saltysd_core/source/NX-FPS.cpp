@@ -379,6 +379,7 @@ namespace NX_FPS_Math {
 				Shared -> readSpeedPerSecond = readSpeedPerSecond;
 			}
 			Stats.FPS = FPS_temp - 1;
+			(Shared -> FPS) = Stats.FPS;
 			if (deltatick > (systemtickfrequency * 2)) {
 				starttick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
 				FPS_temp = 0;
@@ -387,7 +388,6 @@ namespace NX_FPS_Math {
 				starttick += systemtickfrequency;
 				FPS_temp = 1;
 			}
-			(Shared -> FPS) = Stats.FPS;
 			if (!configRC && FPSlock) {
 				(Shared -> patchApplied) = 1;
 			}
