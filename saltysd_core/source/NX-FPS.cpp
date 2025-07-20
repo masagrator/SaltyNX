@@ -1117,7 +1117,7 @@ extern "C" {
 			SaltySDCore_printf("NX-FPS: MemoryOffset: %d\n", SharedMemoryOffset);
 
 			Shared = (NxFpsSharedBlock*)((uintptr_t)shmemGetAddr(_sharedmemory) + SharedMemoryOffset);
-			Shared -> MAGIC = *(uint32_t*)(&"FPS\x00");
+			Shared -> MAGIC = 0x465053;
 			
 			Address_weaks.nvnBootstrapLoader = SaltySDCore_FindSymbolBuiltin("nvnBootstrapLoader");
 			Address_weaks.eglSwapBuffers = SaltySDCore_FindSymbolBuiltin("eglSwapBuffers");
@@ -1183,6 +1183,7 @@ extern "C" {
 			#ifndef SWITCH
 			systemtickfrequency = ((_ZN2nn2os22GetSystemTickFrequencyEv_0)(Address_weaks.GetSystemTickFrequency))();
 			#endif
+
 			char titleid[17];
 			CheckTitleID(&titleid[0]);
 			char path[128];
