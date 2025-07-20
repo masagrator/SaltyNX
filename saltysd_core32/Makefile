@@ -48,7 +48,7 @@ CFLAGS			:=	-Wall -Wno-pointer-to-int-cast -O2 \
 					-ffast-math -ffunction-sections \
 					$(ARCH) $(DEFINES)
 
-CFLAGS			+=	$(INCLUDE) -DSWITCH -DAPP_VERSION=\"$(VERSION)\"
+CFLAGS			+=	$(INCLUDE) -DSWITCH32 -DAPP_VERSION=\"$(VERSION)\"
 
 CXXFLAGS		:= $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++23
 
