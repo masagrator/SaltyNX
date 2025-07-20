@@ -320,12 +320,22 @@ namespace Utils {
 		#ifdef SWITCH
 			return armTicksToNs(tick);
 		#elif SWITCH32
-			uint64_t tickfrequency = 0;
-			((_ZN2nn2os17ConvertToTimeSpanENS0_4TickE_1)(Address_weaks.ConvertToTimeSpan))(&tickfrequency);
+			return (tick * 625) / 12;
+		#else
+			return uint64_t((double)tick / ((double)(systemtickfrequency) / 1000000000.d));
+		#endif		
+	}
+
+	inline uint64_t _getSystemTickFrequency() {
+		#ifdef SWITCH
+			return armGetSystemTickFreq();
+		#elif SWITCH32
+			uint64_t tickfrquency = 0;
+			((_ZN2nn2os22GetSystemTickFrequencyEv_1)(Address_weaks.GetSystemTickFrequency))(&tickfrequency);
 			return tickfrequency;
 		#else
-			return ((_ZN2nn2os17ConvertToTimeSpanENS0_4TickE_0)(Address_weaks.ConvertToTimeSpan))(tick);
-		#endif		
+			return ((_ZN2nn2os22GetSystemTickFrequencyEv_0)(Address_weaks.GetSystemTickFrequency))();
+		#endif
 	}
 
 	inline AppletFocusState _getCurrentFocusState() {
@@ -1218,7 +1228,7 @@ extern "C" {
 			else SaltySDCore_fclose(readFlag);
 			
 			#ifndef SWITCH
-			systemtickfrequency = ((_ZN2nn2os22GetSystemTickFrequencyEv_0)(Address_weaks.GetSystemTickFrequency))();
+			systemtickfrequency = Utils::_getSystemTickFrequency();
 			#endif
 
 			char titleid[17];
