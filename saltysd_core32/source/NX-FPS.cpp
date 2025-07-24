@@ -261,10 +261,10 @@ inline uintptr_t getMainAddress() {
 
 namespace Utils {
 	inline uint64_t _getSystemTick() {
-		#ifdef SWITCH
+		#if SWITCH
 			return armGetSystemTick();
-		#elif SWITCH32
-			uint64_t tick = 0;
+		#elif defined(SWITCH32) || defined(OUNCE32)
+			u64 tick = 0;
 			((_ZN2nn2os13GetSystemTickEv_1)(Address_weaks.GetSystemTick))(&tick);
 			return tick;
 		#else
@@ -273,24 +273,22 @@ namespace Utils {
 	}
 
 	inline uint64_t _convertToTimeSpan(uint64_t tick) {
-		#ifdef SWITCH
+		#if defined(SWITCH) || defined(SWITCH32)
 			return armTicksToNs(tick);
-		#elif SWITCH32
-			return (tick * 625) / 12;
+		#elif defined(OUNCE) || defined(OUNCE32)
+			return tick << 5;
 		#else
 			return uint64_t((double)tick / ((double)(systemtickfrequency) / 1000000000.d));
-		#endif		
+		#endif
 	}
 
 	inline uint64_t _getSystemTickFrequency() {
-		#ifdef SWITCH
-			return armGetSystemTickFreq();
-		#elif SWITCH32
-			uint64_t tickfrequency = 0;
-			((_ZN2nn2os22GetSystemTickFrequencyEv_1)(Address_weaks.GetSystemTickFrequency))(&tickfrequency);
-			return tickfrequency;
+		#if defined(SWITCH) || defined(SWITCH32)
+			return 19200000;
+		#elif defined(OUNCE) || defined(OUNCE32)
+			return 31250000;
 		#else
-			return ((_ZN2nn2os22GetSystemTickFrequencyEv_0)(Address_weaks.GetSystemTickFrequency))();
+			#error "Compiling for platform with undefined tick frequency!"
 		#endif
 	}
 
