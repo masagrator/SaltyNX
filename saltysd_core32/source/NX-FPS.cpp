@@ -212,11 +212,14 @@ struct {
 	bool FPSmode = 0;
 } Stats;
 
-#if !defined(SWITCH) && !defined(SWITCH32)
-	uint64_t systemtickfrequency = 19200000;
-#else
+#if defined(SWITCH) || defined(SWITCH32)
 	#define systemtickfrequency 19200000
+#elif defined(OUNCE) || defined(OUNCE32)
+	#define systemtickfrequency 31250000
+#else
+	uint64_t systemtickfrequency = 0;
 #endif
+
 typedef void (*nvnQueuePresentTexture_0)(const void* _this, const void* unk2_1, const int index);
 typedef uintptr_t (*GetProcAddress)(const void* unk1_a, const char * nvnFunction_a);
 
