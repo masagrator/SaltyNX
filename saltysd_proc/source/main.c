@@ -52,7 +52,6 @@ bool cheatCheck = false;
 bool isDocked = false;
 bool dontForce60InDocked = false;
 bool matchLowestDocked = false;
-extern uint8_t DockedModeRefreshRateAllowedValues[];
 #ifndef SWITCH
     uint64_t systemtickfrequency = 0;
 #else 
