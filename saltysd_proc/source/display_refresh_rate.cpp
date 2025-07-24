@@ -31,6 +31,7 @@ extern SharedMemory _sharedMemory;
 
 constexpr uint8_t DockedModeRefreshRateAllowedValues[] = {40, 45, 50, 55, 60, 70, 72, 75, 80, 90, 95, 100, 110, 120};
 bool DockedModeRefreshRateAllowed[sizeof(DockedModeRefreshRateAllowedValues)] = {0};
+bool DockedModeRefreshRateAllowed720p[sizeof(DockedModeRefreshRateAllowedValues)] = {0};
 
 struct dockedTimings {
     uint16_t hFrontPorch;
@@ -286,24 +287,76 @@ extern "C" uint8_t getDockedHighestRefreshRateAllowed() {
     return 60;
 }
 
-constexpr uint8_t getDocked60RefreshRateIterator() {
+constexpr uint8_t getDockedRefreshRateIterator(uint32_t refreshRate) {
     for (size_t i = 0; i < sizeof(DockedModeRefreshRateAllowedValues); i++) {
-        if (DockedModeRefreshRateAllowedValues[i] == 60)
+        if (DockedModeRefreshRateAllowedValues[i] == refreshRate)
             return i;
     }
 }
 
-constexpr uint8_t getDocked50RefreshRateIterator() {
-    for (size_t i = 0; i < sizeof(DockedModeRefreshRateAllowedValues); i++) {
-        if (DockedModeRefreshRateAllowedValues[i] == 50)
-            return i;
+extern "C" void setAllowedDockedRefreshRatesIPC(uint32_t refreshRates, bool is720p) {
+    struct {
+        unsigned int Hz_40: 1;
+        unsigned int Hz_45: 1;
+        unsigned int Hz_50: 1;
+        unsigned int Hz_55: 1;
+        unsigned int Hz_60: 1;
+        unsigned int Hz_70: 1;
+        unsigned int Hz_72: 1;
+        unsigned int Hz_75: 1;
+        unsigned int Hz_80: 1;
+        unsigned int Hz_90: 1;
+        unsigned int Hz_95: 1;
+        unsigned int Hz_100: 1;
+        unsigned int Hz_110: 1;
+        unsigned int Hz_120: 1;
+        unsigned int reserved: 18;
+    } DockedRefreshRates;
+
+    static_assert(sizeof(DockedRefreshRates) == 4);
+
+    memcpy(&DockedRefreshRates, &refreshRates, 4);
+    if (!is720p) {
+        DockedModeRefreshRateAllowed[getDockedRefreshRateIterator(40)] = DockedRefreshRates.Hz_40;
+        DockedModeRefreshRateAllowed[getDockedRefreshRateIterator(45)] = DockedRefreshRates.Hz_45;
+        DockedModeRefreshRateAllowed[getDockedRefreshRateIterator(50)] = DockedRefreshRates.Hz_50;
+        DockedModeRefreshRateAllowed[getDockedRefreshRateIterator(55)] = DockedRefreshRates.Hz_55;
+        DockedModeRefreshRateAllowed[getDockedRefreshRateIterator(60)] = true;
+        DockedModeRefreshRateAllowed[getDockedRefreshRateIterator(70)] = DockedRefreshRates.Hz_70;
+        DockedModeRefreshRateAllowed[getDockedRefreshRateIterator(72)] = DockedRefreshRates.Hz_72;
+        DockedModeRefreshRateAllowed[getDockedRefreshRateIterator(75)] = DockedRefreshRates.Hz_75;
+        DockedModeRefreshRateAllowed[getDockedRefreshRateIterator(80)] = DockedRefreshRates.Hz_80;
+        DockedModeRefreshRateAllowed[getDockedRefreshRateIterator(90)] = DockedRefreshRates.Hz_90;
+        DockedModeRefreshRateAllowed[getDockedRefreshRateIterator(95)] = DockedRefreshRates.Hz_95;
+        DockedModeRefreshRateAllowed[getDockedRefreshRateIterator(100)] = DockedRefreshRates.Hz_100;
+        DockedModeRefreshRateAllowed[getDockedRefreshRateIterator(110)] = DockedRefreshRates.Hz_110;
+        DockedModeRefreshRateAllowed[getDockedRefreshRateIterator(120)] = DockedRefreshRates.Hz_120;
+    }
+    else {
+        DockedModeRefreshRateAllowed720p[getDockedRefreshRateIterator(40)] = DockedRefreshRates.Hz_40;
+        DockedModeRefreshRateAllowed720p[getDockedRefreshRateIterator(45)] = DockedRefreshRates.Hz_45;
+        DockedModeRefreshRateAllowed720p[getDockedRefreshRateIterator(50)] = DockedRefreshRates.Hz_50;
+        DockedModeRefreshRateAllowed720p[getDockedRefreshRateIterator(55)] = DockedRefreshRates.Hz_55;
+        DockedModeRefreshRateAllowed720p[getDockedRefreshRateIterator(60)] = true;
+        DockedModeRefreshRateAllowed720p[getDockedRefreshRateIterator(70)] = DockedRefreshRates.Hz_70;
+        DockedModeRefreshRateAllowed720p[getDockedRefreshRateIterator(72)] = DockedRefreshRates.Hz_72;
+        DockedModeRefreshRateAllowed720p[getDockedRefreshRateIterator(75)] = DockedRefreshRates.Hz_75;
+        DockedModeRefreshRateAllowed720p[getDockedRefreshRateIterator(80)] = DockedRefreshRates.Hz_80;
+        DockedModeRefreshRateAllowed720p[getDockedRefreshRateIterator(90)] = DockedRefreshRates.Hz_90;
+        DockedModeRefreshRateAllowed720p[getDockedRefreshRateIterator(95)] = DockedRefreshRates.Hz_95;
+        DockedModeRefreshRateAllowed720p[getDockedRefreshRateIterator(100)] = DockedRefreshRates.Hz_100;
+        DockedModeRefreshRateAllowed720p[getDockedRefreshRateIterator(110)] = DockedRefreshRates.Hz_110;
+        DockedModeRefreshRateAllowed720p[getDockedRefreshRateIterator(120)] = DockedRefreshRates.Hz_120;
     }
 }
 
 constexpr void setDefaultDockedSettings() {
     memset(DockedModeRefreshRateAllowed, 0, sizeof(DockedModeRefreshRateAllowed));
-    DockedModeRefreshRateAllowed[getDocked50RefreshRateIterator()] = true;
-    DockedModeRefreshRateAllowed[getDocked60RefreshRateIterator()] = true;
+    DockedModeRefreshRateAllowed[getDockedRefreshRateIterator(50)] = true;
+    DockedModeRefreshRateAllowed[getDockedRefreshRateIterator(60)] = true;
+    memset(DockedModeRefreshRateAllowed720p, 0, sizeof(DockedModeRefreshRateAllowed720p));
+    DockedModeRefreshRateAllowed720p[getDockedRefreshRateIterator(50)] = true;
+    DockedModeRefreshRateAllowed720p[getDockedRefreshRateIterator(60)] = true;
     dontForce60InDocked = false;
     matchLowestDocked = false;
 }
@@ -392,6 +445,36 @@ void LoadDockedModeAllowedSave() {
             matchLowestDocked = (bool)!strncasecmp(substring, "True", 4);
         }
         else SaltySD_printf("SaltySD: %s doesn't have \"matchLowestRefreshRate\"! Setting to false!\n", &path[31]);
+        substring = strstr(temp_string, "refreshRateAllowed720p={");
+        if (substring == NULL) {
+            SaltySD_printf("SaltySD: %s doesn't have \"refreshRateAllowed720p\"! Using default settings!\n", &path[31]);
+            free(temp_string);
+            return;
+        }
+        rr_start = &substring[strlen("refreshRateAllowed720p={")];
+        substring = strstr(rr_start, "}");
+        if (substring == NULL) {
+            SaltySD_printf("SaltySD: %s \"refreshRateAllowed720p\" is malformed! Using default settings!\n", &path[31]);
+            free(temp_string);
+            return;
+        }
+        amount = 1;
+        for (size_t i = 0; i < ((size_t)substring - (size_t)rr_start); i++) {
+            if (rr_start[i] == ',') amount++;
+        }
+        for (size_t i = 0; i < amount; i++) {
+            long value = strtol(rr_start, &rr_start, 10);
+            if ((i+1 == amount) && (rr_start[0] != '}')) return;
+            if ((i+1 < amount) && (rr_start[0] != ',')) return;
+            rr_start = &rr_start[1];
+            if (value < 40 || value > 240) continue;
+            for (size_t i = 0; i < sizeof(DockedModeRefreshRateAllowed720p); i++) {
+                if (value == DockedModeRefreshRateAllowedValues[i]) {
+                    DockedModeRefreshRateAllowed720p[i] = true;
+                    break;
+                }
+            }
+        }
         free(temp_string);
     }
     else {
@@ -505,21 +588,8 @@ bool setNvDispDockedRefreshRate(uint32_t new_refreshRate) {
     if ((file_or_directory_exists("sdmc:/SaltySD/test.flag") == false) && DISPLAY_B.vActive != last_vActive) {
         last_vActive = DISPLAY_B.vActive;
         if (DISPLAY_B.vActive != 720 && DISPLAY_B.vActive != 1080) {
-            for (size_t i = 0; i < sizeof(DockedModeRefreshRateAllowed); i++) {
-                if (DockedModeRefreshRateAllowedValues[i] <= dockedHighestRefreshRate) {
-                    DockedModeRefreshRateAllowed[i] = false;
-                }
-            }
-            DockedModeRefreshRateAllowed[getDocked60RefreshRateIterator()] = true;
-        }
-        else {
-            LoadDockedModeAllowedSave();
-            if (DISPLAY_B.vActive == 720) for (size_t i = (getDocked60RefreshRateIterator() + 1); i < sizeof(DockedModeRefreshRateAllowed); i++) {
-                if (DockedModeRefreshRateAllowedValues[i] > dockedHighestRefreshRate) {
-                    break;
-                }
-                DockedModeRefreshRateAllowed[i] = true;
-            }
+            memset(DockedModeRefreshRateAllowed, 0, sizeof(DockedModeRefreshRateAllowed));
+            DockedModeRefreshRateAllowed[getDockedRefreshRateIterator(60)] = true;
         }
     }
     uint32_t h_total = DISPLAY_B.hActive + DISPLAY_B.hFrontPorch + DISPLAY_B.hSyncWidth + DISPLAY_B.hBackPorch;
@@ -527,10 +597,12 @@ bool setNvDispDockedRefreshRate(uint32_t new_refreshRate) {
     uint32_t refreshRateNow = ((DISPLAY_B.pclkKHz) * 1000 + 999) / (h_total * v_total);
     int8_t itr = -1;
     if ((new_refreshRate <= 60) && ((60 % new_refreshRate) == 0)) {
-        itr = getDocked60RefreshRateIterator();
+        itr = getDockedRefreshRateIterator(60);
     }
-    if (itr == -1) for (size_t i = 0; i < sizeof(DockedModeRefreshRateAllowed); i++) {
-        if (DockedModeRefreshRateAllowed[i] != true)
+    if (itr == -1) for (size_t i = 0; i < sizeof(DockedModeRefreshRateAllowedValues); i++) {
+        if (DISPLAY_B.vActive == 720 && DockedModeRefreshRateAllowed720p[i] != true)
+            continue;
+        else if (DISPLAY_B.vActive == 1080 && DockedModeRefreshRateAllowed[i] != true)
             continue;
         uint8_t val = DockedModeRefreshRateAllowedValues[i];
         if ((val % new_refreshRate) == 0) {
@@ -540,16 +612,25 @@ bool setNvDispDockedRefreshRate(uint32_t new_refreshRate) {
     }
     if (itr == -1) {
         if (!matchLowestDocked)
-            itr = getDocked60RefreshRateIterator();
-        else for (size_t i = 0; i < sizeof(DockedModeRefreshRateAllowed); i++) {
-            if ((DockedModeRefreshRateAllowed[i] == true) && (new_refreshRate < DockedModeRefreshRateAllowedValues[i])) {
-                itr = i;
-                break;
+            itr = getDockedRefreshRateIterator(60);
+        else {
+            if (DISPLAY_B.vActive == 1080) for (size_t i = 0; i < sizeof(DockedModeRefreshRateAllowed); i++) {
+                if ((DockedModeRefreshRateAllowed[i] == true) && (new_refreshRate < DockedModeRefreshRateAllowedValues[i])) {
+                    itr = i;
+                    break;
+                }
+            }
+            else if (DISPLAY_B.vActive == 720) for (size_t i = 0; i < sizeof(DockedModeRefreshRateAllowed720p); i++) {
+                if ((DockedModeRefreshRateAllowed720p[i] == true) && (new_refreshRate < DockedModeRefreshRateAllowedValues[i])) {
+                    itr = i;
+                    break;
+                }
             }
         }
     }
+    if (itr == -1) itr = getDockedRefreshRateIterator(60);
     bool increase = refreshRateNow < DockedModeRefreshRateAllowedValues[itr];
-    while(itr >= 0 && itr < (int8_t)sizeof(DockedModeRefreshRateAllowed) && DockedModeRefreshRateAllowed[itr] != true) {
+    while(itr >= 0 && itr < (int8_t)sizeof(DockedModeRefreshRateAllowedValues) && ((DISPLAY_B.vActive != 720) ? (DockedModeRefreshRateAllowed[itr] != true) : (DockedModeRefreshRateAllowed720p[itr] != true))) {
         if (!displaySyncDocked) {
             if (increase) itr++;
             else itr--;

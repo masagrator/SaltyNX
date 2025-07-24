@@ -52,6 +52,7 @@ bool cheatCheck = false;
 bool isDocked = false;
 bool dontForce60InDocked = false;
 bool matchLowestDocked = false;
+extern uint8_t DockedModeRefreshRateAllowedValues[];
 #ifndef SWITCH
     uint64_t systemtickfrequency = 0;
 #else 
@@ -771,44 +772,11 @@ Result handleServiceCmd(int cmd)
             u64 magic;
             u64 cmd_id;
             u32 refreshRate;
-            u32 reserved[3];
+            u32 is720p;
+            u32 reserved[2];
         } *resp = r.Raw;
 
-        struct {
-            unsigned int Hz_40: 1;
-            unsigned int Hz_45: 1;
-            unsigned int Hz_50: 1;
-            unsigned int Hz_55: 1;
-            unsigned int Hz_60: 1;
-            unsigned int Hz_70: 1;
-            unsigned int Hz_72: 1;
-            unsigned int Hz_75: 1;
-            unsigned int Hz_80: 1;
-            unsigned int Hz_90: 1;
-            unsigned int Hz_95: 1;
-            unsigned int Hz_100: 1;
-            unsigned int Hz_110: 1;
-            unsigned int Hz_120: 1;
-            unsigned int reserved: 18;
-        } DockedRefreshRates;
-
-        static_assert(sizeof(DockedRefreshRates) == 4);
-
-        memcpy(&DockedRefreshRates, &(resp -> refreshRate), 4);
-        DockedModeRefreshRateAllowed[0] = DockedRefreshRates.Hz_40;
-        DockedModeRefreshRateAllowed[1] = DockedRefreshRates.Hz_45;
-        DockedModeRefreshRateAllowed[2] = DockedRefreshRates.Hz_50;
-        DockedModeRefreshRateAllowed[3] = DockedRefreshRates.Hz_55;
-        DockedModeRefreshRateAllowed[4] = true;
-        DockedModeRefreshRateAllowed[5] = DockedRefreshRates.Hz_70;
-        DockedModeRefreshRateAllowed[6] = DockedRefreshRates.Hz_72;
-        DockedModeRefreshRateAllowed[7] = DockedRefreshRates.Hz_75;
-        DockedModeRefreshRateAllowed[8] = DockedRefreshRates.Hz_80;
-        DockedModeRefreshRateAllowed[9] = DockedRefreshRates.Hz_90;
-        DockedModeRefreshRateAllowed[10] = DockedRefreshRates.Hz_95;
-        DockedModeRefreshRateAllowed[11] = DockedRefreshRates.Hz_100;
-        DockedModeRefreshRateAllowed[12] = DockedRefreshRates.Hz_110;
-        DockedModeRefreshRateAllowed[13] = DockedRefreshRates.Hz_120;
+        setAllowedDockedRefreshRatesIPC(resp -> refreshRate, (bool)resp->is720p);
         SaltySD_printf("SaltySD: cmd 13 handler\n");
 
         ret = 0;
