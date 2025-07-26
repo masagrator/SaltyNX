@@ -17,6 +17,7 @@ uint8_t dockedLinkRate = 10;
 bool isRetroSUPER = false;
 bool isPossiblySpoofedRetro = false;
 bool wasRetroSuperTurnedOff = false;
+uint32_t last_vActive = 60;
 
 extern uint64_t dsiVirtAddr;
 extern bool isDocked;
@@ -268,11 +269,16 @@ void getDockedHighestRefreshRate(uint32_t fd_in) {
     }
     if (highestRefreshRate > DockedModeRefreshRateAllowedValues[sizeof(DockedModeRefreshRateAllowedValues) - 1]) 
         highestRefreshRate = DockedModeRefreshRateAllowedValues[sizeof(DockedModeRefreshRateAllowedValues) - 1];
+    struct nvdcMode2 DISPLAY_B = {0};
+    nvrc = nvIoctl(fd, NVDISP_GET_MODE2, &DISPLAY_B);
+    if (R_FAILED(nvrc)) {
+        SaltySD_printf("SaltySD: NVDISP_GET_MODE2 for /dev/nvdisp-disp1 returned error 0x%x!\n", nvrc);
+    }
     struct dpaux_read_0x100 dpaux = {6, 0x100, 0x10};
     nvrc = nvIoctl(fd, NVDISP_GET_PANEL_DATA, &dpaux);
     if (R_SUCCEEDED(nvrc)) {
         dockedLinkRate = dpaux.set.link_rate;
-        if (DB2.modes[0].hActive == 1920 && DB2.modes[0].vActive == 1080 && highestRefreshRate > 75 && dpaux.set.link_rate < 20) highestRefreshRate = 75;
+        if (DISPLAY_B.hActive == 1920 && DISPLAY_B.vActive == 1080 && highestRefreshRate > 75 && dpaux.set.link_rate < 20) highestRefreshRate = 75;
     }
     else SaltySD_printf("SaltySD: NVDISP_GET_PANEL_DATA for /dev/nvdisp-disp1 returned error 0x%x!\n", nvrc);
     if (!fd_in) nvClose(fd);
@@ -280,9 +286,17 @@ void getDockedHighestRefreshRate(uint32_t fd_in) {
 }
 
 extern "C" uint8_t getDockedHighestRefreshRateAllowed() {
-    for (size_t i = (sizeof(DockedModeRefreshRateAllowed) - 1); DockedModeRefreshRateAllowedValues[i] > 60; i--) {
-        if (DockedModeRefreshRateAllowed[i] == true)
-            return DockedModeRefreshRateAllowedValues[i];
+    if (last_vActive == 1080) {
+        for (size_t i = (sizeof(DockedModeRefreshRateAllowed) - 1); DockedModeRefreshRateAllowedValues[i] > 60; i--) {
+            if (DockedModeRefreshRateAllowed[i] == true)
+                return DockedModeRefreshRateAllowedValues[i];
+        }
+    }
+    else if (last_vActive == 720) {
+        for (size_t i = (sizeof(DockedModeRefreshRateAllowed720p) - 1); DockedModeRefreshRateAllowedValues[i] > 60; i--) {
+            if (DockedModeRefreshRateAllowed720p[i] == true)
+                return DockedModeRefreshRateAllowedValues[i];
+        }        
     }
     return 60;
 }
@@ -563,7 +577,7 @@ bool setPLLDHandheldRefreshRate(uint32_t new_refreshRate) {
 }
 
 bool setNvDispDockedRefreshRate(uint32_t new_refreshRate) {
-    static uint8_t last_vActive = 0;
+    static uint8_t last_vActive_set = 0;
     if (isLite || !canChangeRefreshRateDocked)
         return false;
     uint32_t fd = 0;
@@ -585,8 +599,8 @@ bool setNvDispDockedRefreshRate(uint32_t new_refreshRate) {
         nvClose(fd);
         return false;
     }
-    if ((file_or_directory_exists("sdmc:/SaltySD/test.flag") == false) && DISPLAY_B.vActive != last_vActive) {
-        last_vActive = DISPLAY_B.vActive;
+    if ((file_or_directory_exists("sdmc:/SaltySD/test.flag") == false) && DISPLAY_B.vActive != last_vActive_set) {
+        last_vActive_set = DISPLAY_B.vActive;
         if (DISPLAY_B.vActive != 720 && DISPLAY_B.vActive != 1080) {
             memset(DockedModeRefreshRateAllowed, 0, sizeof(DockedModeRefreshRateAllowed));
             DockedModeRefreshRateAllowed[getDockedRefreshRateIterator(60)] = true;
@@ -863,7 +877,6 @@ extern "C" bool GetDisplayRefreshRate(uint32_t* out_refreshRate, bool internal) 
             }
             uint32_t fd = 0;
             if (R_SUCCEEDED(nvOpen(&fd, "/dev/nvdisp-disp1"))) {
-                static uint32_t last_vActive = 0;
                 struct nvdcMode2 DISPLAY_B = {0};
                 if (R_SUCCEEDED(nvIoctl(fd, NVDISP_GET_MODE2, &DISPLAY_B))) {
                     if (!DISPLAY_B.pclkKHz) {

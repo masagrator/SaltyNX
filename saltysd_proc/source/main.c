@@ -1177,17 +1177,15 @@ int main(int argc, char *argv[])
         }
         
         // If someone is waiting for us, handle them.
-        if (!svcWaitSynchronizationSingle(saltyport, 1000))
+        if (!svcWaitSynchronizationSingle(saltyport, 9000000))
         {
             serviceThread(NULL);
         }
-        if (!svcWaitSynchronizationSingle(injectserv, 1000)) {
+        if (!svcWaitSynchronizationSingle(injectserv, 1000000)) {
             Handle sesja;
             svcAcceptSession(&sesja, injectserv);
             svcCloseHandle(sesja);
         }
-
-        svcSleepThread(10*1000*1000);
     }
     free(pids);
 
