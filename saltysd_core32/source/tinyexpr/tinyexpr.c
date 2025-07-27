@@ -237,10 +237,6 @@ static double divide(double a, double b) {return a / b;}
 static double negate(double a) {return -a;}
 static double comma(double a, double b) {(void)a; return b;}
 
-#define LINKABLE __attribute__ ((weak))
-extern double strtod(const char* str, char** endptr) LINKABLE;
-
-
 void next_token(state *s) {
     s->type = TOK_NULL;
 
@@ -253,7 +249,7 @@ void next_token(state *s) {
 
         /* Try reading a number. */
         if ((s->next[0] >= '0' && s->next[0] <= '9') || s->next[0] == '.') {
-            s->value = strtod(s->next, (char**)&s->next);
+            s->value = (float)strtod(s->next, (char**)&s->next);
             s->type = TOK_NUMBER;
         } else {
             /* Look for a variable or builtin function call. */
@@ -602,8 +598,8 @@ double te_eval(const te_expr *n) {
     if (!n) return NAN;
 
     switch(TYPE_MASK(n->type)) {
-        case TE_CONSTANT: return n->value;
-        case TE_VARIABLE: return *n->bound;
+        case TE_CONSTANT: return (double)n->value;
+        case TE_VARIABLE: return (double)*n->bound;
 
         case TE_FUNCTION0: case TE_FUNCTION1: case TE_FUNCTION2: case TE_FUNCTION3:
         case TE_FUNCTION4: case TE_FUNCTION5: case TE_FUNCTION6: case TE_FUNCTION7:
@@ -661,7 +657,7 @@ static void optimize(te_expr *n) {
             const double value = te_eval(n);
             te_free_parameters(n);
             n->type = TE_CONSTANT;
-            n->value = value;
+            n->value = (float)value;
         }
     }
 }

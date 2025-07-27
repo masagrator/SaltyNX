@@ -17,7 +17,7 @@
 
 u32 __nx_applet_type = AppletType_None;
 
-static char g_heap[0x20000];
+static char g_heap[0x30000];
 
 extern void __nx_exit_clear(void* ctx, Handle thread, void* addr);
 extern void elf_trampoline(void* context, Handle thread, void* func);
@@ -280,21 +280,14 @@ void QueryMemoryInfo(void* memoryinfo) {
 	return ((nnosQueryMemoryInfo)(Address_weak_QueryMemoryInfo))(memoryinfo);
 }
 
-typedef double (*strtod_0)(const char* str, char** endptr);
-uint32_t strtod_ptr = 0;
 typedef double (*vsnprintf_0)(char * s, size_t n, const char * format, va_list arg);
 uint32_t vsnprintf_ptr = 0;
-
-double strtod(const char* str, char** endptr) {
-	return ((strtod_0)(strtod_ptr))(str, endptr);
-}
 
 int main(int argc, char *argv[])
 {
 	Result ret;
 
 	SaltySDCore_RegisterExistingModules();
-	strtod_ptr = SaltySDCore_FindSymbolBuiltin("strtod");
 	
 	SaltySD_Init();
 	
