@@ -93,7 +93,7 @@ typedef void (*vkCmdSetViewportWithCount_0)(void* commandBuffer, uint32_t viewpo
 typedef s32 (*vkCreateSwapchainKHR_0)(void* Device, const VkSwapchainCreateInfoKHR* pCreateInfo, const void* pAllocator, const void** pSwapchain);
 typedef s32 (*vkGetSwapchainImagesKHR_0)(void* Device, void* VkSwapchainKHR, uint32_t* pSwapchainImageCount, int** pSwapchainImages);
 typedef AppletFocusState (*GetCurrentFocusState_0)();
-typedef u32 (*FileAccessorRead_0)(void* fileHandle, size_t* bytesRead, uint64_t position, void* buffer, size_t readBytes, unsigned int* ReadOption);
+typedef u32 (*FileAccessorRead_0)(void* fileHandle, size_t* bytesRead, int64_t position, void* buffer, size_t readBytes, unsigned int* ReadOption);
 
 struct {
 	uintptr_t nvnBootstrapLoader;
@@ -1142,7 +1142,7 @@ namespace NVN {
 }
 
 namespace nn {
-	Result FileAccessorRead(void* fileHandle, size_t* bytesRead, uint64_t position, void* buffer, size_t readBytes, unsigned int* ReadOption) {
+	Result FileAccessorRead(void* fileHandle, size_t* bytesRead, int64_t position, void* buffer, size_t readBytes, unsigned int* ReadOption) {
 		size_t bytesRead_impl = 0;
 		if (!bytesRead)
 			bytesRead = &bytesRead_impl;
