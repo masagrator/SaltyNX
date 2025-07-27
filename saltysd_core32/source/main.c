@@ -17,7 +17,7 @@
 
 u32 __nx_applet_type = AppletType_None;
 
-static char g_heap[0x30000];
+static char g_heap[0x20000];
 
 extern void __nx_exit_clear(void* ctx, Handle thread, void* addr);
 extern void elf_trampoline(void* context, Handle thread, void* func);

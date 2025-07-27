@@ -249,7 +249,7 @@ void next_token(state *s) {
 
         /* Try reading a number. */
         if ((s->next[0] >= '0' && s->next[0] <= '9') || s->next[0] == '.') {
-            s->value = (float)strtod(s->next, (char**)&s->next);
+            s->value = strtod(s->next, (char**)&s->next);
             s->type = TOK_NUMBER;
         } else {
             /* Look for a variable or builtin function call. */
@@ -657,7 +657,7 @@ static void optimize(te_expr *n) {
             const double value = te_eval(n);
             te_free_parameters(n);
             n->type = TE_CONSTANT;
-            n->value = (float)value;
+            n->value = value;
         }
     }
 }
