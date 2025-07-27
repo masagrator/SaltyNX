@@ -77,7 +77,7 @@ typedef u32 (*nvnTextureGetFormat_0)(NVNTexture* texture);
 typedef void* (*_vkGetInstanceProcAddr_0)(void* instance, const char* vkFunction);
 typedef void* (*vkGetDeviceProcAddr_0)(void* device, const char* vkFunction);
 typedef AppletFocusState (*GetCurrentFocusState_0)();
-typedef u32 (*FileAccessorRead_0)(void* fileHandle, size_t* bytesRead, uint64_t position, void* buffer, size_t readBytes, unsigned int* ReadOption);
+typedef u32 (*FileAccessorRead_0)(void* fileHandle, size_t* bytesRead, int64_t position, void* buffer, size_t readBytes, unsigned int* ReadOption);
 
 struct {
 	uintptr_t nvnBootstrapLoader;
@@ -1017,7 +1017,7 @@ namespace NVN {
 }
 
 namespace nn {
-	Result FileAccessorRead(void* fileHandle, size_t* bytesRead, uint64_t position, void* buffer, size_t readBytes, unsigned int* ReadOption) {
+	Result FileAccessorRead(void* fileHandle, size_t* bytesRead, int64_t position, void* buffer, size_t readBytes, unsigned int* ReadOption) {
 		size_t bytesRead_impl = 0;
 		if (!bytesRead)
 			bytesRead = &bytesRead_impl;
