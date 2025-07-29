@@ -17,7 +17,7 @@ uint8_t dockedLinkRate = 10;
 bool isRetroSUPER = false;
 bool isPossiblySpoofedRetro = false;
 bool wasRetroSuperTurnedOff = false;
-uint32_t last_vActive = 60;
+uint32_t last_vActive = 1080;
 
 extern uint64_t dsiVirtAddr;
 extern bool isDocked;

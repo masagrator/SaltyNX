@@ -52,10 +52,12 @@ bool cheatCheck = false;
 bool isDocked = false;
 bool dontForce60InDocked = false;
 bool matchLowestDocked = false;
-#ifndef SWITCH
-    uint64_t systemtickfrequency = 0;
-#else 
+#ifdef SWITCH
     #define systemtickfrequency 19200000
+#elif OUNCE
+    #define systemtickfrequency 31250000
+#else 
+    uint64_t systemtickfrequency = 0;
 #endif
 
 void __libnx_initheap(void)
@@ -967,7 +969,7 @@ void serviceThread(void* buf)
 
 int main(int argc, char *argv[])
 {
-    #ifndef SWITCH
+    #if !defined(SWITCH) && !defined(OUNCE)
 	    systemtickfrequency = armGetSystemTickFreq();
     #endif
     ABORT_IF_FAILED(smInitialize_old(), 0);
@@ -1203,4 +1205,3 @@ int main(int argc, char *argv[])
 
     return 0;
 }
-
