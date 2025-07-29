@@ -1163,9 +1163,21 @@ int main(int argc, char *argv[])
                 }
             }
         }
-        uint32_t crr = 0;
-        GetDisplayRefreshRate(&crr, true);
-        if (isOLED) correctOledGamma(crr);
+        static bool wasLastDocked = false;
+        if ((wasLastDocked && !isDocked && !displaySync) || (!wasLastDocked && isDocked && !displaySyncDocked)) {
+            uint32_t temp_refreshRate = 0;
+            if (GetDisplayRefreshRate(&temp_refreshRate, true) && temp_refreshRate != 60) {
+                SetDisplayRefreshRate(60);
+                refreshRate = 0;
+            }
+        }
+        wasLastDocked = isDocked;
+        
+        if (isOLED) {
+            uint32_t crr = 0;
+            GetDisplayRefreshRate(&crr, true);
+            correctOledGamma(crr);
+        }
 
         if (nx_fps) nx_fps -> dontForce60InDocked = dontForce60InDocked;
 
