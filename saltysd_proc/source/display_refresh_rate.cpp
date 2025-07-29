@@ -289,13 +289,13 @@ extern "C" uint8_t getDockedHighestRefreshRateAllowed() {
     if (last_vActive == 1080) {
         for (size_t i = (sizeof(DockedModeRefreshRateAllowed) - 1); DockedModeRefreshRateAllowedValues[i] > 60; i--) {
             if (DockedModeRefreshRateAllowed[i] == true)
-                return DockedModeRefreshRateAllowedValues[i];
+                return (DockedModeRefreshRateAllowedValues[i] > dockedHighestRefreshRate) ? dockedHighestRefreshRate : DockedModeRefreshRateAllowedValues[i];
         }
     }
     else if (last_vActive == 720) {
         for (size_t i = (sizeof(DockedModeRefreshRateAllowed720p) - 1); DockedModeRefreshRateAllowedValues[i] > 60; i--) {
             if (DockedModeRefreshRateAllowed720p[i] == true)
-                return DockedModeRefreshRateAllowedValues[i];
+                return (DockedModeRefreshRateAllowedValues[i] > dockedHighestRefreshRate) ? dockedHighestRefreshRate : DockedModeRefreshRateAllowedValues[i];
         }        
     }
     return 60;
