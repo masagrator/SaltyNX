@@ -1174,6 +1174,14 @@ int main(int argc, char *argv[])
             }
         }
         wasLastDocked = isDocked;
+
+        if (isDocked && !displaySyncDocked && nx_fps) {
+            uint32_t temp_refreshRate = 0;
+            GetDisplayRefreshRate(&temp_refreshRate, true);
+            if (temp_refreshRate <= 60 && nx_fps->FPSlockedDocked > 60) {
+                nx_fps->FPSlockedDocked = 60;
+            }
+        }
         
         if (isOLED) {
             uint32_t crr = 0;
