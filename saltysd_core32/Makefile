@@ -41,8 +41,8 @@ EXEFS_SRC	:=	exefs_src
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
-ARCH_DEBUG		:=	-march=armv8-a -mtune=cortex-a57 -mtp=soft -fPIE -fno-plt
-ARCH			:=	-march=armv8-a -mtune=cortex-a57 -mtp=soft -fPIE -fno-plt -s
+ARCH_DEBUG		:=	-march=armv8-a+simd -mtune=cortex-a57 -mtp=soft -fPIE -fno-plt
+ARCH			:=	-march=armv8-a+simd -mtune=cortex-a57 -mtp=soft -fPIE -fno-plt -s
 
 CFLAGS			:=	-Wall -Wno-pointer-to-int-cast -O2 \
 					-ffast-math -ffunction-sections \
@@ -50,7 +50,7 @@ CFLAGS			:=	-Wall -Wno-pointer-to-int-cast -O2 \
 
 CFLAGS			+=	$(INCLUDE) -DSWITCH32 -DAPP_VERSION=\"$(VERSION)\"
 
-CXXFLAGS		:= $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++23
+CXXFLAGS		:= $(CFLAGS) -fno-exceptions -fno-rtti -std=gnu++23
 
 ASFLAGS			:=	-g $(ARCH)
 LDFLAGS_DEBUG	=	-specs=$(CURDIR)/../libnx32_min/nx/switch.specs -g $(ARCH_DEBUG) -Wl,-Map,$(notdir $*.map)
