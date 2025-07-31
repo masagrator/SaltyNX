@@ -31,7 +31,7 @@ INCLUDES	:=	include external/bsd/include
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
-ARCH	:=	-march=armv8-a+simd -mtune=cortex-a57 -mtp=soft -mfloat-abi=softfp -fPIC -ftls-model=local-exec
+ARCH	:=	-march=armv8-a+simd -mtune=cortex-a57 -mtp=soft -fPIC -ftls-model=local-exec
 
 CFLAGS	:=	-g -Wall -Wno-pointer-to-int-cast \
 			-ffunction-sections \
