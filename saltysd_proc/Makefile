@@ -29,6 +29,8 @@ include $(DEVKITPRO)/libnx/switch_rules
 #	 - icon.jpg
 #	 - <libnx folder>/default_icon.jpg
 #---------------------------------------------------------------------------------
+include $(TOPDIR)/../version.mk
+
 TARGET		:=	saltysd_proc
 BUILD		:=	build
 SOURCES		:=	source
@@ -45,7 +47,7 @@ CFLAGS	:=	-g -Wall -Os \
 			-ffast-math -ffunction-sections -fdata-sections \
 			$(ARCH) $(DEFINES)
 
-CFLAGS	+=	$(INCLUDE) -DSWITCH
+CFLAGS	+=	$(INCLUDE) -DSWITCH -DAPP_VERSION=\"$(VERSION)\"
 
 CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++23
 

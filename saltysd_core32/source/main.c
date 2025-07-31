@@ -280,29 +280,23 @@ void QueryMemoryInfo(void* memoryinfo) {
 	return ((nnosQueryMemoryInfo)(Address_weak_QueryMemoryInfo))(memoryinfo);
 }
 
-typedef double (*strtod_0)(const char* str, char** endptr);
-uint32_t strtod_ptr = 0;
 typedef double (*vsnprintf_0)(char * s, size_t n, const char * format, va_list arg);
 uint32_t vsnprintf_ptr = 0;
-
-double strtod(const char* str, char** endptr) {
-	return ((strtod_0)(strtod_ptr))(str, endptr);
-}
 
 int main(int argc, char *argv[])
 {
 	Result ret;
 
 	SaltySDCore_RegisterExistingModules();
-	strtod_ptr = SaltySDCore_FindSymbolBuiltin("strtod");
 	
 	SaltySD_Init();
+	
+	ret = SaltySD_GetSDCard(&sdcard);
+	if (ret) goto fail;
+
+	SaltySDCore_printf("SaltySD Core32 " APP_VERSION ": restoring code...\n");
 
 	ret = SaltySD_Restore();
-	if (ret) goto fail;
-	
-
-	ret = SaltySD_GetSDCard(&sdcard);
 	if (ret) goto fail;
 
 	SaltySDCore_PatchSVCs();

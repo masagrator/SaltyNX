@@ -74,7 +74,9 @@ typedef void (*glViewportIndexedfv_0)(uint index, const glViewportArray* pViewpo
 typedef s32 (*vkQueuePresentKHR_0)(const void* vkQueue, const void* VkPresentInfoKHR);
 typedef u64 (*_ZN2nn2os17ConvertToTimeSpanENS0_4TickE_0)(u64 tick);
 typedef u64 (*_ZN2nn2os13GetSystemTickEv_0)();
+typedef void (*_ZN2nn2os13GetSystemTickEv_1)(u64* tick);
 typedef u64 (*_ZN2nn2os22GetSystemTickFrequencyEv_0)();
+typedef void (*_ZN2nn2os22GetSystemTickFrequencyEv_1)(u64* tickfrequency);
 typedef u64 (*eglGetProcAddress_0)(const char* eglName);
 typedef void* (*nvnCommandBufferSetRenderTargets_0)(const void* cmdBuf, int numTextures, const NVNTexture** texture, const NVNTextureView** textureView, const NVNTexture* depth, const NVNTextureView* depthView);
 typedef void* (*nvnCommandBufferSetViewport_0)(const void* cmdBuf, int x, int y, int width, int height);
@@ -91,7 +93,7 @@ typedef void (*vkCmdSetViewportWithCount_0)(void* commandBuffer, uint32_t viewpo
 typedef s32 (*vkCreateSwapchainKHR_0)(void* Device, const VkSwapchainCreateInfoKHR* pCreateInfo, const void* pAllocator, const void** pSwapchain);
 typedef s32 (*vkGetSwapchainImagesKHR_0)(void* Device, void* VkSwapchainKHR, uint32_t* pSwapchainImageCount, int** pSwapchainImages);
 typedef AppletFocusState (*GetCurrentFocusState_0)();
-typedef u32 (*FileAccessorRead_0)(void* fileHandle, size_t* bytesRead, size_t position, void* buffer, size_t readBytes, unsigned int* ReadOption);
+typedef u32 (*FileAccessorRead_0)(void* fileHandle, size_t* bytesRead, int64_t position, void* buffer, size_t readBytes, unsigned int* ReadOption);
 
 struct {
 	uintptr_t nvnBootstrapLoader;
@@ -227,6 +229,7 @@ struct NxFpsSharedBlock {
 	bool forceSuspend;
 	uint8_t currentRefreshRate;
 	float readSpeedPerSecond;
+	uint8_t FPSlockedDocked;
 } PACKED;
 
 NxFpsSharedBlock* Shared = 0;
@@ -237,7 +240,14 @@ struct {
 	bool FPSmode = 0;
 } Stats;
 
-uint64_t systemtickfrequency = 19200000;
+#if defined(SWITCH) || defined(SWITCH32)
+	#define systemtickfrequency 19200000
+#elif defined(OUNCE) || defined(OUNCE32)
+	#define systemtickfrequency 31250000
+#else
+	uint64_t systemtickfrequency = 0;
+#endif
+
 typedef void (*nvnQueuePresentTexture_0)(const void* _this, const void* unk2_1, int index);
 typedef uintptr_t (*GetProcAddress)(const void* unk1_a, const char * nvnFunction_a);
 
@@ -280,11 +290,11 @@ inline void CheckTitleID(char* buffer) {
     ltoa(titid, buffer, 16);
 }
 
-inline uint64_t getMainAddress() {
+inline uintptr_t getMainAddress() {
 	MemoryInfo memoryinfo = {0};
 	u32 pageinfo = 0;
 
-	uint64_t base_address = SaltySDCore_getCodeStart() + 0x4000;
+	uintptr_t base_address = SaltySDCore_getCodeStart() + 0x4000;
 	for (size_t i = 0; i < 3; i++) {
 		Result rc = svcQueryMemory(&memoryinfo, &pageinfo, base_address);
 		if (R_FAILED(rc)) return 0;
@@ -294,6 +304,44 @@ inline uint64_t getMainAddress() {
 	}
 
 	return 0;
+}
+
+namespace Utils {
+	inline uint64_t _getSystemTick() {
+		#if SWITCH
+			return armGetSystemTick();
+		#elif defined(SWITCH32) || defined(OUNCE32)
+			u64 tick = 0;
+			((_ZN2nn2os13GetSystemTickEv_1)(Address_weaks.GetSystemTick))(&tick);
+			return tick;
+		#else
+			return ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
+		#endif
+	}
+
+	inline uint64_t _convertToTimeSpan(uint64_t tick) {
+		#if defined(SWITCH) || defined(SWITCH32)
+			return armTicksToNs(tick);
+		#elif defined(OUNCE) || defined(OUNCE32)
+			return tick << 5;
+		#else
+			return uint64_t((double)tick / ((double)(systemtickfrequency) / 1000000000.d));
+		#endif
+	}
+
+	inline uint64_t _getSystemTickFrequency() {
+		#if defined(SWITCH) || defined(SWITCH32)
+			return 19200000;
+		#elif defined(OUNCE) || defined(OUNCE32)
+			return 31250000;
+		#else
+			#error "Compiling for platform with undefined tick frequency!"
+		#endif
+	}
+
+	inline AppletFocusState _getCurrentFocusState() {
+		return ((GetCurrentFocusState_0)(Address_weaks.GetCurrentFocusState))();
+	}
 }
 
 namespace NX_FPS_Math {
@@ -312,7 +360,7 @@ namespace NX_FPS_Math {
 	uint32_t new_fpslock = 0;
 
 	void PreFrame() {
-		new_fpslock = (LOCK::overwriteRefreshRate ? LOCK::overwriteRefreshRate : (Shared -> FPSlocked));
+		new_fpslock = (LOCK::overwriteRefreshRate ? LOCK::overwriteRefreshRate : ((*sharedOperationMode == 1) ? (Shared -> FPSlockedDocked) : (Shared -> FPSlocked)));
 		if (old_force != (Shared -> forceOriginalRefreshRate)) {
 			if (*sharedOperationMode == 1 && !(Shared -> dontForce60InDocked))
 				svcSleepThread(LOCK::DockedRefreshRateDelay);
@@ -320,10 +368,11 @@ namespace NX_FPS_Math {
 		}
 
 		if ((FPStiming && !LOCK::blockDelayFPS && (new_fpslock && new_fpslock < (Shared -> currentRefreshRate)))) {
-			if ((int32_t)(((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))() - frameend) < (FPStiming + (range * 20))) {
+			int64_t FPSTiming_internal = FPStiming + (range * 32);
+			if ((int64_t)(Utils::_getSystemTick() - frameend) < FPSTiming_internal) {
 				FPSlock_delayed = true;
 			}
-			while ((int32_t)(((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))() - frameend) < (FPStiming + (range * 20))) {
+			while ((int64_t)(Utils::_getSystemTick() - frameend) < FPSTiming_internal) {
 				svcSleepThread(-2);
 				svcSleepThread(10000);
 			}
@@ -331,7 +380,7 @@ namespace NX_FPS_Math {
 	}
 
 	void PostFrame() {
-		uint64_t endtick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
+		uint64_t endtick = Utils::_getSystemTick();
 		uint64_t framedelta = endtick - frameend;
 
 		Shared -> FPSticks[FPStickItr++] = framedelta;
@@ -358,7 +407,7 @@ namespace NX_FPS_Math {
 		uint64_t deltatick = endtick - starttick;
 		uint64_t deltatick2 = endtick - starttick2;
 		if (deltatick2 > (systemtickfrequency / ((*sharedOperationMode == 1) ? 30 : 1))) {
-			starttick2 = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
+			starttick2 = Utils::_getSystemTick();
 			LOCK::overwriteRefreshRate = 0;
 			if (!configRC && FPSlock) {
 				LOCK::applyPatch(configBuffer, FPSlock, (Shared -> currentRefreshRate));
@@ -366,21 +415,27 @@ namespace NX_FPS_Math {
 		}
 		if (deltatick > systemtickfrequency) {
 			if (Address_weaks.FileAccessorRead) {
-				float seconds = (float)((_ZN2nn2os17ConvertToTimeSpanENS0_4TickE_0)(Address_weaks.ConvertToTimeSpan))(deltatick) / 1000000000.f;
+				float seconds = (float)Utils::_convertToTimeSpan(deltatick) / 1000000000.f;
 				float readSpeedPerSecond = (float)fileBytesRead / seconds;
 				fileBytesRead = 0;
 				if (readSpeedPerSecond == 0.f && Shared -> readSpeedPerSecond != 0.f) readSpeedPerSecond = 1;
 				Shared -> readSpeedPerSecond = readSpeedPerSecond;
 			}
-			starttick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
 			Stats.FPS = FPS_temp - 1;
-			FPS_temp = 0;
 			(Shared -> FPS) = Stats.FPS;
+			if (deltatick > (systemtickfrequency * 2)) {
+				starttick = Utils::_getSystemTick();
+				FPS_temp = 0;
+			}
+			else {
+				starttick += systemtickfrequency;
+				FPS_temp = 1;
+			}
 			if (!configRC && FPSlock) {
 				(Shared -> patchApplied) = 1;
 			}
 			if (Shared -> forceSuspend) {
-				while (((GetCurrentFocusState_0)(Address_weaks.GetCurrentFocusState))() == AppletFocusState_NotFocusedHomeSleep)
+				while (Utils::_getCurrentFocusState() == AppletFocusState_NotFocusedHomeSleep)
 					svcSleepThread(16000000);
 			}
 		}
@@ -401,7 +456,6 @@ namespace NX_FPS_Math {
 			memset(&m_resolutionRenderCalls, 0, sizeof(m_resolutionRenderCalls));
 			memset(&m_resolutionViewportCalls, 0, sizeof(m_resolutionViewportCalls));
 		}
-
 	}
 
 	template <typename T> void addResToViewports(T m_width, T m_height) {
@@ -410,7 +464,7 @@ namespace NX_FPS_Math {
 			uint16_t width = (uint16_t)m_width;
 			uint16_t height = (uint16_t)m_height;
 			for (size_t i = 0; i < 8; i++) {
-				if (width == m_resolutionViewportCalls[i].width) {
+				if ((width == m_resolutionViewportCalls[i].width) && (height == m_resolutionViewportCalls[i].height)) {
 					m_resolutionViewportCalls[i].calls++;
 					break;
 				}
@@ -420,7 +474,7 @@ namespace NX_FPS_Math {
 					m_resolutionViewportCalls[i].calls = 1;
 					break;
 				}
-			}			
+			}
 		}		
 	}
 
@@ -430,7 +484,7 @@ namespace NX_FPS_Math {
 			uint16_t width = (uint16_t)m_width;
 			uint16_t height = (uint16_t)m_height;
 			for (size_t i = 0; i < 8; i++) {
-				if (width == m_resolutionRenderCalls[i].width) {
+				if ((width == m_resolutionRenderCalls[i].width) && (height == m_resolutionRenderCalls[i].height)) {
 					m_resolutionRenderCalls[i].calls++;
 					break;
 				}
@@ -440,7 +494,7 @@ namespace NX_FPS_Math {
 					m_resolutionRenderCalls[i].calls = 1;
 					break;
 				}
-			}			
+			}
 		}		
 	}
 }
@@ -472,20 +526,15 @@ namespace vk {
 
 	namespace Common {
 		int32_t QueuePresent(const void* VkQueue_T, const void* VkPresentInfoKHR, uintptr_t pointer) {
-			static bool frame_block = false;
 
-			if (frame_block == true)
-				return ((vkQueuePresentKHR_0)(pointer))(VkQueue_T, VkPresentInfoKHR);
 			if (!NX_FPS_Math::starttick) {
 				(Shared -> API) = 3;
-				NX_FPS_Math::starttick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
+				NX_FPS_Math::starttick = Utils::_getSystemTick();
 				NX_FPS_Math::starttick2 = NX_FPS_Math::starttick;
 			}
 			
 			NX_FPS_Math::PreFrame();
-			frame_block = true;
 			int32_t vulkanResult = ((vkQueuePresentKHR_0)(pointer))(VkQueue_T, VkPresentInfoKHR);
-			frame_block = false;
 			if (vulkanResult >= 0) NX_FPS_Math::PostFrame();
 
 			if (!NX_FPS_Math::new_fpslock) {
@@ -495,7 +544,7 @@ namespace vk {
 			}
 			else {
 				changeFPS = true;
-				NX_FPS_Math::FPSlock = (Shared -> FPSlocked);
+				NX_FPS_Math::FPSlock = ((*sharedOperationMode == 1) ? (Shared -> FPSlockedDocked) : (Shared -> FPSlocked));
 				if (NX_FPS_Math::new_fpslock != ((Shared -> currentRefreshRate) ? (Shared -> currentRefreshRate) : 60))
 					NX_FPS_Math::FPStiming = (systemtickfrequency/NX_FPS_Math::new_fpslock) - 6000;
 				else NX_FPS_Math::FPStiming = 0;
@@ -655,7 +704,7 @@ namespace EGL {
 
 		if (!NX_FPS_Math::starttick) {
 			(Shared -> API) = 2;
-			NX_FPS_Math::starttick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
+			NX_FPS_Math::starttick = Utils::_getSystemTick();
 			NX_FPS_Math::starttick2 = NX_FPS_Math::starttick;
 		}
 
@@ -672,7 +721,7 @@ namespace EGL {
 		}
 		else {
 			changeFPS = true;
-			NX_FPS_Math::FPSlock = (Shared -> FPSlocked);
+			NX_FPS_Math::FPSlock = ((*sharedOperationMode == 1) ? (Shared -> FPSlockedDocked) : (Shared -> FPSlocked));
 			if (NX_FPS_Math::new_fpslock <= ((Shared -> currentRefreshRate) ? ((Shared -> currentRefreshRate) / 4) : 15)) {
 				if ((Shared -> FPSmode) != 4)
 					EGL::Interval(EGLDisplay, -4);
@@ -883,16 +932,16 @@ namespace NVN {
 	}
 
 	void* SyncWait0(const void* _this, uint64_t timeout_ns) {
-		uint64_t endFrameTick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
+		uint64_t endFrameTick = Utils::_getSystemTick();
 		if (_this == WindowSync && (Shared -> ActiveBuffers) == 2) {
 			if ((Shared -> ZeroSync) == ZeroSyncType_Semi) {
 				u64 FrameTarget = (systemtickfrequency/60) - 8000;
 				s64 new_timeout = (FrameTarget - (endFrameTick - startFrameTick)) - (systemtickfrequency / 1000);
-				if ((Shared -> FPSlocked) == 60) {
+				if (((*sharedOperationMode == 1) ? (Shared -> FPSlockedDocked) : (Shared -> FPSlocked)) == 60) {
 					new_timeout = (systemtickfrequency/101) - (endFrameTick - startFrameTick);
 				}
 				if (new_timeout > 0) {
-					timeout_ns = ((_ZN2nn2os17ConvertToTimeSpanENS0_4TickE_0)(Address_weaks.ConvertToTimeSpan))(new_timeout);
+					timeout_ns = Utils::_convertToTimeSpan(new_timeout);
 				}
 				else timeout_ns = 0;
 			}
@@ -904,20 +953,15 @@ namespace NVN {
 
 	void PresentTexture(const void* _this, const NVNWindow* nvnWindow, int index) {
 
-		static int last_index = 0;
-		if (last_index == index) {
-			return ((nvnQueuePresentTexture_0)(Address_weaks.nvnQueuePresentTexture))(_this, nvnWindow, index);
-		}
 		//Initialize time calculation;
 		if (!NX_FPS_Math::starttick) {
-			NX_FPS_Math::starttick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
+			NX_FPS_Math::starttick = Utils::_getSystemTick();
 			NX_FPS_Math::starttick2 = NX_FPS_Math::starttick;
 			(Shared -> FPSmode) = (uint8_t)((nvnGetPresentInterval_0)(Address_weaks.nvnWindowGetPresentInterval))(nvnWindow);
 		}
 		NX_FPS_Math::PreFrame();
 		((nvnQueuePresentTexture_0)(Address_weaks.nvnQueuePresentTexture))(_this, nvnWindow, index);
 		NX_FPS_Math::PostFrame();
-		last_index = index;
 
 		(Shared -> FPSmode) = (uint8_t)((nvnGetPresentInterval_0)(Address_weaks.nvnWindowGetPresentInterval))(nvnWindow);
 
@@ -928,7 +972,7 @@ namespace NVN {
 		}
 		else {
 			changeFPS = true;
-			NX_FPS_Math::FPSlock = (Shared -> FPSlocked);
+			NX_FPS_Math::FPSlock = ((*sharedOperationMode == 1) ? (Shared -> FPSlockedDocked) : (Shared -> FPSlocked));
 			if (NX_FPS_Math::new_fpslock <= ((Shared -> currentRefreshRate) ? ((Shared -> currentRefreshRate) / 4) : 15)) {
 				if (((nvnGetPresentInterval_0)(Address_weaks.nvnWindowGetPresentInterval))(nvnWindow) != 4)
 					NVN::SetPresentInterval(nvnWindow, -4);
@@ -989,7 +1033,7 @@ namespace NVN {
 			WindowSync = (void*)nvnSync;
 		}
 		void* ret = ((nvnWindowAcquireTexture_0)(Address_weaks.nvnWindowAcquireTexture))(nvnWindow, nvnSync, index);
-		startFrameTick = ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
+		startFrameTick = Utils::_getSystemTick();
 		return ret;
 	}
 
@@ -1032,46 +1076,46 @@ namespace NVN {
 		if (!strcmp("nvnDeviceGetProcAddress", nvnFunction))
 			return (uintptr_t)&NVN::GetProcAddress0;
 		else if (!strcmp("nvnQueuePresentTexture", nvnFunction)) {
-			Address_weaks.nvnQueuePresentTexture = address;
+			if (!Address_weaks.nvnQueuePresentTexture) Address_weaks.nvnQueuePresentTexture = address;
 			return (uintptr_t)&NVN::PresentTexture;
 		}
 		else if (!strcmp("nvnWindowAcquireTexture", nvnFunction)) {
-			Address_weaks.nvnWindowAcquireTexture = address;
+			if (!Address_weaks.nvnWindowAcquireTexture) Address_weaks.nvnWindowAcquireTexture = address;
 			return (uintptr_t)&NVN::AcquireTexture;
 		}
 		else if (!strcmp("nvnWindowSetPresentInterval", nvnFunction)) {
-			Address_weaks.nvnWindowSetPresentInterval = address;
+			if (!Address_weaks.nvnWindowSetPresentInterval) Address_weaks.nvnWindowSetPresentInterval = address;
 			return (uintptr_t)&NVN::SetPresentInterval;
 		}
 		else if (!strcmp("nvnWindowGetPresentInterval", nvnFunction)) {
-			Address_weaks.nvnWindowGetPresentInterval = address;
+			if (!Address_weaks.nvnWindowGetPresentInterval) Address_weaks.nvnWindowGetPresentInterval = address;
 		}
 		else if (!strcmp("nvnWindowSetNumActiveTextures", nvnFunction)) {
-			Address_weaks.nvnWindowSetNumActiveTextures = address;
+			if (!Address_weaks.nvnWindowSetNumActiveTextures) Address_weaks.nvnWindowSetNumActiveTextures = address;
 			return (uintptr_t)&NVN::WindowSetNumActiveTextures;
 		}
 		else if (!strcmp("nvnWindowBuilderSetTextures", nvnFunction)) {
-			Address_weaks.nvnWindowBuilderSetTextures = address;
+			if (!Address_weaks.nvnWindowBuilderSetTextures) Address_weaks.nvnWindowBuilderSetTextures = address;
 			return (uintptr_t)&NVN::WindowBuilderSetTextures;
 		}
 		else if (!strcmp("nvnWindowInitialize", nvnFunction)) {
-			Address_weaks.nvnWindowInitialize = address;
+			if (!Address_weaks.nvnWindowInitialize) Address_weaks.nvnWindowInitialize = address;
 			return (uintptr_t)&NVN::WindowInitialize;
 		}
 		else if (!strcmp("nvnSyncWait", nvnFunction)) {
-			Address_weaks.nvnSyncWait = address;
+			if (!Address_weaks.nvnSyncWait) Address_weaks.nvnSyncWait = address;
 			return (uintptr_t)&NVN::SyncWait0;
 		}
 		else if (!strcmp("nvnCommandBufferSetRenderTargets", nvnFunction)) {
-			Address_weaks.nvnCommandBufferSetRenderTargets = address;
+			if (!Address_weaks.nvnCommandBufferSetRenderTargets) Address_weaks.nvnCommandBufferSetRenderTargets = address;
 			return (uintptr_t)&NVN::CommandBufferSetRenderTargets;
 		}
 		else if (!strcmp("nvnCommandBufferSetViewport", nvnFunction)) {
-			Address_weaks.nvnCommandBufferSetViewport = address;
+			if (!Address_weaks.nvnCommandBufferSetViewport) Address_weaks.nvnCommandBufferSetViewport = address;
 			return (uintptr_t)&NVN::CommandBufferSetViewport;
 		}
 		else if (!strcmp("nvnCommandBufferSetViewports", nvnFunction)) {
-			Address_weaks.nvnCommandBufferSetViewports = address;
+			if (!Address_weaks.nvnCommandBufferSetViewports) Address_weaks.nvnCommandBufferSetViewports = address;
 			return (uintptr_t)&NVN::CommandBufferSetViewports;
 		}
 		else if (!strcmp("nvnTextureGetWidth", nvnFunction)) {
@@ -1089,7 +1133,7 @@ namespace NVN {
 	uintptr_t BootstrapLoader_1(const char* nvnName) {
 		if (strcmp(nvnName, "nvnDeviceGetProcAddress") == 0) {
 			(Shared -> API) = 1;
-			Address_weaks.nvnDeviceGetProcAddress = ((nvnBootstrapLoader_0)(Address_weaks.nvnBootstrapLoader))("nvnDeviceGetProcAddress");
+			if (!Address_weaks.nvnDeviceGetProcAddress) Address_weaks.nvnDeviceGetProcAddress = ((nvnBootstrapLoader_0)(Address_weaks.nvnBootstrapLoader))("nvnDeviceGetProcAddress");
 			return (uintptr_t)&GetProcAddress0;
 		}
 		uintptr_t ptrret = ((nvnBootstrapLoader_0)(Address_weaks.nvnBootstrapLoader))(nvnName);
@@ -1098,7 +1142,7 @@ namespace NVN {
 }
 
 namespace nn {
-	Result FileAccessorRead(void* fileHandle, size_t* bytesRead, size_t position, void* buffer, size_t readBytes, unsigned int* ReadOption) {
+	Result FileAccessorRead(void* fileHandle, size_t* bytesRead, int64_t position, void* buffer, size_t readBytes, unsigned int* ReadOption) {
 		size_t bytesRead_impl = 0;
 		if (!bytesRead)
 			bytesRead = &bytesRead_impl;
@@ -1151,7 +1195,6 @@ extern "C" {
 			Address_weaks.nvSwapchainGetSwapchainImagesKHR = SaltySDCore_FindSymbolBuiltin("_ZN11NvSwapchain21GetSwapchainImagesKHREP10VkDevice_TP16VkSwapchainKHR_TPjPP9VkImage_T");
 			Address_weaks.nvSwapchainCreateSwapchainKHR = SaltySDCore_FindSymbolBuiltin("_ZN11NvSwapchain18CreateSwapchainKHREP10VkDevice_TPK24VkSwapchainCreateInfoKHRPK21VkAllocationCallbacksPP16VkSwapchainKHR_T");
 			Address_weaks.GetCurrentFocusState = SaltySDCore_FindSymbolBuiltin("_ZN2nn2oe20GetCurrentFocusStateEv");
-			//For 32-bit it's different
 			SaltySDCore_ReplaceImport("nvnBootstrapLoader", (void*)NVN::BootstrapLoader_1);
 			SaltySDCore_ReplaceImport("eglSwapBuffers", (void*)EGL::Swap);
 			SaltySDCore_ReplaceImport("eglSwapInterval", (void*)EGL::Interval);
@@ -1177,15 +1220,18 @@ extern "C" {
 				//Minecraft is using nn::ro::LookupSymbol to search for Vulkan functions
 				SaltySDCore_ReplaceImport("_ZN2nn2ro12LookupSymbolEPmPKc", (void*)vk::LookupSymbol);
 			}
-			FILE* readFlag = SaltySDCore_fopen("sdmc:/SaltySD/flags/filestats.flag", "rb");
-			if (readFlag) {
-				SaltySDCore_fclose(readFlag);
+			FILE* readFlag = SaltySDCore_fopen("sdmc:/SaltySD/flags/blockfilestats.flag", "rb");
+			if (!readFlag) {
 				//For 32-bit it's different
 				Address_weaks.FileAccessorRead = SaltySDCore_FindSymbolBuiltin("_ZN2nn2fs6detail12FileAccessor4ReadEPmlPvmRKNS0_10ReadOptionE");		
 				SaltySDCore_ReplaceImport("_ZN2nn2fs6detail12FileAccessor4ReadEPmlPvmRKNS0_10ReadOptionE", (void*)nn::FileAccessorRead);
 			}
+			else SaltySDCore_fclose(readFlag);
 			
-			systemtickfrequency = ((_ZN2nn2os22GetSystemTickFrequencyEv_0)(Address_weaks.GetSystemTickFrequency))();
+			#if !defined(SWITCH) && !defined(SWITCH32)
+			systemtickfrequency = Utils::_getSystemTickFrequency();
+			#endif
+
 			char titleid[17];
 			CheckTitleID(&titleid[0]);
 			char path[128];
@@ -1197,6 +1243,7 @@ extern "C" {
 				uint8_t temp = 0;
 				SaltySDCore_fread(&temp, 1, 1, file_dat);
 				(Shared -> FPSlocked) = temp;
+				(Shared -> FPSlockedDocked) = temp;
 				if (temp >= 40 && temp <= 120) {
 					FILE* sync_file = SaltySDCore_fopen("sdmc:/SaltySD/flags/displaysync.flag", "rb");
 					if  (sync_file) {
@@ -1219,6 +1266,8 @@ extern "C" {
 					(Shared -> SetBuffers) = temp;
 				if (SaltySDCore_fread(&temp, 1, 1, file_dat))
 					(Shared -> forceSuspend) = (bool)temp;
+				if (SaltySDCore_fread(&temp, 1, 1, file_dat))
+					(Shared -> FPSlockedDocked) = temp;
 				SaltySDCore_fclose(file_dat);
 			}
 

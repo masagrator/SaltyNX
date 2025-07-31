@@ -237,10 +237,6 @@ static double divide(double a, double b) {return a / b;}
 static double negate(double a) {return -a;}
 static double comma(double a, double b) {(void)a; return b;}
 
-#define LINKABLE __attribute__ ((weak))
-extern double strtod(const char* str, char** endptr) LINKABLE;
-
-
 void next_token(state *s) {
     s->type = TOK_NULL;
 
@@ -602,8 +598,8 @@ double te_eval(const te_expr *n) {
     if (!n) return NAN;
 
     switch(TYPE_MASK(n->type)) {
-        case TE_CONSTANT: return n->value;
-        case TE_VARIABLE: return *n->bound;
+        case TE_CONSTANT: return (double)n->value;
+        case TE_VARIABLE: return (double)*n->bound;
 
         case TE_FUNCTION0: case TE_FUNCTION1: case TE_FUNCTION2: case TE_FUNCTION3:
         case TE_FUNCTION4: case TE_FUNCTION5: case TE_FUNCTION6: case TE_FUNCTION7:

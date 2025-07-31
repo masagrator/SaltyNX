@@ -149,7 +149,7 @@ namespace LOCK {
 		if (masterWrite) start_offset += 4;
 		if (*(uint32_t*)(&(buffer[8])) != start_offset)
 			return false;
-		compiledSize = buffer[6] * buffer[6];
+		compiledSize = (uint32_t)buffer[6] * buffer[6];
 		return true;
 
 	}
@@ -420,8 +420,7 @@ namespace LOCK {
 			if (OPCODE == 1) {
 				uint8_t offsets_count = read8(buffer);
 				uintptr_t address = getAddress(buffer, offsets_count);
-				if (address < 0) 
-					return 6;
+
 				/* value_type:
 					1		=	uint8
 					2		=	uin16
@@ -485,8 +484,6 @@ namespace LOCK {
 			else if (OPCODE == 2) {
 				uint8_t offsets_count = read8(buffer);
 				uintptr_t address = getAddress(buffer, offsets_count);
-				if (address < 0) 
-					return 6;
 
 				/* compare_type:
 					1	=	>
@@ -566,8 +563,6 @@ namespace LOCK {
 
 				offsets_count = read8(buffer);
 				address = getAddress(buffer, offsets_count);
-				if (address < 0) 
-					return 6;
 				value_type = read8(buffer);
 				uint8_t loops = read8(buffer);
 				switch(value_type) {
