@@ -221,7 +221,15 @@ struct NxFpsSharedBlock {
 	uint8_t SetBuffers;
 	uint8_t ActiveBuffers;
 	uint8_t SetActiveBuffers;
-	uint8_t displaySync;
+	union {
+		struct {
+
+			bool handheld: 1;
+			bool docked: 1;
+			unsigned int reserved: 6;
+		} PACKED ds;
+		uint8_t general;
+	} displaySync;
 	resolutionCalls renderCalls[8];
 	resolutionCalls viewportCalls[8];
 	bool forceOriginalRefreshRate;
@@ -231,6 +239,9 @@ struct NxFpsSharedBlock {
 	float readSpeedPerSecond;
 	uint8_t FPSlockedDocked;
 } PACKED;
+
+static_assert(sizeof(NxFpsSharedBlock) == 165);
+
 
 NxFpsSharedBlock* Shared = 0;
 
@@ -1249,14 +1260,14 @@ extern "C" {
 					if  (sync_file) {
 						SaltySDCore_fclose(sync_file);
 						SaltySD_SetDisplaySync(true);
-						(Shared -> displaySync) = 1;
+						Shared->displaySync.ds.handheld = true;
 					}
 					else SaltySD_SetDisplaySync(false);
 					sync_file = SaltySDCore_fopen("sdmc:/SaltySD/flags/displaysyncdocked.flag", "rb");
 					if  (sync_file) {
 						SaltySDCore_fclose(sync_file);
 						SaltySD_SetDisplaySyncDocked(true);
-						(Shared -> displaySync) |= 2;
+						Shared->displaySync.ds.docked = true;
 					}
 					else SaltySD_SetDisplaySyncDocked(false);
 				}
