@@ -195,7 +195,6 @@ struct NxFpsSharedBlock {
 	uint8_t SetActiveBuffers;
 	union {
 		struct {
-
 			bool handheld: 1;
 			bool docked: 1;
 			unsigned int reserved: 6;
