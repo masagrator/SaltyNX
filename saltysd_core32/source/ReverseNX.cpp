@@ -194,18 +194,25 @@ uint8_t GetOperationMode() {
 
 */
 void GetDefaultDisplayResolution(int* width, int* height) {
-	if ((ReverseNX_RT->def)) {
+	*sharedOperationMode = ((_ZN2nn2oe18GetPerformanceModeEv)(Address_weaks.GetPerformanceMode))();
+	if (ReverseNX_RT->def) {
 		((_ZN2nn2oe27GetDefaultDisplayResolutionEPiS1_)(Address_weaks.GetDefaultDisplayResolution))(width, height);
-		if (*width == 1920) (ReverseNX_RT->isDocked) = true;
-		else (ReverseNX_RT->isDocked) = false;
-	}
-	else if ((ReverseNX_RT->isDocked)) {
-		*width = 1920;
-		*height = 1080;
+		ReverseNX_RT->isDocked = *sharedOperationMode;
 	}
 	else {
-		*width = 1280;
-		*height = 720;
+		if (ReverseNX_RT->isDocked) {
+			if (((_ZN2nn2oe18GetPerformanceModeEv)(Address_weaks.GetPerformanceMode))()) {
+				return ((_ZN2nn2oe27GetDefaultDisplayResolutionEPiS1_)(Address_weaks.GetDefaultDisplayResolution))(width, height);
+			}
+			else {
+				*width = 1920;
+				*height = 1080;
+			}
+		}
+		else {
+			*width = 1280;
+			*height = 720;
+		}
 	}
 }
 
