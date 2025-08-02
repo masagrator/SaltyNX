@@ -7,6 +7,7 @@
 #include <cmath>
 #include "lock.hpp"
 #include <algorithm>
+#include <arm_neon.h>
 
 struct NVNTexture {
 	char reserved[0x80];
@@ -471,17 +472,26 @@ namespace NX_FPS_Math {
 	template <typename T> void addResToViewports(T m_width, T m_height) {
 		T ratio = (m_width * 10) / m_height;
 		if (ratio >= (T)12 && ratio <= (T)18) {
-			uint16_t width = (uint16_t)m_width;
-			uint16_t height = (uint16_t)m_height;
+			union {
+				struct {
+					uint16_t width;
+					uint16_t height;
+				} values;
+				uint32_t value;
+			} value_to_compare;
+
+			static_assert(sizeof(value_to_compare) == sizeof(m_resolutionViewportCalls[0].width) + sizeof(m_resolutionViewportCalls[0].height));
+
+			value_to_compare.values = {(uint16_t)m_width, (uint16_t)m_height};
+
 			for (size_t i = 0; i < 8; i++) {
-				if ((width == m_resolutionViewportCalls[i].width) && (height == m_resolutionViewportCalls[i].height)) {
-					m_resolutionViewportCalls[i].calls++;
+				if (!m_resolutionViewportCalls[i].calls) {
+					memcpy(&m_resolutionViewportCalls[i], &value_to_compare, sizeof(value_to_compare));
+					m_resolutionViewportCalls[i].calls = 1;
 					break;
 				}
-				if (m_resolutionViewportCalls[i].width == 0) {
-					m_resolutionViewportCalls[i].width = width;
-					m_resolutionViewportCalls[i].height = height;
-					m_resolutionViewportCalls[i].calls = 1;
+				if (!memcmp(&value_to_compare, &m_resolutionViewportCalls[i], sizeof(value_to_compare))) {
+					m_resolutionViewportCalls[i].calls++;
 					break;
 				}
 			}
@@ -491,17 +501,26 @@ namespace NX_FPS_Math {
 	template <typename T> void addResToRender(T m_width, T m_height) {
 		T ratio = (m_width * 10) / m_height;
 		if (ratio >= (T)12 && ratio <= (T)18) {
-			uint16_t width = (uint16_t)m_width;
-			uint16_t height = (uint16_t)m_height;
+			union {
+				struct {
+					uint16_t width;
+					uint16_t height;
+				} values;
+				uint32_t value;
+			} value_to_compare;
+
+			static_assert(sizeof(value_to_compare) == sizeof(m_resolutionRenderCalls[0].width) + sizeof(m_resolutionRenderCalls[0].height));
+
+			value_to_compare.values = {(uint16_t)m_width, (uint16_t)m_height};
+
 			for (size_t i = 0; i < 8; i++) {
-				if ((width == m_resolutionRenderCalls[i].width) && (height == m_resolutionRenderCalls[i].height)) {
-					m_resolutionRenderCalls[i].calls++;
+				if (!m_resolutionRenderCalls[i].calls) {
+					memcpy(&m_resolutionRenderCalls[i], &value_to_compare, sizeof(value_to_compare));
+					m_resolutionRenderCalls[i].calls = 1;
 					break;
 				}
-				if (m_resolutionRenderCalls[i].width == 0) {
-					m_resolutionRenderCalls[i].width = width;
-					m_resolutionRenderCalls[i].height = height;
-					m_resolutionRenderCalls[i].calls = 1;
+				if (!memcmp(&value_to_compare.value, &m_resolutionRenderCalls[i], sizeof(value_to_compare))) {
+					m_resolutionRenderCalls[i].calls++;
 					break;
 				}
 			}
@@ -967,7 +986,6 @@ namespace NVN {
 		if (!NX_FPS_Math::starttick) {
 			NX_FPS_Math::starttick = Utils::_getSystemTick();
 			NX_FPS_Math::starttick2 = NX_FPS_Math::starttick;
-			(Shared -> FPSmode) = (uint8_t)((nvnGetPresentInterval_0)(Address_weaks.nvnWindowGetPresentInterval))(nvnWindow);
 		}
 		NX_FPS_Math::PreFrame();
 		((nvnQueuePresentTexture_0)(Address_weaks.nvnQueuePresentTexture))(_this, nvnWindow, index);
