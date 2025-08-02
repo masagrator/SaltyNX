@@ -246,12 +246,24 @@ namespace LOCK {
 			case 0x18:
 				*(int64_t*)(&buffer[*offset_impl]) = (int64_t)value;
 				break;
-			case 0x24:
+			case 0x24: {
+				#if defined(SWITCH32) || defined(OUNCE32)
+				//HOS requires from SIMD load/store instructions to have aligned pointers in A32 mode, so we must avoid using VSTR here
+				float new_value = (float)value;
+				memcpy(&buffer[*offset_impl], &new_value, 4);
+				#else
 				*(float*)(&buffer[*offset_impl]) = (float)value;
+				#endif
 				break;
+			}
 			case 0x28:
 			case 0x38:
+				#if defined(SWITCH32) || defined(OUNCE32)
+				//HOS requires from SIMD load/store instructions to have aligned pointers in A32 mode, so we must avoid using VSTR here
+				memcpy(&buffer[*offset_impl], &value, 8);
+				#else
 				*(double*)(&buffer[*offset_impl]) = (double)value;
+				#endif
 				break;
 			default:
 				return 4;
