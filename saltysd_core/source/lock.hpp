@@ -157,12 +157,12 @@ namespace LOCK {
 	}
 
 	Result applyMasterWrite(FILE* file, size_t master_offset) {
-		uint32_t offset = 0;
+		uint32_t offset_impl = 0;
 
 		SaltySDCore_fseek(file, master_offset, 0);
-		SaltySDCore_fread(&offset, 4, 1, file);
-		SaltySDCore_fseek(file, offset, 0);
-		if (SaltySDCore_ftell(file) != offset)
+		SaltySDCore_fread(&offset_impl, 4, 1, file);
+		SaltySDCore_fseek(file, offset_impl, 0);
+		if (SaltySDCore_ftell(file) != offset_impl)
 			return 0x312;
 		
 		int8_t OPCODE = 0;
@@ -222,43 +222,55 @@ namespace LOCK {
 		}
 	}
 
-	Result writeExprTo(double value, uint8_t* buffer, uint16_t* offset, uint8_t value_type) {
+	Result writeExprTo(double value, uint8_t* buffer, uint16_t* offset_impl, uint8_t value_type) {
 		switch(value_type) {
 			case 1:
-				buffer[*offset] = (uint8_t)value;
+				buffer[*offset_impl] = (uint8_t)value;
 				break;
 			case 2:
-				*(uint16_t*)(&buffer[*offset]) = (uint16_t)value;
+				*(uint16_t*)(&buffer[*offset_impl]) = (uint16_t)value;
 				break;
 			case 4:
-				*(uint32_t*)(&buffer[*offset]) = (uint32_t)value;
+				*(uint32_t*)(&buffer[*offset_impl]) = (uint32_t)value;
 				break;
 			case 8:
-				*(uint64_t*)(&buffer[*offset]) = (uint64_t)value;
+				*(uint64_t*)(&buffer[*offset_impl]) = (uint64_t)value;
 				break;
 			case 0x11:
-				*(int8_t*)(&buffer[*offset]) = (int8_t)value;
+				*(int8_t*)(&buffer[*offset_impl]) = (int8_t)value;
 				break;
 			case 0x12:
-				*(int16_t*)(&buffer[*offset]) = (int16_t)value;
+				*(int16_t*)(&buffer[*offset_impl]) = (int16_t)value;
 				break;
 			case 0x14:
-				*(int32_t*)(&buffer[*offset]) = (int32_t)value;
+				*(int32_t*)(&buffer[*offset_impl]) = (int32_t)value;
 				break;
 			case 0x18:
-				*(int64_t*)(&buffer[*offset]) = (int64_t)value;
+				*(int64_t*)(&buffer[*offset_impl]) = (int64_t)value;
 				break;
-			case 0x24:
-				*(float*)(&buffer[*offset]) = (float)value;
+			case 0x24: {
+				#if defined(SWITCH32) || defined(OUNCE32)
+				//HOS requires from SIMD load/store instructions to have aligned pointers in A32 mode, so we must avoid using VSTR here
+				float new_value = (float)value;
+				memcpy(&buffer[*offset_impl], &new_value, 4);
+				#else
+				*(float*)(&buffer[*offset_impl]) = (float)value;
+				#endif
 				break;
+			}
 			case 0x28:
 			case 0x38:
-				*(double*)(&buffer[*offset]) = (double)value;
+				#if defined(SWITCH32) || defined(OUNCE32)
+				//HOS requires from SIMD load/store instructions to have aligned pointers in A32 mode, so we must avoid using VSTR here
+				memcpy(&buffer[*offset_impl], &value, 8);
+				#else
+				*(double*)(&buffer[*offset_impl]) = (double)value;
+				#endif
 				break;
 			default:
 				return 4;
 		}
-		*offset += value_type % 0x10;
+		*offset_impl += value_type % 0x10;
 		return 0;
 	}
 	
