@@ -1146,6 +1146,8 @@ int main(int argc, char *argv[])
                     GetDisplayRefreshRate(&temp_refreshRate, true);
                     uint32_t check_refresh_rate = refreshRate;
                     if (nx_fps && (isDocked ? nx_fps->FPSlockedDocked : nx_fps->FPSlocked)) check_refresh_rate = (isDocked ? nx_fps->FPSlockedDocked : nx_fps->FPSlocked);
+                    if (check_refresh_rate == 0)
+                        check_refresh_rate = 60;
                     if (nx_fps && nx_fps->forceOriginalRefreshRate && (!isDocked || (isDocked && !dontForce60InDocked))) {
                         check_refresh_rate = 60;
                     }
