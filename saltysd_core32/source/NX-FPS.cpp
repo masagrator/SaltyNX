@@ -425,40 +425,58 @@ namespace NX_FPS_Math {
 	template <typename T> void addResToViewports(T m_width, T m_height) {
 		T ratio = (m_width * 10) / m_height;
 		if (ratio >= (T)12 && ratio <= (T)18) {
-			uint16_t width = (uint16_t)m_width;
-			uint16_t height = (uint16_t)m_height;
+			union {
+				struct {
+					uint16_t width;
+					uint16_t height;
+				} values;
+				uint32_t value;
+			} value_to_compare;
+
+			static_assert(sizeof(value_to_compare) == sizeof(m_resolutionViewportCalls[0].width) + sizeof(m_resolutionViewportCalls[0].height));
+
+			value_to_compare.values = {(uint16_t)m_width, (uint16_t)m_height};
+
 			for (size_t i = 0; i < 8; i++) {
-				if ((width == m_resolutionViewportCalls[i].width) && (height == m_resolutionViewportCalls[i].height)) {
-					m_resolutionViewportCalls[i].calls++;
-					break;
-				}
-				if (m_resolutionViewportCalls[i].width == 0) {
-					m_resolutionViewportCalls[i].width = width;
-					m_resolutionViewportCalls[i].height = height;
+				if (!m_resolutionViewportCalls[i].calls) {
+					memcpy(&m_resolutionViewportCalls[i], &value_to_compare, sizeof(value_to_compare));
 					m_resolutionViewportCalls[i].calls = 1;
 					break;
 				}
-			}		
+				if (!memcmp(&value_to_compare, &m_resolutionViewportCalls[i], sizeof(value_to_compare))) {
+					m_resolutionViewportCalls[i].calls++;
+					break;
+				}
+			}
 		}		
 	}
 
 	template <typename T> void addResToRender(T m_width, T m_height) {
 		T ratio = (m_width * 10) / m_height;
 		if (ratio >= (T)12 && ratio <= (T)18) {
-			uint16_t width = (uint16_t)m_width;
-			uint16_t height = (uint16_t)m_height;
+			union {
+				struct {
+					uint16_t width;
+					uint16_t height;
+				} values;
+				uint32_t value;
+			} value_to_compare;
+
+			static_assert(sizeof(value_to_compare) == sizeof(m_resolutionRenderCalls[0].width) + sizeof(m_resolutionRenderCalls[0].height));
+
+			value_to_compare.values = {(uint16_t)m_width, (uint16_t)m_height};
+
 			for (size_t i = 0; i < 8; i++) {
-				if ((width == m_resolutionRenderCalls[i].width) && (height == m_resolutionRenderCalls[i].height)) {
-					m_resolutionRenderCalls[i].calls++;
-					break;
-				}
-				if (m_resolutionRenderCalls[i].width == 0) {
-					m_resolutionRenderCalls[i].width = width;
-					m_resolutionRenderCalls[i].height = height;
+				if (!m_resolutionRenderCalls[i].calls) {
+					memcpy(&m_resolutionRenderCalls[i], &value_to_compare, sizeof(value_to_compare));
 					m_resolutionRenderCalls[i].calls = 1;
 					break;
 				}
-			}	
+				if (!memcmp(&value_to_compare.value, &m_resolutionRenderCalls[i], sizeof(value_to_compare))) {
+					m_resolutionRenderCalls[i].calls++;
+					break;
+				}
+			}
 		}		
 	}
 }
