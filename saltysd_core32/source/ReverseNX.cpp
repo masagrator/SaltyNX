@@ -201,7 +201,7 @@ void GetDefaultDisplayResolution(int* width, int* height) {
 	}
 	else {
 		if (ReverseNX_RT->isDocked) {
-			if (((_ZN2nn2oe18GetPerformanceModeEv)(Address_weaks.GetPerformanceMode))()) {
+			if (*sharedOperationMode) {
 				return ((_ZN2nn2oe27GetDefaultDisplayResolutionEPiS1_)(Address_weaks.GetDefaultDisplayResolution))(width, height);
 			}
 			else {
