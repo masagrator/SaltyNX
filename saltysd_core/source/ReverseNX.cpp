@@ -206,9 +206,10 @@ uint8_t GetOperationMode() {
 
 */
 void GetDefaultDisplayResolution(int* width, int* height) {
+	*sharedOperationMode = ((_ZN2nn2oe18GetPerformanceModeEv)(Address_weaks.GetPerformanceMode))();
 	if (ReverseNX_RT->def) {
 		((_ZN2nn2oe27GetDefaultDisplayResolutionEPiS1_)(Address_weaks.GetDefaultDisplayResolution))(width, height);
-		ReverseNX_RT->isDocked = ((_ZN2nn2oe18GetPerformanceModeEv)(Address_weaks.GetPerformanceMode))();
+		ReverseNX_RT->isDocked = *sharedOperationMode;
 	}
 	else {
 		if (ReverseNX_RT->isDocked) {
