@@ -7,7 +7,6 @@
 #include <cmath>
 #include "lock.hpp"
 #include <algorithm>
-#include <arm_neon.h>
 
 struct NVNTexture {
 	char reserved[0x80];
