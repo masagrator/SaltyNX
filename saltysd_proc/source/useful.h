@@ -53,10 +53,12 @@ struct NxFpsSharedBlock {
 
 static_assert(sizeof(struct NxFpsSharedBlock) == 165);
 
-#ifndef SWITCH
-	extern uint64_t systemtickfrequency;
-#else 
+#ifdef SWITCH
     #define systemtickfrequency 19200000
+#elif OUNCE
+    #define systemtickfrequency 31250000
+#else
+	extern uint64_t systemtickfrequency;
 #endif
 
 static inline void remove_spaces(char* str_trimmed, const char* str_untrimmed)
