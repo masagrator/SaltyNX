@@ -462,12 +462,12 @@ void LoadDockedModeAllowedSave() {
             matchLowestDocked = (bool)!strncasecmp(substring, "True", 4);
         }
         else SaltySD_printf("SaltySD: %s doesn't have \"matchLowestRefreshRate\"! Setting to false!\n", &path[31]);
-        substring = strstr(temp_string, "BringDefaultRefreshRateWhenOutOfFocus=");
+        substring = strstr(temp_string, "bringDefaultRefreshRateWhenOutOfFocus=");
         if (substring != NULL) {
-            substring = &substring[strlen("BringDefaultRefreshRateWhenOutOfFocus=")];
-            displaySyncDockedOutOfFocus60 = (bool)!strncasecmp(substring, "False", 5);
+            substring = &substring[strlen("bringDefaultRefreshRateWhenOutOfFocus=")];
+            displaySyncDockedOutOfFocus60 = (bool)!strncasecmp(substring, "True", 4);
         }
-        else SaltySD_printf("SaltySD: %s doesn't have \"BringDefaultRefreshRateWhenOutOfFocus=\"! Setting to false!\n", &path[31]);
+        else SaltySD_printf("SaltySD: %s doesn't have \"bringDefaultRefreshRateWhenOutOfFocus=\"! Setting to false!\n", &path[31]);
         substring = strstr(temp_string, "refreshRateAllowed720p={");
         if (substring == NULL) {
             SaltySD_printf("SaltySD: %s doesn't have \"refreshRateAllowed720p\"! Using default settings!\n", &path[31]);
