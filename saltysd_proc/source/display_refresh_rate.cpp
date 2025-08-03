@@ -27,7 +27,9 @@ extern bool isLite;
 extern uint64_t clkVirtAddr;
 extern struct NxFpsSharedBlock* nx_fps;
 extern bool displaySync;
+extern bool displaySyncutOfFocus60;
 extern bool displaySyncDocked;
+extern bool displaySyncDockedOutOfFocus60;
 extern SharedMemory _sharedMemory;
 
 constexpr uint8_t DockedModeRefreshRateAllowedValues[] = {40, 45, 50, 55, 60, 70, 72, 75, 80, 90, 95, 100, 110, 120};
@@ -373,6 +375,7 @@ constexpr void setDefaultDockedSettings() {
     DockedModeRefreshRateAllowed720p[getDockedRefreshRateIterator(60)] = true;
     dontForce60InDocked = false;
     matchLowestDocked = false;
+    displaySyncDockedOutOfFocus60 = false;
 }
 
 void LoadDockedModeAllowedSave() {
@@ -459,6 +462,12 @@ void LoadDockedModeAllowedSave() {
             matchLowestDocked = (bool)!strncasecmp(substring, "True", 4);
         }
         else SaltySD_printf("SaltySD: %s doesn't have \"matchLowestRefreshRate\"! Setting to false!\n", &path[31]);
+        substring = strstr(temp_string, "BringDefaultRefreshRateWhenOutOfFocus=");
+        if (substring != NULL) {
+            substring = &substring[strlen("BringDefaultRefreshRateWhenOutOfFocus=")];
+            displaySyncDockedOutOfFocus60 = (bool)!strncasecmp(substring, "False", 5);
+        }
+        else SaltySD_printf("SaltySD: %s doesn't have \"BringDefaultRefreshRateWhenOutOfFocus=\"! Setting to false!\n", &path[31]);
         substring = strstr(temp_string, "refreshRateAllowed720p={");
         if (substring == NULL) {
             SaltySD_printf("SaltySD: %s doesn't have \"refreshRateAllowed720p\"! Using default settings!\n", &path[31]);

@@ -43,7 +43,9 @@ size_t reservedSharedMemory = 0;
 uint64_t clkVirtAddr = 0;
 uint64_t dsiVirtAddr = 0;
 bool displaySync = false;
+bool displaySyncOutOfFocus60 = false;
 bool displaySyncDocked = false;
+bool displaySyncDockedOutOfFocus60 = false;
 uint8_t refreshRate = 0;
 s64 lastAppPID = -1;
 bool isOLED = false;
@@ -52,6 +54,7 @@ bool cheatCheck = false;
 bool isDocked = false;
 bool dontForce60InDocked = false;
 bool matchLowestDocked = false;
+
 #ifdef SWITCH
     #define systemtickfrequency 19200000
 #elif OUNCE
@@ -176,7 +179,7 @@ ptrdiff_t searchNxFpsSharedMemoryBlock(uintptr_t base) {
 	return -1;
 }
 
-__attribute__((noinline)) Result isApplicationOutOfFocus(bool* outOfFocus) {
+Result isApplicationOutOfFocus(bool* outOfFocus) {
     //hosVersionSet must be used for it to work!
     PdmPlayStatistics stats;
     Result rc = pdmqryQueryPlayStatisticsByApplicationId(TIDnow, true, &stats);
@@ -1085,6 +1088,9 @@ int main(int argc, char *argv[])
     if (file_or_directory_exists("sdmc:/SaltySD/flags/displaysyncdocked.flag")) {
         displaySyncDocked = true;
     }
+    if (file_or_directory_exists("sdmc:/SaltySD/flags/displaysync_outoffocus.flag")) {
+        displaySyncOutOfFocus60 = true;
+    }
 
     // Start our port
     // For some reason, we only have one session maximum (0 reslimit handle related?)	
@@ -1191,7 +1197,7 @@ int main(int argc, char *argv[])
                     if (check_refresh_rate != 60 && nx_fps && nx_fps->forceOriginalRefreshRate && (!isDocked || (isDocked && !dontForce60InDocked))) {
                         check_refresh_rate = 60;
                     }
-                    if (check_refresh_rate != 60) {
+                    if (check_refresh_rate != 60 && ((isDocked && displaySyncDockedOutOfFocus60) || (!isDocked && displaySyncOutOfFocus60))) {
                         bool isOutOfFocus = true;
                         if (R_SUCCEEDED(isApplicationOutOfFocus(&isOutOfFocus)) && isOutOfFocus) {
                             check_refresh_rate = 60;
