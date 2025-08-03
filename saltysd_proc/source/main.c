@@ -1022,7 +1022,6 @@ int main(int argc, char *argv[])
     Result rc = setsysGetFirmwareVersion(&fw);
     if (R_SUCCEEDED(rc)) {
         hosversionSet(MAKEHOSVERSION(fw.major, fw.minor, fw.micro));
-        SaltySD_printf("SaltySD: Got FW version: %d.%d.%d\n", fw.major, fw.minor, fw.micro);
     }
     else {
         SaltySD_printf("SaltySD: Couldn't retrieve Firmware Version! rc: 0x%x.\n", rc);
