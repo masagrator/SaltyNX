@@ -81,6 +81,7 @@ void __appExit(void)
     smExit();
     setsysExit();
     nvExit();
+    pdmqryExit();
 }
 
 void ABORT_IF_FAILED(Result rc, uint8_t ID) {
@@ -173,6 +174,34 @@ ptrdiff_t searchNxFpsSharedMemoryBlock(uintptr_t base) {
 		else search_offset += 4;
 	}
 	return -1;
+}
+
+__attribute__((noinline)) Result isApplicationOutOfFocus(bool* outOfFocus) {
+    //hosVersionSet must be used for it to work!
+    PdmPlayStatistics stats;
+    Result rc = pdmqryQueryPlayStatisticsByApplicationId(TIDnow, true, &stats);
+    if (R_FAILED(rc)) return rc;
+    static u32 old_entry_index = 0;
+    static bool isOutOfFocus = false;
+    if (stats.last_entry_index == old_entry_index) {
+        *outOfFocus = isOutOfFocus;
+        return 0;
+    }
+    old_entry_index = stats.last_entry_index;
+    PdmAppletEvent event;
+    s32 total = 0;
+    rc = pdmqryQueryAppletEvent(stats.last_entry_index, true, &event, 1, &total);
+    if (R_FAILED(rc)) return rc;
+    if (!total) return 1;
+    if (event.event_type == PdmAppletEventType_OutOfFocus || event.event_type == PdmAppletEventType_OutOfFocus4) {
+        *outOfFocus = true;
+        isOutOfFocus = true;
+    }
+    else {
+        *outOfFocus = false;
+        isOutOfFocus = false;
+    }
+    return 0;
 }
 
 bool hijack_bootstrap(Handle* debug, u64 pid, u64 tid, bool isA64)
@@ -989,6 +1018,16 @@ int main(int argc, char *argv[])
     ABORT_IF_FAILED(smInitialize(), 5);
     ABORT_IF_FAILED(setsysInitialize(), 10);
 
+    SetSysFirmwareVersion fw;
+    Result rc = setsysGetFirmwareVersion(&fw);
+    if (R_SUCCEEDED(rc)) {
+        hosversionSet(MAKEHOSVERSION(fw.major, fw.minor, fw.micro));
+        SaltySD_printf("SaltySD: Got FW version: %d.%d.%d\n", fw.major, fw.minor, fw.micro);
+    }
+    else {
+        SaltySD_printf("SaltySD: Couldn't retrieve Firmware Version! rc: 0x%x.\n", rc);
+    }
+
     SetSysProductModel model;
     if (R_SUCCEEDED(setsysGetProductModel(&model))) {
         if (model == SetSysProductModel_Aula) {
@@ -1039,6 +1078,8 @@ int main(int argc, char *argv[])
     serviceClose(ldrDmntSrv);
     memcpy(ldrDmntSrv, &ldrDmntClone, sizeof(Service));
 
+    ABORT_IF_FAILED(pdmqryInitialize(), 8);
+
     if (file_or_directory_exists("sdmc:/SaltySD/flags/displaysync.flag")) {
         displaySync = true;
     }
@@ -1052,7 +1093,7 @@ int main(int argc, char *argv[])
     svcManageNamedPort(&injectserv, "InjectServ", 1);
 
     uint64_t dummy = 0;
-    Result rc = svcQueryMemoryMapping(&clkVirtAddr, &dummy, 0x60006000, 0x1000);
+    rc = svcQueryMemoryMapping(&clkVirtAddr, &dummy, 0x60006000, 0x1000);
     if (R_FAILED(rc)) {
         SaltySD_printf("SaltySD: Retrieving virtual address for 0x60006000 failed. RC: 0x%x.\n", rc);
         clkVirtAddr = 0;
@@ -1148,8 +1189,14 @@ int main(int argc, char *argv[])
                     if (nx_fps && (isDocked ? nx_fps->FPSlockedDocked : nx_fps->FPSlocked)) check_refresh_rate = (isDocked ? nx_fps->FPSlockedDocked : nx_fps->FPSlocked);
                     if (check_refresh_rate == 0)
                         check_refresh_rate = 60;
-                    if (nx_fps && nx_fps->forceOriginalRefreshRate && (!isDocked || (isDocked && !dontForce60InDocked))) {
+                    if (check_refresh_rate != 60 && nx_fps && nx_fps->forceOriginalRefreshRate && (!isDocked || (isDocked && !dontForce60InDocked))) {
                         check_refresh_rate = 60;
+                    }
+                    if (check_refresh_rate != 60) {
+                        bool isOutOfFocus = true;
+                        if (R_SUCCEEDED(isApplicationOutOfFocus(&isOutOfFocus)) && isOutOfFocus) {
+                            check_refresh_rate = 60;
+                        }
                     }
                     if (temp_refreshRate != check_refresh_rate)
                         SetDisplayRefreshRate(check_refresh_rate);
