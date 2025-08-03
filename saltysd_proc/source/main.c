@@ -184,26 +184,24 @@ Result isApplicationOutOfFocus(bool* outOfFocus) {
     PdmPlayStatistics stats;
     Result rc = pdmqryQueryPlayStatisticsByApplicationId(TIDnow, true, &stats);
     if (R_FAILED(rc)) return rc;
+
     static u32 old_entry_index = 0;
     static bool isOutOfFocus = false;
     if (stats.last_entry_index == old_entry_index) {
         *outOfFocus = isOutOfFocus;
         return 0;
     }
+
     old_entry_index = stats.last_entry_index;
     PdmAppletEvent event;
     s32 total = 0;
     rc = pdmqryQueryAppletEvent(stats.last_entry_index, true, &event, 1, &total);
     if (R_FAILED(rc)) return rc;
     if (!total) return 1;
-    if (event.event_type == PdmAppletEventType_OutOfFocus || event.event_type == PdmAppletEventType_OutOfFocus4) {
-        *outOfFocus = true;
-        isOutOfFocus = true;
-    }
-    else {
-        *outOfFocus = false;
-        isOutOfFocus = false;
-    }
+    
+    bool isOut = event.event_type == PdmAppletEventType_OutOfFocus || event.event_type == PdmAppletEventType_OutOfFocus4;
+    *outOfFocus = isOut;
+    isOutOfFocus = isOut;
     return 0;
 }
 
