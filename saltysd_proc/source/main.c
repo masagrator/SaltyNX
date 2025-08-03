@@ -921,6 +921,38 @@ Result handleServiceCmd(int cmd)
 
         ret = 0;
     }
+    else if (cmd == 19) // SetDisplaySyncRefreshRate60WhenOutOfFocus
+    {
+        IpcParsedCommand r = {0};
+        ipcParse(&r);
+
+        struct {
+            u64 magic;
+            u64 cmd_id;
+            u32 value;
+            u32 inDocked;
+            u64 reserved;
+        } *resp = r.Raw;
+
+        bool inDocked = (bool)(resp -> inDocked);
+        if (inDocked) {
+            displaySyncDockedOutOfFocus60 = (bool)(resp -> value);
+        }
+        else {
+            displaySyncOutOfFocus60 = (bool)(resp -> value);
+            if (displaySyncOutOfFocus60) {
+                FILE* file = fopen("sdmc:/SaltySD/flags/displaysync_outoffocus.flag", "wb");
+                fclose(file);
+                SaltySD_printf("SaltySD: cmd 19 handler -> %d\n", displaySyncOutOfFocus60);
+            }
+            else {
+                remove("sdmc:/SaltySD/flags/displaysync_outoffocus.flag");
+                SaltySD_printf("SaltySD: cmd 19 handler -> %d\n", displaySyncOutOfFocus60);
+            }
+        }
+
+        ret = 0;
+    }
     else
     {
         ret = 0xEE01;
