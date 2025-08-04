@@ -235,6 +235,7 @@ uint8_t GetOperationMode() {
 
 */
 void GetDefaultDisplayResolution(int* width, int* height) {
+	(ReverseNX_RT->pluginActive) = true;
 	*sharedOperationMode = ((_ZN2nn2oe18GetPerformanceModeEv)(Address_weaks.GetPerformanceMode))();
 	if (ReverseNX_RT->def) {
 		((_ZN2nn2oe27GetDefaultDisplayResolutionEPiS1_)(Address_weaks.GetDefaultDisplayResolution))(width, height);
@@ -297,7 +298,6 @@ bool TryWaitSystemEvent(SystemEvent* systemEvent) {
 
 void WaitSystemEvent(SystemEvent* systemEvent) {
 	if (systemEvent == defaultDisplayResolutionChangeEventCopy) {
-		ReverseNX_RT->pluginActive = true;
 		while(true) {
 			bool return_now = TryWaitSystemEvent(systemEvent);
 			if (return_now)
