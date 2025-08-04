@@ -4,6 +4,7 @@
 #include "saltysd_ipc.h"
 #include "saltysd_dynamic.h"
 #include <cerrno>
+#include <utility>
 
 enum ReverseNX_state {
 	ReverseNX_Switch_Invalid = -1,
@@ -52,13 +53,29 @@ struct {
 	uintptr_t TimedWaitAny;	
 } Address_weaks;
 
-const char* ver = "3.0.1";
+enum res_mode {
+	res_mode_default = 0,
+	res_mode_480p = 1,
+	res_mode_540p = 2,
+	res_mode_630p = 3,
+	res_mode_720p = 4,
+	res_mode_810p = 5,
+	res_mode_900p = 6,
+	res_mode_1080p = 7,
+	res_mode_amount = 8
+};
+
+std::pair<int, int> resolutions[] = {{0 ,0}, {854, 480}, {960, 540}, {1120, 630}, {1280, 720}, {1440, 810}, {1600, 900}, {1920, 1080}};
 
 struct Shared {
 	uint32_t MAGIC;
 	bool isDocked;
 	bool def;
 	bool pluginActive;
+	struct {
+		res_mode handheld_res: 4;
+		res_mode docked_res: 4;
+	} PACKED res;
 } PACKED;
 
 Shared* ReverseNX_RT;
@@ -82,13 +99,23 @@ ReverseNX_state loadSave() {
 		}
 		uint8_t version = 0;
 		SaltySDCore_fread(&version, 1, 1, save_file);
-		if (version != 1) {
+		if (version != 1 && version != 2) {
 			SaltySDCore_fclose(save_file);
 			SaltySDCore_printf("ReverseNX: Save had wrong version!\n", path);
 			return ReverseNX_Switch_Invalid;
 		}
 		uint8_t state = ReverseNX_Switch_Invalid;
 		SaltySDCore_fread(&state, 1, 1, save_file);
+		if (version == 2) {
+			int8_t res_mode_h = -1;
+			SaltySDCore_fread(&res_mode_h, 1, 1, save_file);
+			int8_t res_mode_d = -1;
+			SaltySDCore_fread(&res_mode_d, 1, 1, save_file);
+			if (res_mode_h >= 0 && res_mode_h < res_mode_amount && res_mode_d >= 0 && res_mode_d < res_mode_amount) {
+				ReverseNX_RT->res.handheld_res = (res_mode)res_mode_h;
+				ReverseNX_RT->res.docked_res = (res_mode)res_mode_d;
+			}
+		}
 		SaltySDCore_fclose(save_file);
 		if (state > ReverseNX_Switch_Docked) {
 			SaltySDCore_printf("ReverseNX: Save had wrong state!\n", path);
@@ -200,18 +227,22 @@ void GetDefaultDisplayResolution(int* width, int* height) {
 		ReverseNX_RT->isDocked = *sharedOperationMode;
 	}
 	else {
-		if (ReverseNX_RT->isDocked) {
-			if (*sharedOperationMode) {
-				return ((_ZN2nn2oe27GetDefaultDisplayResolutionEPiS1_)(Address_weaks.GetDefaultDisplayResolution))(width, height);
-			}
-			else {
+		if (ReverseNX_RT->isDocked && ReverseNX_RT->res.docked_res == res_mode_default) {
+			if (!*sharedOperationMode) {
 				*width = 1920;
 				*height = 1080;
 			}
+			else {
+				*width = 1280;
+				*height = 720;
+			}
+		}
+		else if (*sharedOperationMode && ReverseNX_RT->isDocked && ReverseNX_RT->res.docked_res == res_mode_default) {
+			((_ZN2nn2oe27GetDefaultDisplayResolutionEPiS1_)(Address_weaks.GetDefaultDisplayResolution))(width, height);
 		}
 		else {
-			*width = 1280;
-			*height = 720;
+			*width = resolutions[ReverseNX_RT->isDocked ? ReverseNX_RT->res.docked_res : ReverseNX_RT->res.handheld_res].first;
+			*height = resolutions[ReverseNX_RT->isDocked ? ReverseNX_RT->res.docked_res : ReverseNX_RT->res.handheld_res].second;
 		}
 	}
 }
@@ -224,10 +255,15 @@ void GetDefaultDisplayResolutionChangeEvent(SystemEvent* systemEvent) {
 bool TryWaitSystemEvent(SystemEvent* systemEvent) {
 	static bool check = true;
 	static bool compare = false;
+	static uint8_t compare_res_mode_h = 0;
+	static uint8_t compare_res_mode_d = 0;
 
-	if (systemEvent != defaultDisplayResolutionChangeEventCopy || (ReverseNX_RT->def)) {
+	if (systemEvent != defaultDisplayResolutionChangeEventCopy) 
+		return ((nnosTryWaitSystemEvent)(Address_weaks.TryWaitSystemEvent))(systemEvent);
+
+	if (ReverseNX_RT->def) {
 		bool ret = ((nnosTryWaitSystemEvent)(Address_weaks.TryWaitSystemEvent))(systemEvent);
-		compare = (ReverseNX_RT->isDocked);
+		compare = ReverseNX_RT->isDocked;
 		if (systemEvent == defaultDisplayResolutionChangeEventCopy && !check) {
 			check = true;
 			return true;
@@ -235,14 +271,14 @@ bool TryWaitSystemEvent(SystemEvent* systemEvent) {
 		return ret;
 	}
 	check = false;
-	if (systemEvent == defaultDisplayResolutionChangeEventCopy) {
-		if (compare != (ReverseNX_RT->isDocked)) {
-			compare = (ReverseNX_RT->isDocked);
-			return true;
-		}
-		return false;
+	bool ret = ((nnosTryWaitSystemEvent)(Address_weaks.TryWaitSystemEvent))(systemEvent);
+	if (ret || compare != ReverseNX_RT->isDocked || compare_res_mode_d != ReverseNX_RT->res.docked_res || compare_res_mode_h != ReverseNX_RT->res.handheld_res) {
+		compare = ReverseNX_RT->isDocked;
+		compare_res_mode_d = ReverseNX_RT->res.docked_res;
+		compare_res_mode_h = ReverseNX_RT->res.handheld_res;
+		return true;
 	}
-	return ((nnosTryWaitSystemEvent)(Address_weaks.TryWaitSystemEvent))(systemEvent);
+	return false;
 }
 
 void WaitSystemEvent(SystemEvent* systemEvent) {
@@ -252,7 +288,7 @@ void WaitSystemEvent(SystemEvent* systemEvent) {
 			bool return_now = TryWaitSystemEvent(systemEvent);
 			if (return_now)
 				return;
-			svcSleepThread(1'000'000);
+			svcSleepThread(20'000'000);
 		}
 	}
 	return ((nnosWaitSystemEvent)(Address_weaks.WaitSystemEvent))(systemEvent);
