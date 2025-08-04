@@ -121,7 +121,7 @@ ReverseNX_state loadSave() {
 			SaltySDCore_fread(&res_mode_h, 1, 1, save_file);
 			int8_t res_mode_d = -1;
 			SaltySDCore_fread(&res_mode_d, 1, 1, save_file);
-			if (res_mode_h > 0 && res_mode_h < res_mode_amount && res_mode_d > 0 && res_mode_d < res_mode_amount) {
+			if (res_mode_h >= 0 && res_mode_h < res_mode_amount && res_mode_d >= 0 && res_mode_d < res_mode_amount) {
 				ReverseNX_RT->res.handheld_res = (res_mode)res_mode_h;
 				ReverseNX_RT->res.docked_res = (res_mode)res_mode_d;
 			}
