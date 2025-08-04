@@ -321,8 +321,9 @@ void hijack_pid(u64 pid)
                 SaltySD_printf("SaltySD: %s TID %016lx is a homebrew application, aborting bootstrap...\n", eventinfo.name, eventinfo.tid);
                 goto abort_bootstrap;
             }
-            if (shmemGetAddr(&_sharedMemory)) {
-                memset(shmemGetAddr(&_sharedMemory), 0, 0x1000);
+            uintptr_t shmem = (uintptr_t)shmemGetAddr(&_sharedMemory);
+            if (shmem) {
+                memset((void*)(shmem+4), 0, _sharedMemory.size-4);
             }
             char* hbloader = "hbloader";
             if (strcasecmp(eventinfo.name, hbloader) == 0)
@@ -658,7 +659,8 @@ Result handleServiceCmd(int cmd)
         else if (new_size < (_sharedMemory.size - reservedSharedMemory)) {
             if (shmemGetAddr(&_sharedMemory)) {
                 if (!reservedSharedMemory) {
-                    memset(shmemGetAddr(&_sharedMemory), 0, 0x1000);
+                    uintptr_t shmem = (uintptr_t)shmemGetAddr(&_sharedMemory);
+                    if (shmem) memset((void*)(shmem+4), 0, _sharedMemory.size-4);
                 }
                 raw->result = 0;
                 raw->offset = reservedSharedMemory;
@@ -1142,6 +1144,8 @@ int main(int argc, char *argv[])
     }
     shmemCreate(&_sharedMemory, 0x1000, Perm_Rw, Perm_Rw);
     shmemMap(&_sharedMemory);
+    memset(shmemGetAddr(&_sharedMemory), 0, _sharedMemory.size);
+
     // Main service loop
     u64* pids = malloc(0x200 * sizeof(u64));
     u64 max = 0;
@@ -1206,8 +1210,9 @@ int main(int argc, char *argv[])
                 lastAppPID = -1;
                 nx_fps = 0;
                 cheatCheck = false;
-                if (shmemGetAddr(&_sharedMemory)) {
-                    memset(shmemGetAddr(&_sharedMemory), 0, 0x1000);
+                uintptr_t shmem = (uintptr_t)shmemGetAddr(&_sharedMemory);
+                if (shmem) {
+                    memset((void*)(shmem+4), 0, _sharedMemory.size-4);
                 }
                 if ((!isDocked && displaySync) || (isDocked && displaySyncDocked)) {
                     uint32_t temp_refreshRate = 0;
@@ -1267,11 +1272,9 @@ int main(int argc, char *argv[])
             }
         }
         
-        if (isOLED) {
-            uint32_t crr = 0;
-            GetDisplayRefreshRate(&crr, true);
-            correctOledGamma(crr);
-        }
+        uint32_t crr = 0;
+        GetDisplayRefreshRate(&crr, true);
+        if (isOLED && !isDocked) correctOledGamma(crr);
 
         if (nx_fps) nx_fps -> dontForce60InDocked = dontForce60InDocked;
 
