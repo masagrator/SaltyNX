@@ -17,8 +17,7 @@
 #define MODULE_SALTYSD 420
 #define NVDISP_PANEL_GET_VENDOR_ID 0xC003021A
 
-#define MIN(a,b) (((a)<(b))?(a):(b))
-#define MAX(a,b) (((a)>(b))?(a):(b))
+#define shmem_size 0x1000
 
 struct NxFpsSharedBlock* nx_fps = 0;
 
@@ -323,7 +322,7 @@ void hijack_pid(u64 pid)
             }
             uintptr_t shmem = (uintptr_t)shmemGetAddr(&_sharedMemory);
             if (shmem) {
-                memset((void*)(shmem+4), 0, _sharedMemory.size-4);
+                memset((void*)(shmem+4), 0, shmem_size-4);
             }
             char* hbloader = "hbloader";
             if (strcasecmp(eventinfo.name, hbloader) == 0)
@@ -656,11 +655,11 @@ Result handleServiceCmd(int cmd)
             raw->offset = 0;
             raw->result = 0xFFE;
         }
-        else if (new_size < (_sharedMemory.size - reservedSharedMemory)) {
+        else if (new_size < (shmem_size - reservedSharedMemory)) {
             if (shmemGetAddr(&_sharedMemory)) {
                 if (!reservedSharedMemory) {
                     uintptr_t shmem = (uintptr_t)shmemGetAddr(&_sharedMemory);
-                    if (shmem) memset((void*)(shmem+4), 0, _sharedMemory.size-4);
+                    if (shmem) memset((void*)(shmem+4), 0, shmem_size-4);
                 }
                 raw->result = 0;
                 raw->offset = reservedSharedMemory;
@@ -676,7 +675,7 @@ Result handleServiceCmd(int cmd)
             }
         }
         else {
-            SaltySD_printf("SaltySD: cmd 6 failed. Not enough free space. Left: %d\n", (_sharedMemory.size - reservedSharedMemory));
+            SaltySD_printf("SaltySD: cmd 6 failed. Not enough free space. Left: %d\n", (shmem_size - reservedSharedMemory));
             raw->offset = -1;
             raw->result = 0xFFE;
         }
@@ -1142,9 +1141,9 @@ int main(int argc, char *argv[])
             dsiVirtAddr = 0;
         }
     }
-    shmemCreate(&_sharedMemory, 0x1000, Perm_Rw, Perm_Rw);
+    shmemCreate(&_sharedMemory, shmem_size, Perm_Rw, Perm_Rw);
     shmemMap(&_sharedMemory);
-    memset(shmemGetAddr(&_sharedMemory), 0, _sharedMemory.size);
+    memset(shmemGetAddr(&_sharedMemory), 0, shmem_size);
 
     // Main service loop
     u64* pids = malloc(0x200 * sizeof(u64));
@@ -1212,7 +1211,7 @@ int main(int argc, char *argv[])
                 cheatCheck = false;
                 uintptr_t shmem = (uintptr_t)shmemGetAddr(&_sharedMemory);
                 if (shmem) {
-                    memset((void*)(shmem+4), 0, _sharedMemory.size-4);
+                    memset((void*)(shmem+4), 0, shmem_size-4);
                 }
                 if ((!isDocked && displaySync) || (isDocked && displaySyncDocked)) {
                     uint32_t temp_refreshRate = 0;
