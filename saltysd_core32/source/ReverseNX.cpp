@@ -234,23 +234,31 @@ void GetDefaultDisplayResolution(int* width, int* height) {
 		ReverseNX_RT->isDocked = *sharedOperationMode;
 	}
 	else {
-		if (ReverseNX_RT->isDocked && ReverseNX_RT->res.docked_res == res_mode_default) {
-			if (!*sharedOperationMode) {
-				*width = 1920;
-				*height = 1080;
-			}
-			else {
-				*width = 1280;
-				*height = 720;
-			}
-		}
-		else if (*sharedOperationMode && ReverseNX_RT->isDocked && ReverseNX_RT->res.docked_res == res_mode_default) {
+		if (*sharedOperationMode && ReverseNX_RT->isDocked && ReverseNX_RT->res.docked_res == res_mode_default) {
 			((_ZN2nn2oe27GetDefaultDisplayResolutionEPiS1_)(Address_weaks.GetDefaultDisplayResolution))(width, height);
+			return;
 		}
-		else {
-			*width = resolutions[ReverseNX_RT->isDocked ? ReverseNX_RT->res.docked_res : ReverseNX_RT->res.handheld_res].first;
-			*height = resolutions[ReverseNX_RT->isDocked ? ReverseNX_RT->res.docked_res : ReverseNX_RT->res.handheld_res].second;
+		if (*sharedOperationMode && !(ReverseNX_RT->isDocked) && ReverseNX_RT->res.handheld_res == res_mode_default) {
+			*width = 1280;
+			*height = 720;
+			return;
 		}
+		if (!*sharedOperationMode && !(ReverseNX_RT->isDocked) && ReverseNX_RT->res.handheld_res == res_mode_default) {
+			((_ZN2nn2oe27GetDefaultDisplayResolutionEPiS1_)(Address_weaks.GetDefaultDisplayResolution))(width, height);
+			return;
+		}
+		if (!*sharedOperationMode && (ReverseNX_RT->isDocked) && ReverseNX_RT->res.docked_res == res_mode_default) {
+			*width = 1920;
+			*height = 1080;
+			return;
+		}
+		res_mode res = ReverseNX_RT->isDocked ? ReverseNX_RT->res.docked_res : ReverseNX_RT->res.handheld_res;
+		if (res == res_mode_default) {
+			((_ZN2nn2oe27GetDefaultDisplayResolutionEPiS1_)(Address_weaks.GetDefaultDisplayResolution))(width, height);
+			return;
+		}
+		*width = resolutions[res].first;
+		*height = resolutions[res].second;
 	}
 }
 
