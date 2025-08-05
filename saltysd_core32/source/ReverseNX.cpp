@@ -76,7 +76,10 @@ struct Shared {
 		res_mode handheld_res: 4;
 		res_mode docked_res: 4;
 	} PACKED res;
+	bool wasDDRused;
 } PACKED;
+
+static_assert(sizeof(Shared) == 9);
 
 Shared* ReverseNX_RT;
 
@@ -221,8 +224,11 @@ uint8_t GetOperationMode() {
 
 */
 void GetDefaultDisplayResolution(int* width, int* height) {
+	if (ReverseNX_RT->wasDDRused == false) {
+		ReverseNX_RT->wasDDRused = true;
+		ReverseNX_RT->pluginActive = true;
+	}
 	*sharedOperationMode = ((_ZN2nn2oe18GetPerformanceModeEv)(Address_weaks.GetPerformanceMode))();
-	(ReverseNX_RT->pluginActive) = true;
 	if (ReverseNX_RT->def) {
 		((_ZN2nn2oe27GetDefaultDisplayResolutionEPiS1_)(Address_weaks.GetDefaultDisplayResolution))(width, height);
 		ReverseNX_RT->isDocked = *sharedOperationMode;
