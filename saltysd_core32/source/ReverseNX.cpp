@@ -277,9 +277,11 @@ bool TryWaitSystemEvent(SystemEvent* systemEvent) {
 		}
 		return ret;
 	}
+	bool last_check = check;
 	check = false;
 	bool ret = ((nnosTryWaitSystemEvent)(Address_weaks.TryWaitSystemEvent))(systemEvent);
-	if (ret || compare != ReverseNX_RT->isDocked || compare_res_mode_d != ReverseNX_RT->res.docked_res || compare_res_mode_h != ReverseNX_RT->res.handheld_res) {
+	if (last_check || ret || compare != ReverseNX_RT->isDocked || compare_res_mode_d != ReverseNX_RT->res.docked_res || compare_res_mode_h != ReverseNX_RT->res.handheld_res) {
+		last_check = false;
 		compare = ReverseNX_RT->isDocked;
 		compare_res_mode_d = ReverseNX_RT->res.docked_res;
 		compare_res_mode_h = ReverseNX_RT->res.handheld_res;
