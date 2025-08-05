@@ -83,13 +83,21 @@ static_assert(sizeof(Shared) == 9);
 
 Shared* ReverseNX_RT;
 
-static uint32_t *sharedOperationMode = 0;
+ptrdiff_t SharedMemoryOffset2 = -1;
+
+SystemEvent* defaultDisplayResolutionChangeEventCopy = 0;
+SystemEvent* notificationMessageEventCopy = 0;
+void* multiWaitHolderCopy = 0;
+void* multiWaitCopy = 0;
+bool multiWaitHack = false;
+
+static uint32_t* sharedOperationMode = 0;
 
 ReverseNX_state loadSave() {
 	char path[128];
     uint64_t titid = 0;
     svcGetInfo(&titid, InfoType_TitleId, CUR_PROCESS_HANDLE, 0);	
-	snprintf(path, sizeof(path), "sdmc:/SaltySD/plugins/ReverseNX-RT/%016llX.dat", titid);
+	snprintf(path, sizeof(path), "sdmc:/SaltySD/plugins/ReverseNX-RT/%016lX.dat", titid);
 	errno = 0;
 	FILE* save_file = SaltySDCore_fopen(path, "rb");
 	if (save_file) {
@@ -135,13 +143,6 @@ ReverseNX_state loadSave() {
 	}
 }
 
-ptrdiff_t SharedMemoryOffset2 = -1;
-
-SystemEvent* defaultDisplayResolutionChangeEventCopy = 0;
-SystemEvent* notificationMessageEventCopy = 0;
-void* multiWaitHolderCopy = 0;
-void* multiWaitCopy = 0;
-
 bool TryPopNotificationMessage(int &msg) {
 
 	static bool check1 = true;
@@ -149,9 +150,9 @@ bool TryPopNotificationMessage(int &msg) {
 	static bool compare = false;
 	static bool compare2 = false;
 
-	(ReverseNX_RT->pluginActive) = true;
+	ReverseNX_RT->pluginActive = true;
 
-	if ((ReverseNX_RT->def)) {
+	if (ReverseNX_RT->def) {
 		if (!check1) {
 			check1 = true;
 			msg = 0x1f;
@@ -162,22 +163,31 @@ bool TryPopNotificationMessage(int &msg) {
 			msg = 0x1e;
 			return true;
 		}
+		else if (multiWaitHack == true) {
+			multiWaitHack = false;
+			msg = 0xFF;
+			return true;
+		}
 		else return ((_ZN2nn2oe25TryPopNotificationMessageEPj)(Address_weaks.TryPopNotificationMessage))(msg);
 	}
 	
 	check1 = false;
 	check2 = false;
-	if (compare2 != (ReverseNX_RT->isDocked)) {
-		compare2 = (ReverseNX_RT->isDocked);
+	if (compare2 != ReverseNX_RT->isDocked) {
+		compare2 = ReverseNX_RT->isDocked;
 		msg = 0x1f;
 		return true;
 	}
-	if (compare != (ReverseNX_RT->isDocked)) {
-		compare = (ReverseNX_RT->isDocked);
+	if (compare != ReverseNX_RT->isDocked) {
+		compare = ReverseNX_RT->isDocked;
 		msg = 0x1e;
 		return true;
 	}
-	
+	if (multiWaitHack == true) {
+		multiWaitHack = false;
+		msg = 0xFF;
+		return true;
+	}
 	return ((_ZN2nn2oe25TryPopNotificationMessageEPj)(Address_weaks.TryPopNotificationMessage))(msg);
 }
 
@@ -193,16 +203,18 @@ int PopNotificationMessage() {
 
 uint32_t GetPerformanceMode() {
 	*sharedOperationMode = ((_ZN2nn2oe18GetPerformanceModeEv)(Address_weaks.GetPerformanceMode))();
-	if ((ReverseNX_RT->def)) (ReverseNX_RT->isDocked) = *sharedOperationMode;
+	if (ReverseNX_RT->def) ReverseNX_RT->isDocked = *sharedOperationMode;
 	
-	return (ReverseNX_RT->isDocked);
+	return ReverseNX_RT->isDocked;
 }
 
 uint8_t GetOperationMode() {
+	//Fix for Unravel Two that calls this function constantly without checking notifications
+	ReverseNX_RT->pluginActive = true;
 	*sharedOperationMode = ((_ZN2nn2oe16GetOperationModeEv)(Address_weaks.GetOperationMode))();
-	if ((ReverseNX_RT->def)) (ReverseNX_RT->isDocked) = *sharedOperationMode;
+	if (ReverseNX_RT->def) ReverseNX_RT->isDocked = *sharedOperationMode;
 	
-	return (ReverseNX_RT->isDocked);
+	return ReverseNX_RT->isDocked;
 }
 
 /* 
@@ -212,7 +224,7 @@ uint8_t GetOperationMode() {
 	default display resolution of currently running mode.
 	Those are:
 	Handheld - 1280x720
-	Docked - 1920x1080
+	Docked - 1920x1080 only when true handheld mode is detected
 	
 	Game is waiting for DefaultDisplayResolutionChange event to check again
 	which mode is currently in use. And to do that nn::os::TryWaitSystemEvent is used
@@ -303,7 +315,7 @@ void WaitSystemEvent(SystemEvent* systemEvent) {
 }
 
 /* 
-	Used by Monster Hunter Rise.
+	Used by Monster Hunter Rise and The Legend of Zelda: Echoes of Wisdom
 
 	Game won't check if mode was changed until NotificationMessage event will be flagged.
 	Functions below are detecting which MultiWait includes NotificationMessage event,
@@ -334,7 +346,11 @@ void LinkMultiWaitHolder(void* MultiWaitType, void* MultiWaitHolderType) {
 void* WaitAny(void* MultiWaitType) {
 	if (multiWaitCopy != MultiWaitType)
 		return ((nnosWaitAny)(Address_weaks.WaitAny))(MultiWaitType);
-	return ((nnosTimedWaitAny)(Address_weaks.TimedWaitAny))(MultiWaitType, 1000000);
+	ReverseNX_RT->pluginActive = true;
+	void* ret_value = ((nnosTimedWaitAny)(Address_weaks.TimedWaitAny))(MultiWaitType, 1000000);
+	if (ret_value != NULL) return ret_value;
+	multiWaitHack = true;
+	return multiWaitHolderCopy;
 }
 
 extern "C" {
