@@ -294,12 +294,6 @@ inline void createBuildidPath(const uint64_t buildid, char* titleid, char* buffe
 	strcat(buffer, ".bin");	
 }
 
-inline void CheckTitleID(char* buffer) {
-    uint64_t titid = 0;
-    svcGetInfo(&titid, InfoType_TitleId, CUR_PROCESS_HANDLE, 0);	
-    ltoa(titid, buffer, 16);
-}
-
 inline uintptr_t getMainAddress() {
 	MemoryInfo memoryinfo = {0};
 	u32 pageinfo = 0;
@@ -689,12 +683,14 @@ namespace vk {
 
 	u32 LookupSymbol(uintptr_t* pOutAddress, const char* name) {
 		if (!strcmp("vkGetInstanceProcAddr", name)) {
-			((_ZN2nn2ro12LookupSymbolEPmPKc_0)(Address_weaks.LookupSymbol))(&Address_weaks.vkGetInstanceProcAddr, name);
+			if (!Address_weaks.vkGetInstanceProcAddr)
+				((_ZN2nn2ro12LookupSymbolEPmPKc_0)(Address_weaks.LookupSymbol))(&Address_weaks.vkGetInstanceProcAddr, name);
 			*pOutAddress = (uintptr_t)&GetInstanceProcAddr;
 			return 0;
 		}
 		if (!strcmp("vkGetDeviceProcAddr", name)) {
-			((_ZN2nn2ro12LookupSymbolEPmPKc_0)(Address_weaks.LookupSymbol))(&Address_weaks.vkGetDeviceProcAddr, name);
+			if (!Address_weaks.vkGetDeviceProcAddr)
+				((_ZN2nn2ro12LookupSymbolEPmPKc_0)(Address_weaks.LookupSymbol))(&Address_weaks.vkGetDeviceProcAddr, name);
 			*pOutAddress = (uintptr_t)&GetDeviceProcAddr;
 			return 0;
 		}
@@ -1193,6 +1189,9 @@ extern "C" {
 
 			Shared = (NxFpsSharedBlock*)((uintptr_t)shmemGetAddr(_sharedmemory) + SharedMemoryOffset);
 			Shared -> MAGIC = 0x465053;
+
+			uint64_t titid = 0;
+			svcGetInfo(&titid, InfoType_TitleId, CUR_PROCESS_HANDLE, 0);
 			
 			Address_weaks.nvnBootstrapLoader = SaltySDCore_FindSymbolBuiltin("nvnBootstrapLoader");
 			Address_weaks.eglSwapBuffers = SaltySDCore_FindSymbolBuiltin("eglSwapBuffers");
@@ -1236,7 +1235,10 @@ extern "C" {
 			SaltySDCore_ReplaceImport("glViewportIndexedfvNV", (void*)EGL::ViewportIndexedfvNV);
 			SaltySDCore_ReplaceImport("glViewportIndexedfvOES", (void*)EGL::ViewportIndexedfvOES);
 			SaltySDCore_ReplaceImport("vkQueuePresentKHR", (void*)vk::QueuePresent);
-			SaltySDCore_ReplaceImport("_ZN11NvSwapchain15QueuePresentKHREP9VkQueue_TPK16VkPresentInfoKHR", (void*)vk::nvSwapchain::QueuePresent);
+			//Compatibility fix for Crypt of the NecroDancer
+			if (titid != 0x0100CEA007D08000) {
+				SaltySDCore_ReplaceImport("_ZN11NvSwapchain15QueuePresentKHREP9VkQueue_TPK16VkPresentInfoKHR", (void*)vk::nvSwapchain::QueuePresent);
+			}
 			SaltySDCore_ReplaceImport("eglGetProcAddress", (void*)EGL::GetProc);
 			SaltySDCore_ReplaceImport("vkGetDeviceProcAddr", (void*)vk::GetDeviceProcAddr);
 			SaltySDCore_ReplaceImport("vkGetInstanceProcAddr", (void*)vk::GetInstanceProcAddr);
@@ -1260,7 +1262,7 @@ extern "C" {
 			#endif
 
 			char titleid[17];
-			CheckTitleID(&titleid[0]);
+			ltoa(titid, titleid, 16);
 			char path[128];
 			strcpy(&path[0], "sdmc:/SaltySD/plugins/FPSLocker/0");
 			strcat(&path[0], &titleid[0]);
