@@ -549,6 +549,11 @@ namespace vk {
 	namespace Common {
 		int32_t QueuePresent(const void* VkQueue_T, const void* VkPresentInfoKHR, uintptr_t pointer) {
 
+			static bool check_redirection = false;
+			//Fix for games in which subsdk redirects internally vkQueuePresentKHR to nv::Swapchain
+			if (check_redirection == true) {
+				return ((vkQueuePresentKHR_0)(pointer))(VkQueue_T, VkPresentInfoKHR);
+			}
 			if (!NX_FPS_Math::starttick) {
 				(Shared -> API) = 3;
 				NX_FPS_Math::starttick = Utils::_getSystemTick();
@@ -556,7 +561,11 @@ namespace vk {
 			}
 			
 			NX_FPS_Math::PreFrame();
+			if (pointer == Address_weaks.vkQueuePresentKHR) {
+				check_redirection = true;
+			}
 			int32_t vulkanResult = ((vkQueuePresentKHR_0)(pointer))(VkQueue_T, VkPresentInfoKHR);
+			check_redirection = false;
 			if (vulkanResult >= 0) NX_FPS_Math::PostFrame();
 
 			if (!NX_FPS_Math::new_fpslock) {
@@ -1235,15 +1244,7 @@ extern "C" {
 			SaltySDCore_ReplaceImport("glViewportIndexedfvNV", (void*)EGL::ViewportIndexedfvNV);
 			SaltySDCore_ReplaceImport("glViewportIndexedfvOES", (void*)EGL::ViewportIndexedfvOES);
 			SaltySDCore_ReplaceImport("vkQueuePresentKHR", (void*)vk::QueuePresent);
-			const std::array vulkan_titleids_exc {
-				0x0100CEA007D08000, //Crypt of the NecroDancer
-				0x0100AA80194B0000, //Pikmin 1
-				0x0100D680194B2000  //Pikmin 2
-			};
-			//Compatibility fix for few games
-			if (std::find(vulkan_titleids_exc.cbegin(), vulkan_titleids_exc.cend(), titid) == vulkan_titleids_exc.cend()) {
-				SaltySDCore_ReplaceImport("_ZN11NvSwapchain15QueuePresentKHREP9VkQueue_TPK16VkPresentInfoKHR", (void*)vk::nvSwapchain::QueuePresent);
-			}
+			SaltySDCore_ReplaceImport("_ZN11NvSwapchain15QueuePresentKHREP9VkQueue_TPK16VkPresentInfoKHR", (void*)vk::nvSwapchain::QueuePresent);
 			SaltySDCore_ReplaceImport("eglGetProcAddress", (void*)EGL::GetProc);
 			SaltySDCore_ReplaceImport("vkGetDeviceProcAddr", (void*)vk::GetDeviceProcAddr);
 			SaltySDCore_ReplaceImport("vkGetInstanceProcAddr", (void*)vk::GetInstanceProcAddr);
