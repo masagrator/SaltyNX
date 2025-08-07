@@ -1235,8 +1235,13 @@ extern "C" {
 			SaltySDCore_ReplaceImport("glViewportIndexedfvNV", (void*)EGL::ViewportIndexedfvNV);
 			SaltySDCore_ReplaceImport("glViewportIndexedfvOES", (void*)EGL::ViewportIndexedfvOES);
 			SaltySDCore_ReplaceImport("vkQueuePresentKHR", (void*)vk::QueuePresent);
-			//Compatibility fix for Crypt of the NecroDancer
-			if (titid != 0x0100CEA007D08000) {
+			const std::array vulkan_titleids_exc {
+				0x0100CEA007D08000, //Crypt of the NecroDancer
+				0x0100AA80194B0000, //Pikmin 1
+				0x0100D680194B2000  //Pikmin 2
+			};
+			//Compatibility fix for few games
+			if (std::find(vulkan_titleids_exc.cbegin(), vulkan_titleids_exc.cend(), titid) == vulkan_titleids_exc.cend()) {
 				SaltySDCore_ReplaceImport("_ZN11NvSwapchain15QueuePresentKHREP9VkQueue_TPK16VkPresentInfoKHR", (void*)vk::nvSwapchain::QueuePresent);
 			}
 			SaltySDCore_ReplaceImport("eglGetProcAddress", (void*)EGL::GetProc);
