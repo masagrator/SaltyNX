@@ -493,7 +493,7 @@ namespace NX_FPS_Math {
 
 	template <typename T> void addResToRender(T m_width, T m_height) {
 		T ratio = (m_width * 10) / m_height;
-		if (ratio >= (T)12 && ratio <= (T)18) {
+		if (ratio >= (T)5 && ratio <= (T)18) {
 			union {
 				struct {
 					uint16_t width;
@@ -561,9 +561,7 @@ namespace vk {
 			}
 			
 			NX_FPS_Math::PreFrame();
-			if (pointer == Address_weaks.vkQueuePresentKHR) {
-				check_redirection = true;
-			}
+			check_redirection = true;
 			int32_t vulkanResult = ((vkQueuePresentKHR_0)(pointer))(VkQueue_T, VkPresentInfoKHR);
 			check_redirection = false;
 			if (vulkanResult >= 0) NX_FPS_Math::PostFrame();
