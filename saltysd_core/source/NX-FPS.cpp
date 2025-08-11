@@ -7,7 +7,6 @@
 #include <cmath>
 #include "lock.hpp"
 #include <algorithm>
-#include <unordered_set>
 
 struct NVNTexture {
 	char reserved[0x80];
@@ -64,20 +63,6 @@ typedef struct VkSwapchainCreateInfoKHR {
 	void*        surface;
 	uint32_t     minImageCount;
 } VkSwapchainCreateInfoKHR;
-
-// Provided by VK_VERSION_1_0
-typedef enum VkPipelineBindPoint {
-	VK_PIPELINE_BIND_POINT_GRAPHICS = 0,
-	VK_PIPELINE_BIND_POINT_COMPUTE = 1,
-// Provided by VK_KHR_ray_tracing_pipeline
-	VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR = 1000165000,
-// Provided by VK_HUAWEI_subpass_shading
-	VK_PIPELINE_BIND_POINT_SUBPASS_SHADING_HUAWEI = 1000369003,
-// Provided by VK_ARM_data_graph
-	VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM = 1000507000,
-// Provided by VK_NV_ray_tracing
-	VK_PIPELINE_BIND_POINT_RAY_TRACING_NV = VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
-} VkPipelineBindPoint;
 
 typedef u64 (*nvnBootstrapLoader_0)(const char * nvnName);
 typedef u16 (*nvnTextureGetWidth_0)(const NVNTexture* texture);
