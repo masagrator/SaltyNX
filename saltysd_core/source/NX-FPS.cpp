@@ -7,6 +7,7 @@
 #include <cmath>
 #include "lock.hpp"
 #include <algorithm>
+#include <unordered_set>
 
 struct NVNTexture {
 	char reserved[0x80];
@@ -64,39 +65,74 @@ typedef struct VkSwapchainCreateInfoKHR {
 	uint32_t     minImageCount;
 } VkSwapchainCreateInfoKHR;
 
+// Provided by VK_VERSION_1_0
+typedef enum VkPipelineBindPoint {
+	VK_PIPELINE_BIND_POINT_GRAPHICS = 0,
+	VK_PIPELINE_BIND_POINT_COMPUTE = 1,
+// Provided by VK_KHR_ray_tracing_pipeline
+	VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR = 1000165000,
+// Provided by VK_HUAWEI_subpass_shading
+	VK_PIPELINE_BIND_POINT_SUBPASS_SHADING_HUAWEI = 1000369003,
+// Provided by VK_ARM_data_graph
+	VK_PIPELINE_BIND_POINT_DATA_GRAPH_ARM = 1000507000,
+// Provided by VK_NV_ray_tracing
+	VK_PIPELINE_BIND_POINT_RAY_TRACING_NV = VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
+} VkPipelineBindPoint;
+
 typedef u64 (*nvnBootstrapLoader_0)(const char * nvnName);
+typedef u16 (*nvnTextureGetWidth_0)(const NVNTexture* texture);
+typedef u16 (*nvnTextureGetHeight_0)(const NVNTexture* texture);
+typedef u32 (*nvnTextureGetFormat_0)(const NVNTexture* texture);
+typedef void* (*nvnCommandBufferSetRenderTargets_0)(const void* cmdBuf, int numTextures, const NVNTexture** texture, const NVNTextureView** textureView, const NVNTexture* depth, const NVNTextureView* depthView);
+typedef void* (*nvnCommandBufferSetViewport_0)(const void* cmdBuf, int x, int y, int width, int height);
+typedef void* (*nvnCommandBufferSetViewports_0)(void* cmdBuf, int start, int count, const NVNViewport* viewports);
+typedef void* (*nvnCommandBufferSetDepthRange_0)(void* cmdBuf, float s0, float s1);
+
 typedef bool (*eglSwapBuffers_0)(const void* EGLDisplay, const void* EGLSurface);
 typedef bool (*eglSwapInterval_0)(const void* EGLDisplay, int interval);
 typedef void (*glViewport_0)(int x, int y, uint width, uint height);
 typedef void (*glViewportArrayv_0)(uint firstViewport, uint viewportCount, const glViewportArray* pViewports);
 typedef void (*glViewportIndexedf_0)(uint index, float x, float y, float width, float height);
 typedef void (*glViewportIndexedfv_0)(uint index, const glViewportArray* pViewports);
-typedef s32 (*vkQueuePresentKHR_0)(const void* vkQueue, const void* VkPresentInfoKHR);
-typedef u64 (*_ZN2nn2os17ConvertToTimeSpanENS0_4TickE_0)(u64 tick);
-typedef u64 (*_ZN2nn2os13GetSystemTickEv_0)();
-typedef void (*_ZN2nn2os13GetSystemTickEv_1)(u64* tick);
-typedef u64 (*_ZN2nn2os22GetSystemTickFrequencyEv_0)();
-typedef void (*_ZN2nn2os22GetSystemTickFrequencyEv_1)(u64* tickfrequency);
+
 typedef u64 (*eglGetProcAddress_0)(const char* eglName);
-typedef void* (*nvnCommandBufferSetRenderTargets_0)(const void* cmdBuf, int numTextures, const NVNTexture** texture, const NVNTextureView** textureView, const NVNTexture* depth, const NVNTextureView* depthView);
-typedef void* (*nvnCommandBufferSetViewport_0)(const void* cmdBuf, int x, int y, int width, int height);
-typedef void* (*nvnCommandBufferSetViewports_0)(void* cmdBuf, int start, int count, const NVNViewport* viewports);
-typedef void* (*nvnCommandBufferSetDepthRange_0)(void* cmdBuf, float s0, float s1);
-typedef u16 (*nvnTextureGetWidth_0)(const NVNTexture* texture);
-typedef u16 (*nvnTextureGetHeight_0)(const NVNTexture* texture);
-typedef u32 (*nvnTextureGetFormat_0)(const NVNTexture* texture);
 typedef void* (*_vkGetInstanceProcAddr_0)(void* instance, const char* vkFunction);
 typedef void* (*vkGetDeviceProcAddr_0)(void* device, const char* vkFunction);
-typedef u32 (*_ZN2nn2ro12LookupSymbolEPmPKc_0)(uintptr_t* pOutAddress, const char* name);
 typedef void (*vkCmdSetViewport_0)(void* commandBuffer, uint32_t firstViewport, uint32_t viewportCount, const VkViewport* pViewports);
 typedef void (*vkCmdSetViewportWithCount_0)(void* commandBuffer, uint32_t viewportCount, const VkViewport* pViewports);
 typedef s32 (*vkCreateSwapchainKHR_0)(void* Device, const VkSwapchainCreateInfoKHR* pCreateInfo, const void* pAllocator, const void** pSwapchain);
 typedef s32 (*vkGetSwapchainImagesKHR_0)(void* Device, void* VkSwapchainKHR, uint32_t* pSwapchainImageCount, int** pSwapchainImages);
+typedef s32 (*vkQueuePresentKHR_0)(const void* vkQueue, const void* VkPresentInfoKHR);
+
 typedef AppletFocusState (*GetCurrentFocusState_0)();
 typedef u32 (*FileAccessorRead_0)(void* fileHandle, size_t* bytesRead, int64_t position, void* buffer, size_t readBytes, unsigned int* ReadOption);
+typedef u64 (*_ZN2nn2os17ConvertToTimeSpanENS0_4TickE_0)(u64 tick);
+typedef u64 (*_ZN2nn2os13GetSystemTickEv_0)();
+typedef u32 (*_ZN2nn2ro12LookupSymbolEPmPKc_0)(uintptr_t* pOutAddress, const char* name);
+typedef void (*_ZN2nn2os13GetSystemTickEv_1)(u64* tick);
+typedef u64 (*_ZN2nn2os22GetSystemTickFrequencyEv_0)();
+typedef void (*_ZN2nn2os22GetSystemTickFrequencyEv_1)(u64* tickfrequency);
 
 struct {
 	uintptr_t nvnBootstrapLoader;
+
+	uintptr_t nvnDeviceGetProcAddress;
+	uintptr_t nvnQueuePresentTexture;
+	uintptr_t nvnWindowSetPresentInterval;
+	uintptr_t nvnWindowGetPresentInterval;
+	uintptr_t nvnWindowBuilderSetTextures;
+	uintptr_t nvnWindowAcquireTexture;
+	uintptr_t nvnSyncWait;
+	uintptr_t nvnWindowSetNumActiveTextures;
+	uintptr_t nvnWindowInitialize;
+	uintptr_t nvnTextureGetWidth;
+	uintptr_t nvnTextureGetHeight;
+	uintptr_t nvnTextureGetFormat;
+	uintptr_t nvnCommandBufferSetRenderTargets;
+	uintptr_t nvnCommandBufferSetViewport;
+	uintptr_t nvnCommandBufferSetViewports;
+	uintptr_t nvnCommandBufferSetDepthRange;
+
 	uintptr_t eglSwapBuffers;
 	uintptr_t eglSwapInterval;
 	uintptr_t glViewport;
@@ -109,46 +145,28 @@ struct {
 	uintptr_t glViewportIndexedfvNV;
 	uintptr_t glViewportIndexedfOES;
 	uintptr_t glViewportIndexedfvOES;
-	uintptr_t vkQueuePresentKHR;
-	uintptr_t nvSwapchainQueuePresentKHR;
-	uintptr_t ConvertToTimeSpan;
-	uintptr_t GetSystemTick;
-	uintptr_t GetSystemTickFrequency;
 	uintptr_t eglGetProcAddress;
-	uintptr_t ReferSymbol;
+
+	uintptr_t vkGetDeviceProcAddr;
 	uintptr_t vkGetInstanceProcAddr;
-	uintptr_t LookupSymbol;
+	uintptr_t vkQueuePresentKHR;
+	uintptr_t vkGetSwapchainImagesKHR;
 	uintptr_t vkCmdSetViewport;
 	uintptr_t vkCmdSetViewportWithCount;
 	uintptr_t vkCreateSwapchainKHR;
 	uintptr_t nvSwapchainCreateSwapchainKHR;
 	uintptr_t nvSwapchainGetInstanceProcAddr;
 	uintptr_t nvSwapchainGetDeviceProcAddr;
-	uintptr_t vkGetDeviceProcAddr;
-
-	uintptr_t nvnDeviceGetProcAddress;
-	uintptr_t nvnQueuePresentTexture;
-
-	uintptr_t nvnWindowSetPresentInterval;
-	uintptr_t nvnWindowGetPresentInterval;
-	uintptr_t nvnWindowBuilderSetTextures;
-	uintptr_t nvnWindowAcquireTexture;
-	uintptr_t nvnSyncWait;
-
-	uintptr_t nvnWindowSetNumActiveTextures;
-	uintptr_t nvnWindowInitialize;
-	uintptr_t nvnTextureGetWidth;
-	uintptr_t nvnTextureGetHeight;
-	uintptr_t nvnTextureGetFormat;
-	uintptr_t nvnCommandBufferSetRenderTargets;
-	uintptr_t nvnCommandBufferSetViewport;
-	uintptr_t nvnCommandBufferSetViewports;
-	uintptr_t nvnCommandBufferSetDepthRange;
-	uintptr_t vkGetSwapchainImagesKHR;
+	uintptr_t nvSwapchainQueuePresentKHR;
 	uintptr_t nvSwapchainGetSwapchainImagesKHR;
 
+	uintptr_t LookupSymbol;
+	uintptr_t ReferSymbol;
+	uintptr_t GetSystemTick;
+	uintptr_t GetSystemTickFrequency;
 	uintptr_t GetCurrentFocusState;
 	uintptr_t FileAccessorRead;
+	uintptr_t ConvertToTimeSpan;
 } Address_weaks;
 
 struct nvnWindowBuilder {
@@ -240,7 +258,6 @@ struct NxFpsSharedBlock {
 } PACKED;
 
 static_assert(sizeof(NxFpsSharedBlock) == 165);
-
 
 NxFpsSharedBlock* Shared = 0;
 
@@ -464,7 +481,7 @@ namespace NX_FPS_Math {
 
 	template <typename T> void addResToViewports(T m_width, T m_height) {
 		T ratio = (m_width * 10) / m_height;
-		if (ratio >= (T)12 && ratio <= (T)18) {
+		if (ratio >= (T)6 && ratio <= (T)18) {
 			union {
 				struct {
 					uint16_t width;
@@ -599,7 +616,7 @@ namespace vk {
 			uintptr_t address = (uintptr_t)((vkGetDeviceProcAddr_0)(pointer))(device, vkFunction);
 			if (!strcmp("vkQueuePresentKHR", vkFunction)) {
 				if (!Address_weaks.vkQueuePresentKHR) Address_weaks.vkQueuePresentKHR = address;
-				return (void*)&vk::QueuePresent;
+				return (void*)&QueuePresent;
 			}
 			if (!strcmp("vkGetDeviceProcAddr", vkFunction)) {
 				if (!Address_weaks.vkGetDeviceProcAddr) Address_weaks.vkGetDeviceProcAddr = address;
@@ -607,15 +624,15 @@ namespace vk {
 			}
 			if (!strcmp("vkCmdSetViewport", vkFunction)) {
 				if (!Address_weaks.vkCmdSetViewport) Address_weaks.vkCmdSetViewport = address;
-				return (void*)&vk::CmdSetViewport;
+				return (void*)&CmdSetViewport;
 			}
 			if (!strcmp("vkCmdSetViewportWithCount", vkFunction)) {
 				if (!Address_weaks.vkCmdSetViewportWithCount) Address_weaks.vkCmdSetViewportWithCount = address;
-				return (void*)&vk::CmdSetViewportWithCount;
+				return (void*)&CmdSetViewportWithCount;
 			}
 			if (!strcmp("vkCreateSwapchainKHR", vkFunction)) {
 				if (!Address_weaks.vkCreateSwapchainKHR) Address_weaks.vkCreateSwapchainKHR = address;
-				return (void*)&vk::CreateSwapchain;
+				return (void*)&CreateSwapchain;
 			}
 			if (!strcmp("vkGetSwapchainImagesKHR", vkFunction)) {
 				if (!Address_weaks.vkGetSwapchainImagesKHR) Address_weaks.vkGetSwapchainImagesKHR = address;
@@ -628,15 +645,15 @@ namespace vk {
 			uintptr_t address = (uintptr_t)((_vkGetInstanceProcAddr_0)(pointer))(instance, vkFunction);
 			if (!strcmp("vkQueuePresentKHR", vkFunction)) {
 				if (!Address_weaks.vkQueuePresentKHR) Address_weaks.vkQueuePresentKHR = address;
-				return (void*)&vk::QueuePresent;
+				return (void*)&QueuePresent;
 			}
 			if (!strcmp("vkGetDeviceProcAddr", vkFunction)) {
 				if (!Address_weaks.vkGetDeviceProcAddr) Address_weaks.vkGetDeviceProcAddr = address;
-				return (void*)&vk::GetDeviceProcAddr;
+				return (void*)&GetDeviceProcAddr;
 			}
 			if (!strcmp("vkCreateSwapchainKHR", vkFunction)) {
 				if (!Address_weaks.vkCreateSwapchainKHR) Address_weaks.vkCreateSwapchainKHR = address;
-				return (void*)&vk::CreateSwapchain;
+				return (void*)&CreateSwapchain;
 			}
 			if (!strcmp("vkGetSwapchainImagesKHR", vkFunction)) {
 				if (!Address_weaks.vkGetSwapchainImagesKHR) Address_weaks.vkGetSwapchainImagesKHR = address;
@@ -644,11 +661,11 @@ namespace vk {
 			}
 			if (!strcmp("vkCmdSetViewport", vkFunction)) {
 				if (!Address_weaks.vkCmdSetViewport) Address_weaks.vkCmdSetViewport = address;
-				return (void*)&vk::CmdSetViewport;
+				return (void*)&CmdSetViewport;
 			}
 			if (!strcmp("vkCmdSetViewportWithCount", vkFunction)) {
 				if (!Address_weaks.vkCmdSetViewportWithCount) Address_weaks.vkCmdSetViewportWithCount = address;
-				return (void*)&vk::CmdSetViewportWithCount;
+				return (void*)&CmdSetViewportWithCount;
 			}
 			return (void*)address;
 		}
@@ -1104,49 +1121,49 @@ namespace NVN {
 	uintptr_t GetProcAddress0 (NVNDevice* nvnDevice, const char* nvnFunction) {
 		uintptr_t address = ((GetProcAddress)(Address_weaks.nvnDeviceGetProcAddress))(nvnDevice, nvnFunction);
 		if (!strcmp("nvnDeviceGetProcAddress", nvnFunction))
-			return (uintptr_t)&NVN::GetProcAddress0;
+			return (uintptr_t)&GetProcAddress0;
 		else if (!strcmp("nvnQueuePresentTexture", nvnFunction)) {
 			if (!Address_weaks.nvnQueuePresentTexture) Address_weaks.nvnQueuePresentTexture = address;
-			return (uintptr_t)&NVN::PresentTexture;
+			return (uintptr_t)&PresentTexture;
 		}
 		else if (!strcmp("nvnWindowAcquireTexture", nvnFunction)) {
 			if (!Address_weaks.nvnWindowAcquireTexture) Address_weaks.nvnWindowAcquireTexture = address;
-			return (uintptr_t)&NVN::AcquireTexture;
+			return (uintptr_t)&AcquireTexture;
 		}
 		else if (!strcmp("nvnWindowSetPresentInterval", nvnFunction)) {
 			if (!Address_weaks.nvnWindowSetPresentInterval) Address_weaks.nvnWindowSetPresentInterval = address;
-			return (uintptr_t)&NVN::SetPresentInterval;
+			return (uintptr_t)&SetPresentInterval;
 		}
 		else if (!strcmp("nvnWindowGetPresentInterval", nvnFunction)) {
 			if (!Address_weaks.nvnWindowGetPresentInterval) Address_weaks.nvnWindowGetPresentInterval = address;
 		}
 		else if (!strcmp("nvnWindowSetNumActiveTextures", nvnFunction)) {
 			if (!Address_weaks.nvnWindowSetNumActiveTextures) Address_weaks.nvnWindowSetNumActiveTextures = address;
-			return (uintptr_t)&NVN::WindowSetNumActiveTextures;
+			return (uintptr_t)&WindowSetNumActiveTextures;
 		}
 		else if (!strcmp("nvnWindowBuilderSetTextures", nvnFunction)) {
 			if (!Address_weaks.nvnWindowBuilderSetTextures) Address_weaks.nvnWindowBuilderSetTextures = address;
-			return (uintptr_t)&NVN::WindowBuilderSetTextures;
+			return (uintptr_t)&WindowBuilderSetTextures;
 		}
 		else if (!strcmp("nvnWindowInitialize", nvnFunction)) {
 			if (!Address_weaks.nvnWindowInitialize) Address_weaks.nvnWindowInitialize = address;
-			return (uintptr_t)&NVN::WindowInitialize;
+			return (uintptr_t)&WindowInitialize;
 		}
 		else if (!strcmp("nvnSyncWait", nvnFunction)) {
 			if (!Address_weaks.nvnSyncWait) Address_weaks.nvnSyncWait = address;
-			return (uintptr_t)&NVN::SyncWait0;
+			return (uintptr_t)&SyncWait0;
 		}
 		else if (!strcmp("nvnCommandBufferSetRenderTargets", nvnFunction)) {
 			if (!Address_weaks.nvnCommandBufferSetRenderTargets) Address_weaks.nvnCommandBufferSetRenderTargets = address;
-			return (uintptr_t)&NVN::CommandBufferSetRenderTargets;
+			return (uintptr_t)&CommandBufferSetRenderTargets;
 		}
 		else if (!strcmp("nvnCommandBufferSetViewport", nvnFunction)) {
 			if (!Address_weaks.nvnCommandBufferSetViewport) Address_weaks.nvnCommandBufferSetViewport = address;
-			return (uintptr_t)&NVN::CommandBufferSetViewport;
+			return (uintptr_t)&CommandBufferSetViewport;
 		}
 		else if (!strcmp("nvnCommandBufferSetViewports", nvnFunction)) {
 			if (!Address_weaks.nvnCommandBufferSetViewports) Address_weaks.nvnCommandBufferSetViewports = address;
-			return (uintptr_t)&NVN::CommandBufferSetViewports;
+			return (uintptr_t)&CommandBufferSetViewports;
 		}
 		else if (!strcmp("nvnTextureGetWidth", nvnFunction)) {
 			Address_weaks.nvnTextureGetWidth = address;
@@ -1201,17 +1218,10 @@ extern "C" {
 			svcGetInfo(&titid, InfoType_TitleId, CUR_PROCESS_HANDLE, 0);
 			
 			Address_weaks.nvnBootstrapLoader = SaltySDCore_FindSymbolBuiltin("nvnBootstrapLoader");
+
+			Address_weaks.eglGetProcAddress = SaltySDCore_FindSymbolBuiltin("eglGetProcAddress");
 			Address_weaks.eglSwapBuffers = SaltySDCore_FindSymbolBuiltin("eglSwapBuffers");
 			Address_weaks.eglSwapInterval = SaltySDCore_FindSymbolBuiltin("eglSwapInterval");
-			Address_weaks.vkQueuePresentKHR = SaltySDCore_FindSymbolBuiltin("vkQueuePresentKHR");
-			Address_weaks.nvSwapchainQueuePresentKHR = SaltySDCore_FindSymbolBuiltin("_ZN11NvSwapchain15QueuePresentKHREP9VkQueue_TPK16VkPresentInfoKHR");
-			Address_weaks.ConvertToTimeSpan = SaltySDCore_FindSymbolBuiltin("_ZN2nn2os17ConvertToTimeSpanENS0_4TickE");
-			Address_weaks.GetSystemTick = SaltySDCore_FindSymbolBuiltin("_ZN2nn2os13GetSystemTickEv");
-			Address_weaks.GetSystemTickFrequency = SaltySDCore_FindSymbolBuiltin("_ZN2nn2os22GetSystemTickFrequencyEv");
-			Address_weaks.eglGetProcAddress = SaltySDCore_FindSymbolBuiltin("eglGetProcAddress");
-			Address_weaks.vkGetInstanceProcAddr = SaltySDCore_FindSymbolBuiltin("vkGetInstanceProcAddr");
-			Address_weaks.LookupSymbol = SaltySDCore_FindSymbolBuiltin("_ZN2nn2ro12LookupSymbolEPmPKc");
-			Address_weaks.vkCmdSetViewport = SaltySDCore_FindSymbolBuiltin("vkCmdSetViewport");
 			Address_weaks.glViewport = SaltySDCore_FindSymbolBuiltin("glViewport");
 			Address_weaks.glViewportArrayv = SaltySDCore_FindSymbolBuiltin("glViewportArrayv");
 			Address_weaks.glViewportArrayvNV = SaltySDCore_FindSymbolBuiltin("glViewportArrayvNV");
@@ -1222,12 +1232,23 @@ extern "C" {
 			Address_weaks.glViewportIndexedfv = SaltySDCore_FindSymbolBuiltin("glViewportIndexedfv");
 			Address_weaks.glViewportIndexedfvNV = SaltySDCore_FindSymbolBuiltin("glViewportIndexedfvNV");
 			Address_weaks.glViewportIndexedfvOES = SaltySDCore_FindSymbolBuiltin("glViewportIndexedfvOES");
+
+			Address_weaks.vkQueuePresentKHR = SaltySDCore_FindSymbolBuiltin("vkQueuePresentKHR");
+			Address_weaks.nvSwapchainQueuePresentKHR = SaltySDCore_FindSymbolBuiltin("_ZN11NvSwapchain15QueuePresentKHREP9VkQueue_TPK16VkPresentInfoKHR");
+			Address_weaks.vkGetInstanceProcAddr = SaltySDCore_FindSymbolBuiltin("vkGetInstanceProcAddr");
+			Address_weaks.vkCmdSetViewport = SaltySDCore_FindSymbolBuiltin("vkCmdSetViewport");
 			Address_weaks.vkCreateSwapchainKHR = SaltySDCore_FindSymbolBuiltin("vkCreateSwapchainKHR");
 			Address_weaks.vkGetDeviceProcAddr = SaltySDCore_FindSymbolBuiltin("vkGetDeviceProcAddr");
 			Address_weaks.vkGetSwapchainImagesKHR = SaltySDCore_FindSymbolBuiltin("vkGetSwapchainImagesKHR");
 			Address_weaks.nvSwapchainGetSwapchainImagesKHR = SaltySDCore_FindSymbolBuiltin("_ZN11NvSwapchain21GetSwapchainImagesKHREP10VkDevice_TP16VkSwapchainKHR_TPjPP9VkImage_T");
 			Address_weaks.nvSwapchainCreateSwapchainKHR = SaltySDCore_FindSymbolBuiltin("_ZN11NvSwapchain18CreateSwapchainKHREP10VkDevice_TPK24VkSwapchainCreateInfoKHRPK21VkAllocationCallbacksPP16VkSwapchainKHR_T");
+
+			Address_weaks.ConvertToTimeSpan = SaltySDCore_FindSymbolBuiltin("_ZN2nn2os17ConvertToTimeSpanENS0_4TickE");
+			Address_weaks.GetSystemTick = SaltySDCore_FindSymbolBuiltin("_ZN2nn2os13GetSystemTickEv");
+			Address_weaks.GetSystemTickFrequency = SaltySDCore_FindSymbolBuiltin("_ZN2nn2os22GetSystemTickFrequencyEv");
 			Address_weaks.GetCurrentFocusState = SaltySDCore_FindSymbolBuiltin("_ZN2nn2oe20GetCurrentFocusStateEv");
+			Address_weaks.LookupSymbol = SaltySDCore_FindSymbolBuiltin("_ZN2nn2ro12LookupSymbolEPmPKc");
+
 			SaltySDCore_ReplaceImport("nvnBootstrapLoader", (void*)NVN::BootstrapLoader_1);
 			SaltySDCore_ReplaceImport("eglSwapBuffers", (void*)EGL::Swap);
 			SaltySDCore_ReplaceImport("eglSwapInterval", (void*)EGL::Interval);
