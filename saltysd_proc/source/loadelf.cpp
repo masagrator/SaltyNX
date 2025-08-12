@@ -9,6 +9,8 @@
 
 using namespace elf_parser;
 
+extern uintptr_t game_start_address;
+
 void *text_save;
 void *data_save;
 u64 text_addr, data_addr, text_fsize, data_fsize, text_msize, data_msize;
@@ -205,15 +207,18 @@ Result load_elf_proc(Handle proc, uint64_t pid, uint64_t heap, uint64_t* start, 
 	
 	// Unmap heap, map new code
 	
-	u64 load_addr;
-	SaltySD_printf("SaltySD: Search for size %llx\n", (max_vaddr - min_vaddr));
-	do
-	{
-		load_addr = randomGet64() & 0xFFFFFF000ull;
-		ret = svcMapProcessCodeMemory(proc, load_addr, heap, (max_vaddr - min_vaddr));
+	u64 load_addr = game_start_address - 0x200000;
+	ret = svcMapProcessCodeMemory(proc, load_addr, heap, (max_vaddr - min_vaddr));
+	if (R_FAILED(ret)) {
+		SaltySD_printf("SaltySD: Search for size %llx\n", (max_vaddr - min_vaddr));
+		do
+		{
+			load_addr = randomGet64() & 0xFFFFFF000ull;
+			ret = svcMapProcessCodeMemory(proc, load_addr, heap, (max_vaddr - min_vaddr));
+		}
+		while (ret == 0xDC01 || ret == 0xD401);
+		if (ret) return ret;
 	}
-	while (ret == 0xDC01 || ret == 0xD401);
-	if (ret) return ret;
 	
 	SaltySD_printf("SaltySD: Found free address space at %llx, size %llx\n", load_addr, (max_vaddr - min_vaddr));
 	

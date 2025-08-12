@@ -53,6 +53,7 @@ bool cheatCheck = false;
 bool isDocked = false;
 bool dontForce60InDocked = false;
 bool matchLowestDocked = false;
+uintptr_t game_start_address = 0;
 
 #ifdef SWITCH
     #define systemtickfrequency 19200000
@@ -222,6 +223,7 @@ bool hijack_bootstrap(Handle* debug, u64 pid, u64 tid, bool isA64)
     
     // Load in the ELF
     //svcReadDebugProcessMemory(backup, debug, context.pc.x, 0x1000);
+    game_start_address = context.pc.x;
     uint64_t new_start;
     if (isA64) {
         FILE* file = 0;
