@@ -209,9 +209,10 @@ struct NxFpsSharedBlock {
 	uint8_t currentRefreshRate;
 	float readSpeedPerSecond;
 	uint8_t FPSlockedDocked;
+	uint64_t frameNumber;
 } PACKED;
 
-static_assert(sizeof(NxFpsSharedBlock) == 165);
+static_assert(sizeof(NxFpsSharedBlock) == 173);
 
 NxFpsSharedBlock* Shared = 0;
 
@@ -346,6 +347,7 @@ namespace NX_FPS_Math {
 	}
 
 	void PostFrame() {
+		Shared->frameNumber++;
 		endtick = Utils::_getSystemTick();
 		uint64_t framedelta = endtick - frameend;
 		frameavg = ((9*frameavg) + framedelta) / 10;
