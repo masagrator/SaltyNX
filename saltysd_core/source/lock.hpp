@@ -123,8 +123,12 @@ namespace LOCK {
 				return -1;
 		}
 		for (int i = 0; i < offsets_count; i++) {
-			int32_t temp_offset = (int32_t)read32(buffer);
-			address += temp_offset;
+			uint64_t temp_offset2 = read32(buffer);
+			int32_t temp_offset = 0;
+			memcpy(&temp_offset, &temp_offset2, 4);
+			if (temp_offset < 0 && temp_offset > -0x1000)
+				address += temp_offset;
+			else address += temp_offset2;
 			if (i+1 < offsets_count) {
 				if (!isAddressValid(*(int64_t*)address)) return -2;
 				address = *(uint64_t*)address;
@@ -169,8 +173,11 @@ namespace LOCK {
 		while(true) {
 			SaltySDCore_fread(&OPCODE, 1, 1, file);
 			if (OPCODE == 1) {
-				uint32_t main_offset = 0;
+				int64_t main_offset = 0;
 				SaltySDCore_fread(&main_offset, 4, 1, file);
+				int32_t main_offset_to_check = 0;
+				memcpy(&main_offset_to_check, &main_offset, 4);
+				if (main_offset_to_check < 0 && main_offset_to_check > -0x1000) main_offset = main_offset_to_check;
 				uint8_t value_type = 0;
 				SaltySDCore_fread(&value_type, 1, 1, file);
 				uint8_t elements = 0;
