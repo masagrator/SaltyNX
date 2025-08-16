@@ -603,7 +603,7 @@ namespace vk {
 			uintptr_t address = (uintptr_t)((vkGetDeviceProcAddr_0)(pointer))(device, vkFunction);
 			if (!strcmp("vkQueuePresentKHR", vkFunction)) {
 				if (!Address_weaks.vkQueuePresentKHR) Address_weaks.vkQueuePresentKHR = address;
-				return (void*)&QueuePresent;
+				return (void*)&vk::QueuePresent;
 			}
 			if (!strcmp("vkGetDeviceProcAddr", vkFunction)) {
 				if (!Address_weaks.vkGetDeviceProcAddr) Address_weaks.vkGetDeviceProcAddr = address;
@@ -619,7 +619,7 @@ namespace vk {
 			}
 			if (!strcmp("vkCreateSwapchainKHR", vkFunction)) {
 				if (!Address_weaks.vkCreateSwapchainKHR) Address_weaks.vkCreateSwapchainKHR = address;
-				return (void*)&CreateSwapchain;
+				return (void*)&vk::CreateSwapchain;
 			}
 			if (!strcmp("vkGetSwapchainImagesKHR", vkFunction)) {
 				if (!Address_weaks.vkGetSwapchainImagesKHR) Address_weaks.vkGetSwapchainImagesKHR = address;
@@ -632,15 +632,15 @@ namespace vk {
 			uintptr_t address = (uintptr_t)((_vkGetInstanceProcAddr_0)(pointer))(instance, vkFunction);
 			if (!strcmp("vkQueuePresentKHR", vkFunction)) {
 				if (!Address_weaks.vkQueuePresentKHR) Address_weaks.vkQueuePresentKHR = address;
-				return (void*)&QueuePresent;
+				return (void*)&vk::QueuePresent;
 			}
 			if (!strcmp("vkGetDeviceProcAddr", vkFunction)) {
 				if (!Address_weaks.vkGetDeviceProcAddr) Address_weaks.vkGetDeviceProcAddr = address;
-				return (void*)&GetDeviceProcAddr;
+				return (void*)&vk::GetDeviceProcAddr;
 			}
 			if (!strcmp("vkCreateSwapchainKHR", vkFunction)) {
 				if (!Address_weaks.vkCreateSwapchainKHR) Address_weaks.vkCreateSwapchainKHR = address;
-				return (void*)&CreateSwapchain;
+				return (void*)&vk::CreateSwapchain;
 			}
 			if (!strcmp("vkGetSwapchainImagesKHR", vkFunction)) {
 				if (!Address_weaks.vkGetSwapchainImagesKHR) Address_weaks.vkGetSwapchainImagesKHR = address;
