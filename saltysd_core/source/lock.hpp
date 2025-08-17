@@ -7,6 +7,10 @@
 
 1. Helper functions */
 
+namespace Utils {
+	uint64_t _convertToTimeSpan(uint64_t tick);
+}
+
 namespace LOCK {
 
 	uint32_t offset = 0;
@@ -172,7 +176,7 @@ namespace LOCK {
 		int8_t OPCODE = 0;
 		while(true) {
 			SaltySDCore_fread(&OPCODE, 1, 1, file);
-			if (OPCODE == 1) {
+			if (OPCODE == 1 || OPCODE == 2) {
 				int64_t main_offset = 0;
 				SaltySDCore_fread(&main_offset, 4, 1, file);
 				int32_t main_offset_to_check = 0;
@@ -202,8 +206,28 @@ namespace LOCK {
 					case 4:
 					case 0x14:
 					case 0x24: {
-						void* temp_buffer = calloc(elements, 4);
-						SaltySDCore_fread(temp_buffer, 4, elements, file);
+						uint32_t* temp_buffer = (uint32_t*)calloc(elements, 4);
+						SaltySDCore_fread((void*)temp_buffer, 4, elements, file);
+						uint32_t* code = (uint32_t*)(LOCK::mappings.main_start + main_offset);
+						if (OPCODE == 2) {
+							for (size_t i = 0; i < elements; i++) {
+								if (temp_buffer[i] == 0xFFFFFFFE) {
+									struct {
+										unsigned int imm: 26;
+										unsigned int opcode: 6;
+									} Branch;
+
+									static_assert(sizeof(Branch) == 4);
+
+									Branch.opcode = 0x25;
+									intptr_t pointer = (intptr_t)&Utils::_convertToTimeSpan;
+									intptr_t pointer2 = (intptr_t)&code[i];
+									ptrdiff_t offset = (pointer - pointer2) / 4;
+									Branch.imm = offset;
+									memcpy(&temp_buffer[i], &Branch, 4);
+								}
+							}
+						}
 						SaltySD_Memcpy(LOCK::mappings.main_start + main_offset, (u64)temp_buffer, elements*4);
 						free(temp_buffer);
 						break;
