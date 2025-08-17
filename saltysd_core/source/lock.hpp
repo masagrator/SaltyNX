@@ -11,6 +11,10 @@ namespace Utils {
 	uint64_t _convertToTimeSpan(uint64_t tick);
 }
 
+namespace nn {
+	Result SetUserInactivityDetectionTimeExtended(bool isTrue);
+}
+
 namespace LOCK {
 
 	uint32_t offset = 0;
@@ -210,17 +214,25 @@ namespace LOCK {
 						SaltySDCore_fread((void*)temp_buffer, 4, elements, file);
 						uint32_t* code = (uint32_t*)(LOCK::mappings.main_start + main_offset);
 						if (OPCODE == 2) {
+							struct {
+								unsigned int imm: 26;
+								unsigned int opcode: 6;
+							} Branch;
+							static_assert(sizeof(Branch) == 4);
 							for (size_t i = 0; i < elements; i++) {
-								if (temp_buffer[i] == 0xFFFFFFFE) {
-									struct {
-										unsigned int imm: 26;
-										unsigned int opcode: 6;
-									} Branch;
-
-									static_assert(sizeof(Branch) == 4);
-
-									Branch.opcode = 0x25;
+								if (temp_buffer[i] == 0xFFFFFFE0 || temp_buffer[i] == 0xFFFFFFE1) {
+									if (temp_buffer[i] == 0xFFFFFFE0) Branch.opcode = 0x25;
+									else Branch.opcode = 0x5;
 									intptr_t pointer = (intptr_t)&Utils::_convertToTimeSpan;
+									intptr_t pointer2 = (intptr_t)&code[i];
+									ptrdiff_t offset = (pointer - pointer2) / 4;
+									Branch.imm = offset;
+									memcpy(&temp_buffer[i], &Branch, 4);
+								}
+								else if (temp_buffer[i] == 0xFFFFFFC0 || temp_buffer[i] == 0xFFFFFFC1) {
+									if (temp_buffer[i] == 0xFFFFFFC0) Branch.opcode = 0x25;
+									else Branch.opcode = 0x5;
+									intptr_t pointer = (intptr_t)&nn::SetUserInactivityDetectionTimeExtended;
 									intptr_t pointer2 = (intptr_t)&code[i];
 									ptrdiff_t offset = (pointer - pointer2) / 4;
 									Branch.imm = offset;

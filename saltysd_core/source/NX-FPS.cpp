@@ -97,6 +97,7 @@ typedef u32 (*_ZN2nn2ro12LookupSymbolEPmPKc_0)(uintptr_t* pOutAddress, const cha
 typedef void (*_ZN2nn2os13GetSystemTickEv_1)(u64* tick);
 typedef u64 (*_ZN2nn2os22GetSystemTickFrequencyEv_0)();
 typedef void (*_ZN2nn2os22GetSystemTickFrequencyEv_1)(u64* tickfrequency);
+typedef u32 (*SetUserInactivityDetectionTimeExtended_0)(bool isTrue);
 
 struct {
 	uintptr_t nvnBootstrapLoader;
@@ -152,6 +153,7 @@ struct {
 	uintptr_t GetCurrentFocusState;
 	uintptr_t FileAccessorRead;
 	uintptr_t ConvertToTimeSpan;
+	uintptr_t SetUserInactivityDetectionTimeExtended;
 } Address_weaks;
 
 struct nvnWindowBuilder {
@@ -326,7 +328,7 @@ namespace Utils {
 		#endif
 	}
 
-	inline uint64_t _convertToTimeSpan(uint64_t tick) {
+	uint64_t _convertToTimeSpan(uint64_t tick) {
 		#if defined(SWITCH) || defined(SWITCH32)
 			return armTicksToNs(tick);
 		#elif defined(OUNCE) || defined(OUNCE32)
@@ -1184,6 +1186,10 @@ namespace nn {
 		fileBytesRead += *bytesRead;
 		return ret;
 	}
+
+	Result SetUserInactivityDetectionTimeExtended(bool isTrue) {
+		return ((SetUserInactivityDetectionTimeExtended_0)(Address_weaks.SetUserInactivityDetectionTimeExtended))(isTrue);
+	}
 }
 
 extern "C" {
@@ -1235,6 +1241,7 @@ extern "C" {
 			Address_weaks.GetSystemTickFrequency = SaltySDCore_FindSymbolBuiltin("_ZN2nn2os22GetSystemTickFrequencyEv");
 			Address_weaks.GetCurrentFocusState = SaltySDCore_FindSymbolBuiltin("_ZN2nn2oe20GetCurrentFocusStateEv");
 			Address_weaks.LookupSymbol = SaltySDCore_FindSymbolBuiltin("_ZN2nn2ro12LookupSymbolEPmPKc");
+			Address_weaks.SetUserInactivityDetectionTimeExtended = SaltySDCore_FindSymbolBuiltin("_ZN2nn2oe44SetUserInactivityDetectionTimeExtendedUnsafeEb");
 
 			SaltySDCore_ReplaceImport("nvnBootstrapLoader", (void*)NVN::BootstrapLoader_1);
 			SaltySDCore_ReplaceImport("eglSwapBuffers", (void*)EGL::Swap);
