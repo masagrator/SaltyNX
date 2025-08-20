@@ -3,9 +3,17 @@
 #include "tinyexpr/tinyexpr.h"
 #include <array>
 
-/* Design file how to build binary file for FPSLocker.
+void codeCave(void) __attribute__ ((section(".codecave")));
 
-1. Helper functions */
+void codeCave() {
+	return;
+}
+
+size_t codeCave_buffer_reserved = 0;
+
+alignas(0x1000) uint8_t variables_buffer[0x1000];
+
+size_t variables_buffer_reserved = 0;
 
 namespace Utils {
 	uint64_t _convertToTimeSpan(uint64_t tick);
@@ -30,6 +38,8 @@ namespace LOCK {
 		int64_t main_start;
 		uint64_t alias_start;
 		uint64_t heap_start;
+		int64_t variables_start;
+		int64_t codeCave_start;
 	} mappings;
 
 	template <typename T>
@@ -115,28 +125,27 @@ namespace LOCK {
 		offsets_count -= 1;
 		int64_t address = 0;
 		switch(region) {
-			case 1: {
+			case 1:
 				address = mappings.main_start;
 				break;
-			}
-			case 2: {
+			case 2:
 				address = mappings.heap_start;
 				break;
-			}
-			case 3: {
+			case 3:
 				address = mappings.alias_start;
 				break;
-			}
+			case 4:
+				address = mappings.variables_start;
+				break;
+			case 5:
+				address = mappings.codeCave_start;
+				break;
 			default:
 				return -1;
 		}
 		for (int i = 0; i < offsets_count; i++) {
-			uint64_t temp_offset2 = read32(buffer);
-			int32_t temp_offset = 0;
-			memcpy(&temp_offset, &temp_offset2, 4);
-			if (temp_offset < 0 && temp_offset > -0x1000)
-				address += temp_offset;
-			else address += temp_offset2;
+			uint32_t temp_offset = read32(buffer);
+			address += (int64_t)temp_offset;
 			if (i+1 < offsets_count) {
 				if (!isAddressValid(*(int64_t*)address)) return -2;
 				address = *(uint64_t*)address;
@@ -168,6 +177,28 @@ namespace LOCK {
 
 	}
 
+	Result processBytes(FILE* file) {
+		uint32_t main_offset = 0;
+		SaltySDCore_fread(&main_offset, 4, 1, file);
+		uint8_t value_type = 0;
+		SaltySDCore_fread(&value_type, 1, 1, file);
+		uint8_t elements = 0;
+		SaltySDCore_fread(&elements, 1, 1, file);
+		void* temp_buffer = calloc(elements, value_type % 0x10);
+		SaltySDCore_fread(temp_buffer, value_type % 0x10, elements, file);
+		SaltySD_Memcpy(LOCK::mappings.main_start + main_offset, (u64)temp_buffer, elements * (value_type % 0x10));
+		free(temp_buffer);
+		return 0;
+	}
+
+	Result processVariables(FILE* file) {
+		return 0; //TO DO
+	}
+
+	Result processCodeCave(FILE* file) {
+		return 0; //TO DO
+	}
+
 	Result applyMasterWrite(FILE* file, size_t master_offset) {
 		uint32_t offset_impl = 0;
 
@@ -180,88 +211,13 @@ namespace LOCK {
 		int8_t OPCODE = 0;
 		while(true) {
 			SaltySDCore_fread(&OPCODE, 1, 1, file);
-			if (OPCODE == 1 || OPCODE == 2) {
-				int64_t main_offset = 0;
-				SaltySDCore_fread(&main_offset, 4, 1, file);
-				int32_t main_offset_to_check = 0;
-				memcpy(&main_offset_to_check, &main_offset, 4);
-				if (main_offset_to_check < 0 && main_offset_to_check > -0x1000) main_offset = main_offset_to_check;
-				uint8_t value_type = 0;
-				SaltySDCore_fread(&value_type, 1, 1, file);
-				uint8_t elements = 0;
-				SaltySDCore_fread(&elements, 1, 1, file);
-				switch(value_type) {
-					case 1:
-					case 0x11: {
-						void* temp_buffer = calloc(elements, 1);
-						SaltySDCore_fread(temp_buffer, 1, elements, file);
-						SaltySD_Memcpy(LOCK::mappings.main_start + main_offset, (u64)temp_buffer, elements);
-						free(temp_buffer);
-						break;
-					}
-					case 2:
-					case 0x12: {
-						void* temp_buffer = calloc(elements, 2);
-						SaltySDCore_fread(temp_buffer, 2, elements, file);
-						SaltySD_Memcpy(LOCK::mappings.main_start + main_offset, (u64)temp_buffer, elements*2);
-						free(temp_buffer);
-						break;
-					}
-					case 4:
-					case 0x14:
-					case 0x24: {
-						uint32_t* temp_buffer = (uint32_t*)calloc(elements, 4);
-						SaltySDCore_fread((void*)temp_buffer, 4, elements, file);
-						uint32_t* code = (uint32_t*)(LOCK::mappings.main_start + main_offset);
-						if (OPCODE == 2) {
-							struct {
-								unsigned int imm: 26;
-								unsigned int opcode: 6;
-							} Branch;
-							static_assert(sizeof(Branch) == 4);
-							for (size_t i = 0; i < elements; i++) {
-								if (temp_buffer[i] == 0xFFFFFFE0 || temp_buffer[i] == 0xFFFFFFE1) {
-									if (temp_buffer[i] == 0xFFFFFFE0) Branch.opcode = 0x25;
-									else Branch.opcode = 0x5;
-									intptr_t pointer = (intptr_t)&Utils::_convertToTimeSpan;
-									intptr_t pointer2 = (intptr_t)&code[i];
-									ptrdiff_t offset = (pointer - pointer2) / 4;
-									Branch.imm = offset;
-									memcpy(&temp_buffer[i], &Branch, 4);
-								}
-								else if (temp_buffer[i] == 0xFFFFFFC0 || temp_buffer[i] == 0xFFFFFFC1) {
-									if (temp_buffer[i] == 0xFFFFFFC0) Branch.opcode = 0x25;
-									else Branch.opcode = 0x5;
-									intptr_t pointer = (intptr_t)&nn::SetUserInactivityDetectionTimeExtended;
-									intptr_t pointer2 = (intptr_t)&code[i];
-									ptrdiff_t offset = (pointer - pointer2) / 4;
-									Branch.imm = offset;
-									memcpy(&temp_buffer[i], &Branch, 4);
-								}
-							}
-						}
-						SaltySD_Memcpy(LOCK::mappings.main_start + main_offset, (u64)temp_buffer, elements*4);
-						free(temp_buffer);
-						break;
-					}
-					case 8:
-					case 0x18:
-					case 0x28: {
-						void* temp_buffer = calloc(elements, 8);
-						SaltySDCore_fread(temp_buffer, 8, elements, file);
-						SaltySD_Memcpy(LOCK::mappings.main_start + main_offset, (u64)temp_buffer, elements*8);
-						free(temp_buffer);
-						break;
-					}
-					default:
-						return 0x313;
-				}				
+			switch(OPCODE) {
+				case 1: return processBytes(file);
+				case 2: return processVariables(file);
+				case 3: return processCodeCave(file);
+				case -1: {MasterWriteApplied = true; return 0;}
+				default: return 0x355;
 			}
-			else if (OPCODE == -1) {
-				MasterWriteApplied = true;
-				return 0;
-			}
-			else return 0x355;
 		}
 	}
 

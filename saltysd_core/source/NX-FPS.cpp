@@ -28,14 +28,6 @@ struct NVNDevice {
 	char reserved[0x3000];
 };
 
-uint32_t codeCave(void) __attribute__ ((section(".codecave")));
-
-uint32_t codeCave() {
-	return 0;
-}
-
-volatile uintptr_t address = 0;
-
 typedef int NVNtextureFlags;
 typedef int NVNtextureTarget;
 typedef int NVNformat;
@@ -1345,11 +1337,13 @@ extern "C" {
 					SaltySDCore_printf("NX-FPS: FPSLocker: readConfig rc: 0x%x\n", configRC);
 					svcGetInfo(&LOCK::mappings.alias_start, InfoType_AliasRegionAddress, CUR_PROCESS_HANDLE, 0);
 					svcGetInfo(&LOCK::mappings.heap_start, InfoType_HeapRegionAddress, CUR_PROCESS_HANDLE, 0);
+					LOCK::mappings.variables_start = (int64_t)&variables_buffer[0];
+					LOCK::mappings.codeCave_start = (int64_t)&codeCave;
+
 				}
 				else SaltySDCore_printf("NX-FPS: FPSLocker: File not found: %s\n", path);
 			}
 		}
-		address = (uintptr_t)&codeCave;
 		SaltySDCore_printf("NX-FPS: injection finished\n");
 	}
 }
