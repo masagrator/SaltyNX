@@ -3,11 +3,8 @@
 #include "tinyexpr/tinyexpr.h"
 #include <array>
 
-void codeCave(void) __attribute__ ((section(".codecave")));
-
-void codeCave() {
-	return;
-}
+//We need to define something in that section and reference its pointer to not get whole section discarded by garbage collector
+void __attribute__ ((section(".codecave"))) codeCave() {}
 
 size_t codeCave_buffer_reserved = 0;
 
