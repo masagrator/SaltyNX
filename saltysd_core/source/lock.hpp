@@ -254,7 +254,7 @@ namespace LOCK {
 					}
 					else {
 						intptr_t jump_address = (intptr_t)(LOCK::mappings.main_start + ((int64_t)(Branch.imm)*4));
-						if (address_region == 5) current_address = LOCK::mappings.codeCave_start;
+						if (address_region == 5) current_address = (intptr_t)&output[i];
 						ptrdiff_t offset = jump_address - current_address;
 						Branch.imm = offset / 4;
 					}
