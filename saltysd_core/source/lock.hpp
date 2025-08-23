@@ -288,6 +288,20 @@ namespace LOCK {
 					SaltySD_Memcpy((u64)&output[i], (u64)&ADRP, 4);
 					break;
 				}
+				case 4: {
+					struct {
+						signed int imm: 26;
+						unsigned int opcode: 6;
+					} Branch;
+					static_assert(sizeof(Branch) == 4);
+					memcpy(&Branch, &temp_buffer[i].instruction, 4);
+					intptr_t current_address = (intptr_t)&output[i];
+					intptr_t jump_address = (intptr_t)(LOCK::mappings.main_start + ((int64_t)(Branch.imm)*4) + (i*4));
+					ptrdiff_t offset = jump_address - current_address;
+					Branch.imm = offset / 4;
+					SaltySD_Memcpy((u64)&output[i], (u64)&Branch, 4);
+					break;					
+				}
 				default:
 					return 0x345;
 			}
