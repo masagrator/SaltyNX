@@ -1198,6 +1198,8 @@ extern "C" {
 		sharedOperationMode = _sharedOperationMode;
 		SaltySDCore_printf("NX-FPS: alive\n");
 		LOCK::mappings.main_start = getMainAddress();
+		LOCK::mappings.variables_start = (int64_t)&variables_buffer[0];
+		LOCK::mappings.codeCave_start = (int64_t)&codeCave;
 		SaltySDCore_printf("NX-FPS: found main at: 0x%lX\n", LOCK::mappings.main_start);
 		Result ret = SaltySD_CheckIfSharedMemoryAvailable(&SharedMemoryOffset, sizeof(NxFpsSharedBlock));
 		SaltySDCore_printf("NX-FPS: ret: 0x%X\n", ret);
@@ -1337,8 +1339,6 @@ extern "C" {
 					SaltySDCore_printf("NX-FPS: FPSLocker: readConfig rc: 0x%x\n", configRC);
 					svcGetInfo(&LOCK::mappings.alias_start, InfoType_AliasRegionAddress, CUR_PROCESS_HANDLE, 0);
 					svcGetInfo(&LOCK::mappings.heap_start, InfoType_HeapRegionAddress, CUR_PROCESS_HANDLE, 0);
-					LOCK::mappings.variables_start = (int64_t)&variables_buffer[0];
-					LOCK::mappings.codeCave_start = (int64_t)&codeCave;
 
 				}
 				else SaltySDCore_printf("NX-FPS: FPSLocker: File not found: %s\n", path);

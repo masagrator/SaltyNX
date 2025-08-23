@@ -117,11 +117,13 @@ namespace LOCK {
 		return false;
 	}
 
-	int64_t NOINLINE getAddress(uint8_t* buffer, uint8_t offsets_count) {
+	int64_t NOINLINE getAddress(uint8_t* buffer, int8_t offsets_count) {
 		uint8_t region = read8(buffer);
 		offsets_count -= 1;
 		int64_t address = 0;
 		switch(region) {
+			case 0:
+				break;
 			case 1:
 				address = mappings.main_start;
 				break;
@@ -159,7 +161,7 @@ namespace LOCK {
 		if (*(uint32_t*)buffer != *(uint32_t*)&MAGIC)
 			return false;
 		gen = buffer[4];
-		if (gen != 3)
+		if (gen != 3 && gen != 4)
 			return false;
 		masterWrite = buffer[5];
 		if (masterWrite > 1)
@@ -189,10 +191,108 @@ namespace LOCK {
 	}
 
 	Result processVariables(FILE* file) {
-		return 0; //TO DO
+		uint32_t main_offset = 0;
+		SaltySDCore_fread(&main_offset, 4, 1, file);
+		uint8_t value_type = 0;
+		SaltySDCore_fread(&value_type, 1, 1, file);
+		uint8_t elements = 0;
+		SaltySDCore_fread(&elements, 1, 1, file);
+		void* temp_buffer = calloc(elements, value_type % 0x10);
+		SaltySDCore_fread(temp_buffer, value_type % 0x10, elements, file);
+		SaltySD_Memcpy(LOCK::mappings.variables_start + main_offset, (u64)temp_buffer, elements * (value_type % 0x10));
+		free(temp_buffer);
+		return 0;
 	}
 
 	Result processCodeCave(FILE* file) {
+		uint8_t address_region = 0;
+		SaltySDCore_fread(&address_region, 1, 1, file);
+		uint32_t main_offset = 0;
+		SaltySDCore_fread(&main_offset, 4, 1, file);
+		uint8_t value_type = 0;
+		SaltySDCore_fread(&value_type, 1, 1, file);
+		uint8_t elements = 0;
+		SaltySDCore_fread(&elements, 1, 1, file);
+		struct codeCave {
+			uint8_t adjustment_type;
+			uint32_t instruction;
+		} PACKED;
+		static_assert(sizeof(codeCave) == 5);
+		codeCave* temp_buffer = (codeCave*)calloc(elements, sizeof(codeCave));
+		uint32_t* output = 0;
+		if (address_region == 5) output = (uint32_t*)(LOCK::mappings.codeCave_start + main_offset);
+		else if (address_region == 1) output = (uint32_t*)(LOCK::mappings.main_start + main_offset);
+		else return 0x321;
+		SaltySDCore_fread(temp_buffer, sizeof(codeCave), elements, file);
+		for (size_t i = 0; i < elements; i++) {
+			switch(temp_buffer[i].adjustment_type) {
+				case 0:
+					SaltySD_Memcpy((u64)&output[i], (u64)&temp_buffer[i].instruction, 4);
+					break;
+				case 1: {
+					struct {
+						signed int imm: 26;
+						unsigned int opcode: 6;
+					} Branch;
+					static_assert(sizeof(Branch) == 4);
+					memcpy(&Branch, &temp_buffer[i].instruction, 4);
+					intptr_t current_address = (intptr_t)&output[i];
+					if (Branch.imm == -1) {
+						intptr_t jump_address = (intptr_t)&Utils::_convertToTimeSpan;
+						ptrdiff_t offset = jump_address - current_address;
+						Branch.imm = offset / 4;
+					}
+					else if (Branch.imm == -2) {
+						intptr_t jump_address = (intptr_t)&nn::SetUserInactivityDetectionTimeExtended;
+						ptrdiff_t offset = jump_address - current_address;
+						Branch.imm = offset / 4;						
+					}
+					else if (Branch.imm <= -64) {
+						intptr_t jump_address = (LOCK::mappings.codeCave_start - 0x100) + (((int64_t)(Branch.imm)*4) * -1);
+						ptrdiff_t offset = jump_address - current_address;
+						Branch.imm = offset / 4;
+					}
+					else {
+						intptr_t jump_address = (intptr_t)(LOCK::mappings.main_start + ((int64_t)(Branch.imm)*4));
+						if (address_region == 5) current_address = LOCK::mappings.codeCave_start;
+						ptrdiff_t offset = jump_address - current_address;
+						Branch.imm = offset / 4;
+					}
+					SaltySD_Memcpy((u64)&output[i], (u64)&Branch, 4);
+					break;
+				}
+				case 2: 
+				case 3: {
+					struct {
+						unsigned int reg: 5;
+						signed int immhi: 19;
+						unsigned int reserved: 5;
+						unsigned int immlo: 2;
+						bool op: 1;
+					} ADRP;
+					static_assert(sizeof(ADRP) == 4);
+					memcpy(&ADRP, &temp_buffer[i].instruction, 4);
+					intptr_t current_address = (intptr_t)(&output[i]) & ~0xFFF;
+					intptr_t jump_address = 0;
+					if (temp_buffer[i].adjustment_type == 2) {
+						jump_address = (intptr_t)LOCK::mappings.codeCave_start;
+					}
+					else if (temp_buffer[i].adjustment_type == 3) {
+						jump_address = (intptr_t)LOCK::mappings.variables_start;
+					}
+					ptrdiff_t offset = jump_address - current_address;
+					ADRP.immlo = (offset % 0x4000) >> 12;
+					ADRP.immhi = (offset >> 14);
+					uint32_t inst = 0;
+					memcpy(&inst, &ADRP, 4);
+					SaltySD_Memcpy((u64)&output[i], (u64)&ADRP, 4);
+					break;
+				}
+				default:
+					return 0x345;
+			}
+		}
+		free(temp_buffer);
 		return 0; //TO DO
 	}
 
@@ -206,15 +306,18 @@ namespace LOCK {
 			return 0x312;
 		
 		int8_t OPCODE = 0;
+		Result rc = 0;
 		while(true) {
 			SaltySDCore_fread(&OPCODE, 1, 1, file);
+			SaltySDCore_printf("processes opcode: %d, offset: 0x%x\n", OPCODE, ftell(file));
 			switch(OPCODE) {
-				case 1: return processBytes(file);
-				case 2: return processVariables(file);
-				case 3: return processCodeCave(file);
+				case 1: {rc = processBytes(file); break;}
+				case 2: {rc = processVariables(file); break;}
+				case 3: {rc = processCodeCave(file); break;}
 				case -1: {MasterWriteApplied = true; return 0;}
 				default: return 0x355;
 			}
+			if (R_FAILED(rc)) return rc;
 		}
 	}
 
@@ -449,6 +552,7 @@ namespace LOCK {
 				switch(value_type) {
 					case 1:
 					case 0x11: {
+						if (!address) return 0x3007;
 						for (uint8_t i = 0; i < loops; i++) {
 							*(uint8_t*)address = read8(buffer);
 							address += 1;
@@ -457,6 +561,7 @@ namespace LOCK {
 					}
 					case 2:
 					case 0x12: {
+						if (!address) return 0x3007;
 						for (uint8_t i = 0; i < loops; i++) {
 							*(uint16_t*)address = read16(buffer);
 							address += 2;
@@ -466,6 +571,7 @@ namespace LOCK {
 					case 4:
 					case 0x14:
 					case 0x24: {
+						if (!address) return 0x3007;
 						for (uint8_t i = 0; i < loops; i++) {
 							*(uint32_t*)address = read32(buffer);
 							address += 4;
@@ -475,6 +581,7 @@ namespace LOCK {
 					case 8:
 					case 0x18:
 					case 0x28: {
+						if (!address) return 0x3007;
 						for (uint8_t i = 0; i < loops; i++) {
 							*(uint64_t*)address = read64(buffer);
 							address += 8;
@@ -571,7 +678,7 @@ namespace LOCK {
 						break;
 					}
 					default:
-						return 3;
+						return 8;
 				}
 
 				offsets_count = read8(buffer);
@@ -583,6 +690,7 @@ namespace LOCK {
 				switch(value_type) {
 					case 1:
 					case 0x11: {
+						if (!address) return 0x3007;
 						for (uint8_t i = 0; i < loops; i++) {
 							uint8_t value8 = read8(buffer);
 							if (passed) writeValue(value8, address);
@@ -592,6 +700,7 @@ namespace LOCK {
 					}
 					case 2:
 					case 0x12: {
+						if (!address) return 0x3007;
 						for (uint8_t i = 0; i < loops; i++) {
 							uint16_t value16 = read16(buffer);
 							if (passed) writeValue(value16, address);
@@ -602,6 +711,7 @@ namespace LOCK {
 					case 4:
 					case 0x14:
 					case 0x24: {
+						if (!address) return 0x3007;
 						for (uint8_t i = 0; i < loops; i++) {
 							uint32_t value32 = read32(buffer);
 							if (passed) writeValue(value32, address);
@@ -612,6 +722,7 @@ namespace LOCK {
 					case 8:
 					case 0x18:
 					case 0x28: {
+						if (!address) return 0x3007;
 						for (uint8_t i = 0; i < loops; i++) {
 							uint64_t value64 = read64(buffer);
 							if (passed) writeValue(value64, address);
@@ -623,11 +734,10 @@ namespace LOCK {
 						for (uint8_t i = 0; i < loops; i++) {
 							uint64_t valueDouble = read64(buffer);
 							if (passed) writeValue(valueDouble, (uint64_t)&overwriteRefreshRate);
-							address += 8;
 						}
 						break;						
 					default:
-						return 3;
+						return 9;
 				}
 			}
 			else if (OPCODE == 3) {
