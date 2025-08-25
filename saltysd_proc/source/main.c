@@ -1275,7 +1275,7 @@ int main(int argc, char *argv[])
         
         uint32_t crr = 0;
         GetDisplayRefreshRate(&crr, true);
-        if (isOLED && !isDocked) correctOledGamma(crr);
+        if (isOLED) correctOledGamma(crr);
 
         if (nx_fps) nx_fps -> dontForce60InDocked = dontForce60InDocked;
 

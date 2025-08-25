@@ -214,7 +214,7 @@ extern "C" __attribute__((noinline)) void correctOledGamma(uint32_t refresh_rate
         return;
     }
     i = 0;
-    #define loop_amount 3
+    #define loop_amount 5
     
     uint32_t offsets[] = {0x1A, 0x24, 0x25, 0x3D};
     uint32_t values_set[4] = {2, 0, 0x83, 0};
