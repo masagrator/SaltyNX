@@ -432,6 +432,7 @@ namespace LOCK {
 					OPCODE = 1;
 				}
 				out_buffer[temp_offset++] = OPCODE;
+				if (gen == 4) out_buffer[temp_offset++] = read8(in_buffer);
 				uint8_t address_count = read8(in_buffer);
 				out_buffer[temp_offset++] = address_count;
 				out_buffer[temp_offset++] = read8(in_buffer);
@@ -461,6 +462,7 @@ namespace LOCK {
 					OPCODE = 2;
 				}
 				out_buffer[temp_offset++] = OPCODE;
+				if (gen == 4) out_buffer[temp_offset++] = read8(in_buffer);
 				uint8_t address_count = read8(in_buffer);
 				out_buffer[temp_offset++] = address_count;
 				out_buffer[temp_offset++] = read8(in_buffer); //compare address region
@@ -474,6 +476,7 @@ namespace LOCK {
 				memcpy(&out_buffer[temp_offset], &in_buffer[offset], value_type % 0x10);
 				temp_offset += value_type % 0x10;
 				offset += value_type % 0x10;
+				if (gen == 4) out_buffer[temp_offset++] = read8(in_buffer);
 				address_count = read8(in_buffer);
 				out_buffer[temp_offset++] = address_count;
 				out_buffer[temp_offset++] = read8(in_buffer); //address region
