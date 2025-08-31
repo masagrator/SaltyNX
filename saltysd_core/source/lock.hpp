@@ -106,8 +106,6 @@ namespace LOCK {
 		MemoryInfo memoryinfo = {0};
 		u32 pageinfo = 0;
 
-		if (unsafeCheck) return true;
-
 		if ((address < 0) || (address >= 0x8000000000)) return false;
 
 		Result rc = svcQueryMemory(&memoryinfo, &pageinfo, address);
@@ -117,7 +115,10 @@ namespace LOCK {
 		return false;
 	}
 
-	int64_t NOINLINE getAddress(uint8_t* buffer, int8_t offsets_count) {
+	int64_t NOINLINE getAddress(uint8_t* buffer) {
+		bool unsafe_address = unsafeCheck;
+		if (gen == 4) unsafe_address = (bool)read8(buffer);
+		int8_t offsets_count = read8(buffer);
 		uint8_t region = read8(buffer);
 		offsets_count -= 1;
 		int64_t address = 0;
@@ -146,7 +147,7 @@ namespace LOCK {
 			uint32_t temp_offset = read32(buffer);
 			address += (int64_t)temp_offset;
 			if (i+1 < offsets_count) {
-				if (!isAddressValid(*(int64_t*)address)) return -2;
+				if (unsafe_address && !isAddressValid(*(int64_t*)address)) return -2;
 				address = *(uint64_t*)address;
 			}
 		}
@@ -545,8 +546,7 @@ namespace LOCK {
 			*/
 			int8_t OPCODE = read8(buffer);
 			if (OPCODE == 1) {
-				uint8_t offsets_count = read8(buffer);
-				int64_t address = getAddress(buffer, offsets_count);
+				int64_t address = getAddress(buffer);
 				if (address < 0) 
 					return 6;
 				/* value_type:
@@ -614,8 +614,7 @@ namespace LOCK {
 				}
 			}
 			else if (OPCODE == 2) {
-				uint8_t offsets_count = read8(buffer);
-				int64_t address = getAddress(buffer, offsets_count);
+				int64_t address = getAddress(buffer);
 				if (address < 0) 
 					return 6;
 
@@ -695,8 +694,7 @@ namespace LOCK {
 						return 8;
 				}
 
-				offsets_count = read8(buffer);
-				address = getAddress(buffer, offsets_count);
+				address = getAddress(buffer);
 				if (address < 0) 
 					return 6;
 				value_type = read8(buffer);
