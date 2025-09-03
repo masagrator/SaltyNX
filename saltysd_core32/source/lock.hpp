@@ -101,7 +101,7 @@ namespace LOCK {
 	}
 
 	uintptr_t NOINLINE getAddress(uint8_t* buffer) {
-		bool unsafe_address = unsafeCheck;
+		bool unsafe_address = !unsafeCheck;
 		if (gen == 4) unsafe_address = (bool)read8(buffer);
 		int8_t offsets_count = read8(buffer);
 		uint8_t region = read8(buffer);
