@@ -87,11 +87,10 @@ namespace LOCK {
 
 	bool unsafeCheck = false;
 
-	bool NOINLINE isAddressValid(uintptr_t address) {
+	bool NOINLINE isAddressValid(uintptr_t address_in) {
+		int64_t address = address_in;
 		MemoryInfo memoryinfo = {0};
 		u32 pageinfo = 0;
-
-		if (unsafeCheck) return true;
 
 		Result rc = svcQueryMemory(&memoryinfo, &pageinfo, address);
 		if (R_FAILED(rc)) return false;
