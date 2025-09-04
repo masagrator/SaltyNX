@@ -271,10 +271,20 @@ void SaltySDCore_PatchSVCs()
 	u64 dst_1 = SaltySDCore_findCodeEx(orig_1, 8);
 	u64 dst_2 = SaltySDCore_findCodeEx(orig_2, 8);
 	
-	if (!dst_1 || !dst_2)
+	if (!dst_1)
 	{
-		SaltySDCore_printf("SaltySD Core: Failed to find svcSetHeapSize! %llx\n", dst_1);
+		SaltySDCore_printf("SaltySD Core: Failed to find svcSetHeapSize!\n");
 		return;
+	}
+	else {
+		SaltySDCore_printf("SaltySD Core: Found svcSetHeapSize at address: 0x%lx!\n", dst_1);
+	}
+	if (!dst_2) {
+		SaltySDCore_printf("SaltySD Core: Failed to find svcGetInfo!\n");
+		return;		
+	}
+	else {
+		SaltySDCore_printf("SaltySD Core: Found svcGetInfo at address: 0x%lx!\n", dst_2);
 	}
 
 	*(u64*)&patch[8] = (u64)svcSetHeapSizeIntercept;
