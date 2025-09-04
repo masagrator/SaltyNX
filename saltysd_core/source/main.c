@@ -419,7 +419,7 @@ size_t GetAllModuleInfo(struct ModuleInfo** modules, void* buffer, size_t buffer
 		if (info.addr != (u64)_start && info.perm == Perm_Rx)
 		{
 			addresses[module_count] = info.addr;
-			sizes[module_count] = info.size;
+			sizes[module_count] = info.size; //this should be size of whole module, but games that use it seems to not care ¯\_(ツ)_/¯
 			module_count++;
 		}
 
@@ -463,7 +463,7 @@ size_t GetAllModuleInfo(struct ModuleInfo** modules, void* buffer, size_t buffer
 			modules_in[i].BID = (uint8_t*)malloc(sizeof(BID_temp));
 			memcpy(modules_in[i].BID, &BID_temp, sizeof(BID_temp));
 			modules_in[i].BID_length = sizeof(BID_temp);
-			modules_in[i].unk = 0x66645c4700000000;
+			modules_in[i].unk = addresses[0] & ~0xFFFFFFFF;
 		}
 		else {
 			modules_in[i].module_name = (const char*)malloc(strlen("multimedia") + 1);
@@ -474,7 +474,7 @@ size_t GetAllModuleInfo(struct ModuleInfo** modules, void* buffer, size_t buffer
 			modules_in[i].BID = (uint8_t*)malloc(sizeof(BID_temp));
 			memcpy(modules_in[i].BID, &BID_temp, sizeof(BID_temp));
 			modules_in[i].BID_length = sizeof(BID_temp);
-			modules_in[i].unk = addresses[0] & ~0xFFFFFFFF;
+			modules_in[i].unk = 0x66645c4700000000;
 		}		
 	}
 
