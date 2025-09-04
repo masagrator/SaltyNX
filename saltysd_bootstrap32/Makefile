@@ -39,8 +39,7 @@ EXEFS_SRC	:=	exefs_src
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
-ARCH			:=	-march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIC -s
-ARCH_DEBUG			:=	-march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIC
+ARCH			:=	-march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIC
 
 CFLAGS				:=	-Wall -Wno-pointer-to-int-cast -O3 \
 					-ffast-math \
@@ -52,9 +51,7 @@ CXXFLAGS			:= $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++23
 
 ASFLAGS				:=	-g $(ARCH)
 LDFLAGS_3K			=	-specs=$(CURDIR)/switch_3k.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
-LDFLAGS_3K_DEBUG	=	-specs=$(CURDIR)/switch_3k.specs -g $(ARCH_DEBUG) -Wl,-Map,$(notdir $*.map)
 LDFLAGS_5K			=	-specs=$(CURDIR)/switch_5k.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
-LDFLAGS_5K_DEBUG	=	-specs=$(CURDIR)/switch_5k.specs -g $(ARCH_DEBUG) -Wl,-Map,$(notdir $*.map)
 
 LIBS				:= -lnx_min
 
@@ -147,11 +144,11 @@ $(BUILD):
 	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
 	@echo linking $(notdir $@)
 	@$(LD) $(LDFLAGS_3K) $(OFILES2) $(LIBPATHS) $(LIBS) -o $(TARGET)_3k.elf
-	@$(LD) $(LDFLAGS_3K_DEBUG) $(OFILES2) $(LIBPATHS) $(LIBS) -o $(TARGET)_3k-debug.elf
 	@$(LD) $(LDFLAGS_5K) $(OFILES2) $(LIBPATHS) $(LIBS) -o $(TARGET)_5k.elf
-	@$(LD) $(LDFLAGS_5K_DEBUG) $(OFILES2) $(LIBPATHS) $(LIBS) -o $(TARGET)_5k-debug.elf
-	@$(NM) -CSn $@ > $(notdir $*.lst)
-	@echo As long as elf was generated, ignore all errors above :)
+	@$(OBJCOPY) --only-keep-debug $(CURDIR)/$(TARGET)_3k.elf $(CURDIR)/$(TARGET)_3k.dbg
+	@$(OBJCOPY) --add-gnu-debuglink=$(CURDIR)/$(TARGET)_3k.dbg --strip-debug --strip-unneeded $(CURDIR)/$(TARGET)_3k.elf
+	@$(OBJCOPY) --only-keep-debug $(CURDIR)/$(TARGET)_5k.elf $(CURDIR)/$(TARGET)_5k.dbg
+	@$(OBJCOPY) --add-gnu-debuglink=$(CURDIR)/$(TARGET)_5k.dbg --strip-debug --strip-unneeded $(CURDIR)/$(TARGET)_5k.elf
 
 #---------------------------------------------------------------------------------
 clean:
