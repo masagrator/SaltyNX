@@ -285,13 +285,13 @@ bool TryWaitSystemEvent(SystemEvent* systemEvent) {
 	static uint8_t compare_res_mode_h = 0;
 	static uint8_t compare_res_mode_d = 0;
 
-	if (systemEvent != defaultDisplayResolutionChangeEventCopy) 
+	if (systemEvent != defaultDisplayResolutionChangeEventCopy && systemEvent != notificationMessageEventCopy) 
 		return ((nnosTryWaitSystemEvent)(Address_weaks.TryWaitSystemEvent))(systemEvent);
 
 	if (ReverseNX_RT->def) {
 		bool ret = ((nnosTryWaitSystemEvent)(Address_weaks.TryWaitSystemEvent))(systemEvent);
 		compare = ReverseNX_RT->isDocked;
-		if (systemEvent == defaultDisplayResolutionChangeEventCopy && !check) {
+		if (!check) {
 			check = true;
 			return true;
 		}
