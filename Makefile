@@ -37,15 +37,23 @@ sdcard_out/atmosphere/contents/0000000000534C56/exefs.nsp: saltysd_core/saltysd_
 	@touch sdcard_out/atmosphere/contents/0000000000534C56/flags/boot2.flag
 	@mkdir -p sdcard_out/SaltySD/flags/
 	@mkdir -p sdcard_out/SaltySD/patches/
+	@mkdir -p sdcard_debug/SaltySD/
+	@mkdir -p sdcard_debug/atmosphere/contents/0000000000534C56/
 	@touch sdcard_out/SaltySD/flags/log.flag
 	@cp exceptions.txt sdcard_out/SaltySD/exceptions.txt
 	@cp toolbox.json sdcard_out/atmosphere/contents/0000000000534C56/toolbox.json
 	@cp saltysd_core32/saltysd_core32.elf sdcard_out/SaltySD/saltysd_core32.elf
+	@cp saltysd_core32/saltysd_core32.dbg sdcard_debug/SaltySD/saltysd_core32.dbg
 	@cp saltysd_core/saltysd_core.elf sdcard_out/SaltySD/saltysd_core.elf
+	@cp saltysd_core/saltysd_core.dbg sdcard_debug/SaltySD/saltysd_core.dbg
 	@cp saltysd_bootstrap/saltysd_bootstrap.elf sdcard_out/SaltySD/saltysd_bootstrap.elf
+	@cp saltysd_bootstrap/saltysd_bootstrap.dbg sdcard_debug/SaltySD/saltysd_bootstrap.dbg
 	@cp saltysd_bootstrap32/saltysd_bootstrap32_3k.elf sdcard_out/SaltySD/saltysd_bootstrap32_3k.elf
 	@cp saltysd_bootstrap32/saltysd_bootstrap32_5k.elf sdcard_out/SaltySD/saltysd_bootstrap32_5k.elf
+	@cp saltysd_bootstrap32/saltysd_bootstrap32_3k.dbg sdcard_debug/SaltySD/saltysd_bootstrap32_3k.dbg
+	@cp saltysd_bootstrap32/saltysd_bootstrap32_5k.dbg sdcard_debug/SaltySD/saltysd_bootstrap32_5k.dbg
 	@cp saltysd_proc/saltysd_proc.nsp sdcard_out/atmosphere/contents/0000000000534C56/exefs.nsp
+	@cp saltysd_proc/saltysd_proc.elf sdcard_debug/atmosphere/contents/0000000000534C56/exefs.elf
 
 clean:
 	@rm -f saltysd_proc/data/*
