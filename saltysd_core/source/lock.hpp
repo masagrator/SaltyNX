@@ -263,7 +263,8 @@ namespace LOCK {
 					break;
 				}
 				case 2: 
-				case 3: {
+				case 3:
+				case 4: {
 					struct {
 						unsigned int reg: 5;
 						signed int immhi: 19;
@@ -275,13 +276,19 @@ namespace LOCK {
 					memcpy(&ADRP, &temp_buffer[i].instruction, 4);
 					intptr_t current_address = (intptr_t)(&output[i]) & ~0xFFF;
 					intptr_t jump_address = 0;
+					ptrdiff_t offset = 0;
 					if (temp_buffer[i].adjustment_type == 2) {
 						jump_address = (intptr_t)LOCK::mappings.codeCave_start;
+						offset = jump_address - current_address;
 					}
 					else if (temp_buffer[i].adjustment_type == 3) {
 						jump_address = (intptr_t)LOCK::mappings.variables_start;
+						offset = jump_address - current_address;
 					}
-					ptrdiff_t offset = jump_address - current_address;
+					else if (temp_buffer[i].adjustment_type == 4) {
+						jump_address = (intptr_t)(((uintptr_t)ADRP.immlo << 12) + ((uintptr_t)ADRP.immhi << 14));
+						offset = jump_address + (LOCK::mappings.main_start - LOCK::mappings.codeCave_start);
+					}
 					ADRP.immlo = (offset % 0x4000) >> 12;
 					ADRP.immhi = (offset >> 14);
 					uint32_t inst = 0;
@@ -289,7 +296,7 @@ namespace LOCK {
 					SaltySD_Memcpy((u64)&output[i], (u64)&ADRP, 4);
 					break;
 				}
-				case 4: {
+				case 5: {
 					struct {
 						signed int imm: 26;
 						unsigned int opcode: 6;
