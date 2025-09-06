@@ -427,7 +427,7 @@ namespace NX_FPS_Math {
 	template <typename T> void addResToViewports(T m_width, T m_height) {
 		if (m_height <= (T)160) return;
 		T ratio = (m_width * 10) / m_height;
-		if (ratio >= (T)12 && ratio <= (T)18) {
+		if (ratio >= (T)6 && ratio <= (T)18) {
 			union {
 				struct {
 					uint16_t width;
