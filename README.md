@@ -31,7 +31,7 @@ https://github.com/masagrator/SaltyNX-Tool
 > Known issues:
 > - Instability with some homebrews and sysmodules (like emuiibo),
 > - You need to have at least Hekate 5.0.2 if you don't want issues related to Hekate,
-> - Cheats using directly heap addresses may not work properly while using plugins.
+> - Cheats using directly heap addresses instead of MAIN+offset chain may not work properly.
 
 # How to download release:
 
