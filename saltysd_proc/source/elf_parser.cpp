@@ -35,9 +35,11 @@ std::vector<section_t> Elf_parser::get_sections() {
 	for (int i = 0; i < shnum; ++i) {
 		section_t section;
 		section.shdr = &shdr[i];
+		section.section_name = std::string(sh_strtab_p + shdr[i].sh_name);
+		if (section.section_name.compare(0, 6, ".debug") == 0)
+			continue;
 		section.data = m_mmap_program + shdr[i].sh_offset;
 		section.section_index= i;
-		section.section_name = std::string(sh_strtab_p + shdr[i].sh_name);
 		section.section_type = get_section_type(shdr[i].sh_type);
 		
 		sections.push_back(section);
