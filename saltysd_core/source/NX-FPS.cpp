@@ -79,8 +79,8 @@ typedef void (*glViewport_0)(int x, int y, uint width, uint height);
 typedef void (*glViewportArrayv_0)(uint firstViewport, uint viewportCount, const glViewportArray* pViewports);
 typedef void (*glViewportIndexedf_0)(uint index, float x, float y, float width, float height);
 typedef void (*glViewportIndexedfv_0)(uint index, const glViewportArray* pViewports);
-
 typedef u64 (*eglGetProcAddress_0)(const char* eglName);
+
 typedef void* (*_vkGetInstanceProcAddr_0)(void* instance, const char* vkFunction);
 typedef void* (*vkGetDeviceProcAddr_0)(void* device, const char* vkFunction);
 typedef void (*vkCmdSetViewport_0)(void* commandBuffer, uint32_t firstViewport, uint32_t viewportCount, const VkViewport* pViewports);
@@ -465,6 +465,7 @@ namespace NX_FPS_Math {
 	}
 
 	template <typename T> void addResToViewports(T m_width, T m_height) {
+		if (m_height <= (T)160) return;
 		T ratio = (m_width * 10) / m_height;
 		if (ratio >= (T)6 && ratio <= (T)18) {
 			union {
@@ -494,6 +495,7 @@ namespace NX_FPS_Math {
 	}
 
 	template <typename T> void addResToRender(T m_width, T m_height) {
+		if (m_height <= (T)160) return;
 		T ratio = (m_width * 10) / m_height;
 		if (ratio >= (T)6 && ratio <= (T)18) {
 			union {
