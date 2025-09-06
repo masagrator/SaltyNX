@@ -22,9 +22,10 @@ For additional functions you need SaltyNX-Tool
 
 https://github.com/masagrator/SaltyNX-Tool
 
-It is required to have FW installed at least 10.0.0 version
-
-No technical support for anything else than stock Atmosphere.
+[!CAUTION]
+> It is required to have FW installed at least 10.0.0 version
+> 
+> No technical support for anything else than stock Atmosphere.
 
 Known issues:
 - Instability with some homebrews and sysmodules (like emuiibo),
