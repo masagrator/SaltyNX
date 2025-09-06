@@ -389,7 +389,7 @@ double strtod(const char* str, char** endptr) {
 //Fix required by Unity 6, possibly newer versions too
 
 size_t GetRequiredBufferSizeForGetAllModuleInfo() {
-	return (0x101 * 13); //0x101 per each module * 13 possible modules
+	return (101 * 13); //101 per each module * 13 possible modules
 }
 
 struct ModuleInfo {
