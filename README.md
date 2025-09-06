@@ -22,15 +22,16 @@ For additional functions you need SaltyNX-Tool
 
 https://github.com/masagrator/SaltyNX-Tool
 
-[!CAUTION]
+> [!CAUTION]
 > It is required to have FW installed at least 10.0.0 version
 > 
 > No technical support for anything else than stock Atmosphere.
 
-Known issues:
-- Instability with some homebrews and sysmodules (like emuiibo),
-- You need to have at least Hekate 5.0.2 if you don't want issues related to Hekate,
-- Cheats using directly heap addresses may not work properly while using plugins.
+> [!IMPORTANT]
+> Known issues:
+> - Instability with some homebrews and sysmodules (like emuiibo),
+> - You need to have at least Hekate 5.0.2 if you don't want issues related to Hekate,
+> - Cheats using directly heap addresses may not work properly while using plugins.
 
 # How to download release:
 
