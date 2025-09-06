@@ -24,11 +24,7 @@ https://github.com/masagrator/SaltyNX-Tool
 
 It is required to have FW installed at least 10.0.0 version
 
-No technical support for:
-- Atmosphere forks
-- SX OS
-- Kosmos
-- ReinX
+No technical support for anything else than stock Atmosphere.
 
 Known issues:
 - Instability with some homebrews and sysmodules (like emuiibo),
