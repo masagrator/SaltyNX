@@ -79,8 +79,8 @@ typedef void (*glViewport_0)(int x, int y, uint width, uint height);
 typedef void (*glViewportArrayv_0)(uint firstViewport, uint viewportCount, const glViewportArray* pViewports);
 typedef void (*glViewportIndexedf_0)(uint index, float x, float y, float width, float height);
 typedef void (*glViewportIndexedfv_0)(uint index, const glViewportArray* pViewports);
-
 typedef u64 (*eglGetProcAddress_0)(const char* eglName);
+
 typedef void* (*_vkGetInstanceProcAddr_0)(void* instance, const char* vkFunction);
 typedef void* (*vkGetDeviceProcAddr_0)(void* device, const char* vkFunction);
 typedef void (*vkCmdSetViewport_0)(void* commandBuffer, uint32_t firstViewport, uint32_t viewportCount, const VkViewport* pViewports);
@@ -97,6 +97,7 @@ typedef u32 (*_ZN2nn2ro12LookupSymbolEPmPKc_0)(uintptr_t* pOutAddress, const cha
 typedef void (*_ZN2nn2os13GetSystemTickEv_1)(u64* tick);
 typedef u64 (*_ZN2nn2os22GetSystemTickFrequencyEv_0)();
 typedef void (*_ZN2nn2os22GetSystemTickFrequencyEv_1)(u64* tickfrequency);
+typedef u32 (*SetUserInactivityDetectionTimeExtended_0)(bool isTrue);
 
 struct {
 	uintptr_t nvnBootstrapLoader;
@@ -152,6 +153,7 @@ struct {
 	uintptr_t GetCurrentFocusState;
 	uintptr_t FileAccessorRead;
 	uintptr_t ConvertToTimeSpan;
+	uintptr_t SetUserInactivityDetectionTimeExtended;
 } Address_weaks;
 
 struct nvnWindowBuilder {
@@ -326,7 +328,7 @@ namespace Utils {
 		#endif
 	}
 
-	inline uint64_t _convertToTimeSpan(uint64_t tick) {
+	uint64_t _convertToTimeSpan(uint64_t tick) {
 		#if defined(SWITCH) || defined(SWITCH32)
 			return armTicksToNs(tick);
 		#elif defined(OUNCE) || defined(OUNCE32)
@@ -413,13 +415,9 @@ namespace NX_FPS_Math {
 		frameend = endtick;
 		FPS_temp++;
 		uint64_t deltatick = endtick - starttick;
-		uint64_t deltatick2 = endtick - starttick2;
-		if (deltatick2 > (systemtickfrequency / ((*sharedOperationMode == 1) ? 30 : 1))) {
-			starttick2 = Utils::_getSystemTick();
-			LOCK::overwriteRefreshRate = 0;
-			if (!configRC && FPSlock) {
-				LOCK::applyPatch(configBuffer, FPSlock, (Shared -> currentRefreshRate));
-			}
+		LOCK::overwriteRefreshRate = 0;
+		if (!configRC && FPSlock) {
+			LOCK::applyPatch(configBuffer, FPSlock, (Shared -> currentRefreshRate));
 		}
 		if (deltatick > systemtickfrequency) {
 			if (Address_weaks.FileAccessorRead) {
@@ -467,6 +465,7 @@ namespace NX_FPS_Math {
 	}
 
 	template <typename T> void addResToViewports(T m_width, T m_height) {
+		if (m_height <= (T)160) return;
 		T ratio = (m_width * 10) / m_height;
 		if (ratio >= (T)6 && ratio <= (T)18) {
 			union {
@@ -496,6 +495,7 @@ namespace NX_FPS_Math {
 	}
 
 	template <typename T> void addResToRender(T m_width, T m_height) {
+		if (m_height <= (T)160) return;
 		T ratio = (m_width * 10) / m_height;
 		if (ratio >= (T)6 && ratio <= (T)18) {
 			union {
@@ -1184,6 +1184,10 @@ namespace nn {
 		fileBytesRead += *bytesRead;
 		return ret;
 	}
+
+	Result SetUserInactivityDetectionTimeExtended(bool isTrue) {
+		return ((SetUserInactivityDetectionTimeExtended_0)(Address_weaks.SetUserInactivityDetectionTimeExtended))(isTrue);
+	}
 }
 
 extern "C" {
@@ -1192,6 +1196,8 @@ extern "C" {
 		sharedOperationMode = _sharedOperationMode;
 		SaltySDCore_printf("NX-FPS: alive\n");
 		LOCK::mappings.main_start = getMainAddress();
+		LOCK::mappings.variables_start = (int64_t)&variables_buffer[0];
+		LOCK::mappings.codeCave_start = (int64_t)&codeCave;
 		SaltySDCore_printf("NX-FPS: found main at: 0x%lX\n", LOCK::mappings.main_start);
 		Result ret = SaltySD_CheckIfSharedMemoryAvailable(&SharedMemoryOffset, sizeof(NxFpsSharedBlock));
 		SaltySDCore_printf("NX-FPS: ret: 0x%X\n", ret);
@@ -1235,6 +1241,7 @@ extern "C" {
 			Address_weaks.GetSystemTickFrequency = SaltySDCore_FindSymbolBuiltin("_ZN2nn2os22GetSystemTickFrequencyEv");
 			Address_weaks.GetCurrentFocusState = SaltySDCore_FindSymbolBuiltin("_ZN2nn2oe20GetCurrentFocusStateEv");
 			Address_weaks.LookupSymbol = SaltySDCore_FindSymbolBuiltin("_ZN2nn2ro12LookupSymbolEPmPKc");
+			Address_weaks.SetUserInactivityDetectionTimeExtended = SaltySDCore_FindSymbolBuiltin("_ZN2nn2oe44SetUserInactivityDetectionTimeExtendedUnsafeEb");
 
 			SaltySDCore_ReplaceImport("nvnBootstrapLoader", (void*)NVN::BootstrapLoader_1);
 			SaltySDCore_ReplaceImport("eglSwapBuffers", (void*)EGL::Swap);
@@ -1330,6 +1337,7 @@ extern "C" {
 					SaltySDCore_printf("NX-FPS: FPSLocker: readConfig rc: 0x%x\n", configRC);
 					svcGetInfo(&LOCK::mappings.alias_start, InfoType_AliasRegionAddress, CUR_PROCESS_HANDLE, 0);
 					svcGetInfo(&LOCK::mappings.heap_start, InfoType_HeapRegionAddress, CUR_PROCESS_HANDLE, 0);
+
 				}
 				else SaltySDCore_printf("NX-FPS: FPSLocker: File not found: %s\n", path);
 			}

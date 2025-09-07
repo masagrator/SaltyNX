@@ -48,7 +48,13 @@ SECTIONS
 	.fini :
 	{
 		KEEP( *(.fini) )
-		. = ALIGN(8);
+		. = ALIGN(0x1000);
+	} :code
+
+	.code_cave :
+	{
+		KEEP( *(.codecave) )
+		. = ALIGN(0x1000);
 	} :code
 
 	/* =========== RODATA section =========== */

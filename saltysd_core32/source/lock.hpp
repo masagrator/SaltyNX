@@ -87,11 +87,10 @@ namespace LOCK {
 
 	bool unsafeCheck = false;
 
-	bool NOINLINE isAddressValid(uintptr_t address) {
+	bool NOINLINE isAddressValid(uintptr_t address_in) {
+		int64_t address = address_in;
 		MemoryInfo memoryinfo = {0};
 		u32 pageinfo = 0;
-
-		if (unsafeCheck) return true;
 
 		Result rc = svcQueryMemory(&memoryinfo, &pageinfo, address);
 		if (R_FAILED(rc)) return false;
@@ -100,7 +99,10 @@ namespace LOCK {
 		return false;
 	}
 
-	uintptr_t NOINLINE getAddress(uint8_t* buffer, uint8_t offsets_count) {
+	uintptr_t NOINLINE getAddress(uint8_t* buffer) {
+		bool unsafe_address = !unsafeCheck;
+		if (gen == 4) unsafe_address = (bool)read8(buffer);
+		int8_t offsets_count = read8(buffer);
 		uint8_t region = read8(buffer);
 		offsets_count -= 1;
 		uintptr_t address = 0;
@@ -124,7 +126,7 @@ namespace LOCK {
 			int32_t temp_offset = (int32_t)read32(buffer);
 			address += temp_offset;
 			if (i+1 < offsets_count) {
-				if (!isAddressValid(*(uintptr_t*)address)) return -2;
+				if (unsafe_address && !isAddressValid(*(uintptr_t*)address)) return -2;
 				address = *(uintptr_t*)address;
 			}
 		}
@@ -139,7 +141,7 @@ namespace LOCK {
 		if (*(uint32_t*)buffer != *(uint32_t*)&MAGIC)
 			return false;
 		gen = buffer[4];
-		if (gen != 3)
+		if (gen != 3 && gen != 4)
 			return false;
 		masterWrite = buffer[5];
 		if (masterWrite > 1)
@@ -316,6 +318,7 @@ namespace LOCK {
 					OPCODE = 1;
 				}
 				out_buffer[temp_offset++] = OPCODE;
+				if (gen == 4) out_buffer[temp_offset++] = read8(in_buffer);
 				uint8_t address_count = read8(in_buffer);
 				out_buffer[temp_offset++] = address_count;
 				out_buffer[temp_offset++] = read8(in_buffer);
@@ -345,6 +348,7 @@ namespace LOCK {
 					OPCODE = 2;
 				}
 				out_buffer[temp_offset++] = OPCODE;
+				if (gen == 4) out_buffer[temp_offset++] = read8(in_buffer);
 				uint8_t address_count = read8(in_buffer);
 				out_buffer[temp_offset++] = address_count;
 				out_buffer[temp_offset++] = read8(in_buffer); //compare address region
@@ -359,6 +363,7 @@ namespace LOCK {
 				temp_offset += value_type % 0x10;
 				offset += value_type % 0x10;
 				address_count = read8(in_buffer);
+				if (gen == 4) out_buffer[temp_offset++] = read8(in_buffer);
 				out_buffer[temp_offset++] = address_count;
 				out_buffer[temp_offset++] = read8(in_buffer); //address region
 				for (size_t i = 1; i < address_count; i++) {
@@ -430,8 +435,7 @@ namespace LOCK {
 			*/
 			int8_t OPCODE = read8(buffer);
 			if (OPCODE == 1) {
-				uint8_t offsets_count = read8(buffer);
-				uintptr_t address = getAddress(buffer, offsets_count);
+				uintptr_t address = getAddress(buffer);
 
 				/* value_type:
 					1		=	uint8
@@ -494,8 +498,7 @@ namespace LOCK {
 				}
 			}
 			else if (OPCODE == 2) {
-				uint8_t offsets_count = read8(buffer);
-				uintptr_t address = getAddress(buffer, offsets_count);
+				uintptr_t address = getAddress(buffer);
 
 				/* compare_type:
 					1	=	>
@@ -573,8 +576,7 @@ namespace LOCK {
 						return 3;
 				}
 
-				offsets_count = read8(buffer);
-				address = getAddress(buffer, offsets_count);
+				address = getAddress(buffer);
 				value_type = read8(buffer);
 				uint8_t loops = read8(buffer);
 				switch(value_type) {
