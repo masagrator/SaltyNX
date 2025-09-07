@@ -253,11 +253,11 @@ namespace LOCK {
 						ptrdiff_t offset = jump_address - current_address;
 						Branch.imm = offset / 4;
 					}
-					else {
-						intptr_t jump_address = (intptr_t)(LOCK::mappings.main_start + ((int64_t)(Branch.imm)*4));
-						if (address_region == 5) current_address = (intptr_t)&output[i];
-						ptrdiff_t offset = jump_address - current_address;
-						Branch.imm = offset / 4;
+					else if (address_region == 5) {
+							intptr_t jump_address = (intptr_t)(LOCK::mappings.main_start + ((int64_t)(Branch.imm)*4));
+							current_address = (intptr_t)&output[i];
+							ptrdiff_t offset = jump_address - current_address;
+							Branch.imm = offset / 4;
 					}
 					SaltySD_Memcpy((u64)&output[i], (u64)&Branch, 4);
 					break;
