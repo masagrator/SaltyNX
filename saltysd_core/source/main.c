@@ -389,11 +389,11 @@ double strtod(const char* str, char** endptr) {
 //Fix required by Unity 6, possibly newer versions too
 
 size_t GetRequiredBufferSizeForGetAllModuleInfo() {
-	return (101 * 13); //101 per each module * 13 possible modules
+	return 0x800; //Average Unity game needs 0x200, so this will definitely cover everything.
 }
 
 struct ModuleInfo {
-	const char* module_name;
+	char* module_name;
 	uintptr_t base_address;
 	size_t module_size;
 	uint8_t* BID;
@@ -419,7 +419,7 @@ size_t GetAllModuleInfo(struct ModuleInfo** modules, void* buffer, size_t buffer
 		if (info.addr != (u64)_start && info.perm == Perm_Rx)
 		{
 			addresses[module_count] = info.addr;
-			sizes[module_count] = info.size; //this should be size of whole module, but games that use it seems to not care ¯\_(ツ)_/¯
+			sizes[module_count] = info.size; //this should be size of whole module, but games that use it seem to not care ¯\_(ツ)_/¯
 			module_count++;
 		}
 
@@ -431,47 +431,51 @@ size_t GetAllModuleInfo(struct ModuleInfo** modules, void* buffer, size_t buffer
 	for (size_t i = 0; i < module_count; i++) {
 		if (modules_in[i].module_name != 0) continue;
 		if (i == 0) {
-			modules_in[0].module_name = (const char*)malloc(strlen("nnrtld") + 1);
-			strcpy((char*)modules_in[0].module_name, "nnrtld");
+			const char name[] = "nnrtld";
+			modules_in[0].module_name = malloc(sizeof(name));
+			memcpy((char*)modules_in[0].module_name, name, sizeof(name));
 			modules_in[0].base_address = addresses[0];
 			modules_in[0].module_size = sizes[0];
 			uint8_t BID_temp[0x14] = {0x93, 0xCB, 0x83, 0x83, 0xD7, 0xA5, 0x4C, 0x0B, 0x42, 0x37, 0x25, 0x3F, 0x20, 0xDE, 0x50, 0x21, 0x00, 0x83, 0x74, 0xDD};
-			modules_in[0].BID = (uint8_t*)malloc(sizeof(BID_temp));
+			modules_in[0].BID = malloc(sizeof(BID_temp));
 			memcpy(modules_in[0].BID, &BID_temp, sizeof(BID_temp));
 			modules_in[0].BID_length = sizeof(BID_temp);
 			modules_in[0].unk = 0;
 		}
 
 		else if (i == 1) {
-			modules_in[i].module_name = (const char*)malloc(strlen("GameAssembly.nss") + 1);
-			strcpy((char*)modules_in[i].module_name, "GameAssembly.nss");
+			const char name[] = "GameAssembly.nss";
+			modules_in[i].module_name = malloc(sizeof(name));
+			memcpy(modules_in[i].module_name, name, sizeof(name));
 			modules_in[i].base_address = addresses[i];
 			modules_in[i].module_size = sizes[i];
 			uint8_t BID_temp[0x10] = {0xDC, 0x3E, 0x4B, 0x89, 0x20, 0x43, 0xEF, 0x23, 0x45, 0xC3, 0xEA, 0xF9, 0x7A, 0x17, 0x7E, 0x7C};
-			modules_in[i].BID = (uint8_t*)malloc(sizeof(BID_temp));
+			modules_in[i].BID = malloc(sizeof(BID_temp));
 			memcpy(modules_in[i].BID, &BID_temp, sizeof(BID_temp));
 			modules_in[i].BID_length = sizeof(BID_temp);
 			modules_in[i].unk = 0x6272617200000000;
 		}
 
 		else if (i+1 == module_count) {
-			modules_in[i].module_name = (const char*)malloc(strlen("nnSdk") + 1);
-			strcpy((char*)modules_in[i].module_name, "nnSdk");
+			const char name[] = "nnSdk";
+			modules_in[i].module_name = malloc(sizeof(name));
+			memcpy(modules_in[i].module_name, name, sizeof(name));
 			modules_in[i].base_address = addresses[i];
 			modules_in[i].module_size = sizes[i];
 			uint8_t BID_temp[0x14] = {0xE0, 0x19, 0x50, 0xC5, 0x8E, 0x17, 0xB0, 0x80, 0xC9, 0x04, 0x94, 0x78, 0x4E, 0xA1, 0xDD, 0x29, 0xE9, 0xDB, 0xD4, 0x86};
-			modules_in[i].BID = (uint8_t*)malloc(sizeof(BID_temp));
+			modules_in[i].BID = malloc(sizeof(BID_temp));
 			memcpy(modules_in[i].BID, &BID_temp, sizeof(BID_temp));
 			modules_in[i].BID_length = sizeof(BID_temp);
 			modules_in[i].unk = addresses[0] & ~0xFFFFFFFF;
 		}
 		else {
-			modules_in[i].module_name = (const char*)malloc(strlen("multimedia") + 1);
-			strcpy((char*)modules_in[i].module_name, "multimedia");
+			const char name[] = "multimedia";
+			modules_in[i].module_name = malloc(sizeof(name));
+			memcpy(modules_in[i].module_name, name, sizeof(name));
 			modules_in[i].base_address = addresses[i];
 			modules_in[i].module_size = sizes[i];
 			uint8_t BID_temp[0x14] = {0xC8, 0x9C, 0x80, 0x4F, 0xC3, 0xB2, 0x67, 0x57, 0x66, 0x1A, 0x70, 0xFC, 0x12, 0x5A, 0xA9, 0x23, 0x31, 0xEC, 0xC6, 0xFE};
-			modules_in[i].BID = (uint8_t*)malloc(sizeof(BID_temp));
+			modules_in[i].BID = malloc(sizeof(BID_temp));
 			memcpy(modules_in[i].BID, &BID_temp, sizeof(BID_temp));
 			modules_in[i].BID_length = sizeof(BID_temp);
 			modules_in[i].unk = 0x66645c4700000000;
