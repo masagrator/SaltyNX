@@ -56,7 +56,7 @@ Remember to restart Switch
 | CelDamage HD | plugins | 32-bit game, not supported |
 | Company of Heroes Collection | plugins | heap related |
 | DEADLY PREMONITION Origins | plugins | 32-bit game, not supported |
-| Death Road to Canada | all | heap related |
+| Death Road to Canada | plugins | 32-bit game, not supported |
 | Dies irae Amantes amentes For Nintendo Switch | plugins | 32-bit game, not supported |
 | Donkey Kong Country: Tropical Freeze | all | From second level heap issues |
 | EA SPORTS FC 24 | plugins | heap related |
