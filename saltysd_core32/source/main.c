@@ -27,7 +27,7 @@ Handle orig_main_thread;
 void* orig_ctx;
 
 Handle sdcard;
-size_t elf_area_size = 0;
+size_t elf_area_size = 0x200000; //We assume that Core itself won't take more than 0x200000 bytes;
 
 ThreadVars vars_orig;
 ThreadVars vars_mine;
@@ -194,46 +194,66 @@ void SaltySDCore_RegisterExistingModules()
 	return;
 }
 
-Result svcSetHeapSizeIntercept(uintptr_t *out, size_t size)
-{
-	size_t addon = ((elf_area_size+0x200000) & ~0x1FFFFF);
+Result svcSetHeapSizeIntercept(u64 *out, u64 size)
+{	
+	size_t addon = ((elf_area_size+0x1FFFFF) & ~0x1FFFFF);
 	Result ret = svcSetHeapSize((void*)out, size+addon);
-	while (R_FAILED(ret) && addon > 0) {
-		addon -= 0x200000;
-		ret = svcSetHeapSize((void*)out, size+addon);
-	}
-	if (R_SUCCEEDED(ret)) {
-		u64 out_64 = 0;
-		svcGetInfo(&out_64, InfoType_HeapRegionAddress, CUR_PROCESS_HANDLE, 0);
-		uintptr_t out_out = 0;
-		memcpy(&out_out, &out_64, sizeof(out_out));
-		out_out += ((elf_area_size+0x200000) & 0xffe00000);
-		if (out_out > *out) *out = out_out;
-	}
 	
 	//SaltySDCore_printf("SaltySD Core: svcSetHeapSize intercept %x %llx %llx\n", ret, *out, size+((elf_area_size+0x200000) & 0xffe00000));
 	
+	if (!ret)
+	{
+		*out += addon;
+	}
+	
 	return ret;
+}
+
+Result svcGetInfoIntercept (u64 *out, size_t id0, Handle handle, u64 id1)	
+{	
+
+	Result ret = svcGetInfo(out, id0, handle, id1);	
+
+	//SaltySDCore_printf("SaltySD Core: svcGetInfo intercept %p (%llx) %llx %x %llx ret %x\n", out, *out, id0, handle, id1, ret);	
+
+	if (id1 == 0 && handle == CUR_PROCESS_HANDLE)	
+	{	
+		switch(id0) {
+			case InfoType_HeapRegionAddress:
+				*out += ((elf_area_size+0x1FFFFF) & ~0x1FFFFF);
+				break;
+		}
+	}
+
+	return ret;	
 }
 
 void SaltySDCore_PatchSVCs()
 {
 	static u8 orig_1[] = {0x04, 0x00, 0x2D, 0xE5, 0x01, 0x00, 0x00, 0xEF, 0x00, 0x20, 0x9D, 0xE5}; //PUSH {r0}; SVC #0x1; LDR r2, [sp]
+	static u8 orig_2[] = {0x04, 0x00, 0x2D, 0xE5, 0x04, 0x00, 0x9D, 0xE5, 0x08, 0x30, 0x9D, 0xE5, 0x29, 0x00, 0x00, 0xEF, 0x00, 0x30, 0x9D, 0xE5}; //PUSH {R0}; LDR r0, [sp, #4]; LDR r3, [sp, #8]; SVC 0x29; LDR r3, [sp]
 	static u8 orig_1_alt[] = {0x04, 0x00, 0x2D, 0xE5, 0x01, 0x00, 0x00, 0xEF}; //PUSH {r0}; SVC #0x1
+	static u8 orig_2_alt[] = {0x04, 0x00, 0x2D, 0xE5, 0x04, 0x00, 0x9D, 0xE5, 0x08, 0x30, 0x9D, 0xE5, 0x29, 0x00, 0x00, 0xEF}; //PUSH {R0}; LDR r0, [sp, #4]; LDR r3, [sp, #8]; SVC 0x29
 	static u8 patch[0x8] = {0x04, 0xF0, 0x1F, 0xE5, 0xDE, 0xAD, 0xBE, 0xEF}; // LDR pc, [pc, #-4]; 0xDEADBEEF
 	u32 dst_1 = SaltySDCore_findCodeEx(orig_1, sizeof(orig_1));
+	u32 dst_2 = SaltySDCore_findCodeEx(orig_2, sizeof(orig_2));
 	if (!dst_1) {
 		dst_1 = SaltySDCore_findCodeEx(orig_1_alt, sizeof(orig_1_alt));
 	}
+	if (!dst_2) {
+		dst_2 = SaltySDCore_findCodeEx(orig_2_alt, sizeof(orig_2_alt));
+	}
 	
-	if (!dst_1)
+	if (!dst_1 || !dst_2)
 	{
 		SaltySDCore_printf("SaltySD Core: Failed to find svcSetHeapSize! %llx\n", dst_1);
 		return;
 	}
 
 	*(u32*)&patch[4] = (u32)svcSetHeapSizeIntercept;
-	SaltySD_Memcpy((u64)dst_1, (u64)patch, 8);	
+	SaltySD_Memcpy((u64)dst_1, (u64)patch, 8);
+	*(u32*)&patch[4] = (u32)svcGetInfoIntercept;
+	SaltySD_Memcpy((u64)dst_2, (u64)patch, 8);		
 }
 
 typedef void (*nnosQueryMemoryInfo)(void* memoryinfo);
