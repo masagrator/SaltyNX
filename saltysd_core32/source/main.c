@@ -196,12 +196,11 @@ void SaltySDCore_RegisterExistingModules()
 
 Result svcSetHeapSizeIntercept(uintptr_t *out, size_t size)
 {
-	Result ret = 1;
-	size += ((elf_area_size+0x200000) & 0xffe00000);
-	ret = svcSetHeapSize((void*)out, size);
-	if (R_FAILED(ret)) {
-		size -= ((elf_area_size+0x200000) & 0xffe00000);
-		ret = svcSetHeapSize((void*)out, size);
+	size_t addon = ((elf_area_size+0x200000) & ~0x1FFFFF);
+	Result ret = svcSetHeapSize((void*)out, size+addon);
+	while (R_FAILED(ret) && addon > 0) {
+		addon -= 0x200000;
+		ret = svcSetHeapSize((void*)out, size+addon);
 	}
 	if (R_SUCCEEDED(ret)) {
 		u64 out_64 = 0;
