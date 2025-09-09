@@ -194,7 +194,7 @@ void SaltySDCore_RegisterExistingModules()
 	return;
 }
 
-Result svcSetHeapSizeIntercept(u32 *out, u64 size)
+Result svcSetHeapSizeIntercept(uintptr_t *out, size_t size)
 {
 	Result ret = 1;
 	size += ((elf_area_size+0x200000) & 0xffe00000);
@@ -211,7 +211,7 @@ Result svcSetHeapSizeIntercept(u32 *out, u64 size)
 	return ret;
 }
 
-Result svcGetInfoIntercept (u64 *out, u32 id0, Handle handle, u64 id1)	
+Result svcGetInfoIntercept (u64 *out, size_t id0, Handle handle, u64 id1)	
 {	
 
 	Result ret = svcGetInfo(out, id0, handle, id1);	
