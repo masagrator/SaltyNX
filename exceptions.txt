@@ -19,8 +19,8 @@
 01004A600EC0A000
 
 ;Stubbs the Zombie in Rebel Without a Pulse
-;1.0.0 - 1.0.2 crash on boot
-X0100964012528000
+;1.0.0 - 1.0.3 crash on boot
+0100964012528000
 
 ;Olympic Games Tokyo 2020 – The Official Video Game
 ;1.0.0 crash on boot
