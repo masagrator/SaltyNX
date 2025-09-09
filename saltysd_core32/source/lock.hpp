@@ -92,6 +92,8 @@ namespace LOCK {
 		MemoryInfo memoryinfo = {0};
 		u32 pageinfo = 0;
 
+		if (address < 0x200000 || address > 0xFFFFFFFF) return false;
+
 		Result rc = svcQueryMemory(&memoryinfo, &pageinfo, address);
 		if (R_FAILED(rc)) return false;
 		if ((memoryinfo.perm & Perm_Rw) && ((address - memoryinfo.addr >= 0) && (address - memoryinfo.addr <= memoryinfo.size)))
