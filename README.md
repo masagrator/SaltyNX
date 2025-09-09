@@ -76,7 +76,7 @@ Remember to restart Switch
 | Monster Hunter XX Nintendo Switch Ver. | plugins | 32-bit game, not supported |
 | New Super Mario Bros. U Deluxe | plugins | 32-bit game, not supported |
 | Ni no Kuni: Wrath of the White Witch | plugins | 32-bit game, not supported |
-| Olympic Games Tokyo 2020 – The Official Video Game™ | plugins | heap related, exefs patch included to get it to work at all |
+| Olympic Games Tokyo 2020 – The Official Video Game™ EUR | plugins | heap related, exefs patch included to get it to work at all |
 | Pikmin 3 Deluxe | plugins | 32-bit game, not supported |
 | Planescape: Torment and Icewind Dale | plugins | 32-bit game, not supported |
 | Plants vs. Zombies: Battle for Neighborville | plugins | Heap related |
