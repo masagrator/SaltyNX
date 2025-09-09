@@ -58,7 +58,6 @@ Remember to restart Switch
 | DEADLY PREMONITION Origins | plugins | 32-bit game, not supported |
 | Death Road to Canada | plugins | 32-bit game, not supported |
 | Dies irae Amantes amentes For Nintendo Switch | plugins | 32-bit game, not supported |
-| Donkey Kong Country: Tropical Freeze | all | From second level heap issues |
 | EA SPORTS FC 24 | plugins | heap related |
 | Goat Simulator | plugins | 32-bit game, not supported |
 | Gothic | plugins | 32-bit game, not supported |
