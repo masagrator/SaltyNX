@@ -199,12 +199,18 @@ Result svcSetHeapSizeIntercept(uintptr_t *out, size_t size)
 	Result ret = 1;
 	size += ((elf_area_size+0x200000) & 0xffe00000);
 	ret = svcSetHeapSize((void*)out, size);
-	u64 out_64 = 0;
-	svcGetInfo(&out_64, InfoType_HeapRegionAddress, CUR_PROCESS_HANDLE, 0);
-	uintptr_t out_out = 0;
-	memcpy(&out_out, &out_64, sizeof(out_out));
-	out_out += ((elf_area_size+0x200000) & 0xffe00000);
-	if (out_out > *out) *out = out_out;
+	if (R_FAILED(ret)) {
+		size -= ((elf_area_size+0x200000) & 0xffe00000);
+		ret = svcSetHeapSize((void*)out, size);
+	}
+	if (R_SUCCEEDED(ret)) {
+		u64 out_64 = 0;
+		svcGetInfo(&out_64, InfoType_HeapRegionAddress, CUR_PROCESS_HANDLE, 0);
+		uintptr_t out_out = 0;
+		memcpy(&out_out, &out_64, sizeof(out_out));
+		out_out += ((elf_area_size+0x200000) & 0xffe00000);
+		if (out_out > *out) *out = out_out;
+	}
 	
 	//SaltySDCore_printf("SaltySD Core: svcSetHeapSize intercept %x %llx %llx\n", ret, *out, size+((elf_area_size+0x200000) & 0xffe00000));
 	
