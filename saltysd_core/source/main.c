@@ -230,46 +230,33 @@ void SaltySDCore_RegisterExistingModules()
 	return;
 }
 
-Result svcSetHeapSizeIntercept(u64 *out, u64 size)
+Result svcSetHeapSizeIntercept(uintptr_t *out, size_t size)
 {
-	static bool Initialized = false;
-	Result ret = 1;
-	if (!Initialized)
-		size += ((elf_area_size+0x200000) & 0xffe00000);
-	ret = svcSetHeapSize((void*)out, size);
+	size_t addon = ((elf_area_size+0x200000) & ~0x1FFFFF);
+	Result ret = svcSetHeapSize((void*)out, size+addon);
+	while (R_FAILED(ret) && addon > 0) {
+		addon -= 0x200000;
+		ret = svcSetHeapSize((void*)out, size+addon);
+	}
+	if (R_SUCCEEDED(ret)) {
+		u64 out_64 = 0;
+		svcGetInfo(&out_64, InfoType_HeapRegionAddress, CUR_PROCESS_HANDLE, 0);
+		uintptr_t out_out = 0;
+		memcpy(&out_out, &out_64, sizeof(out_out));
+		out_out += ((elf_area_size+0x200000) & 0xffe00000);
+		if (out_out > *out) *out = out_out;
+	}
 	
 	//SaltySDCore_printf("SaltySD Core: svcSetHeapSize intercept %x %llx %llx\n", ret, *out, size+((elf_area_size+0x200000) & 0xffe00000));
 	
-	if (!ret && !Initialized)
-	{
-		*out += ((elf_area_size+0x200000) & 0xffe00000);
-		Initialized = true;
-	}
-	
 	return ret;
-}
-
-Result svcGetInfoIntercept (u64 *out, u64 id0, Handle handle, u64 id1)	
-{	
-	Result ret = svcGetInfo(out, id0, handle, id1);	
-
-	//SaltySDCore_printf("SaltySD Core: svcGetInfo intercept %p (%llx) %llx %x %llx ret %x\n", out, *out, id0, handle, id1, ret);	
-
-	if (id0 == 6 && id1 == 0 && handle == 0xffff8001)	
-	{	
-		*out -= elf_area_size;
-	}		
-
-	return ret;	
 }
 
 void SaltySDCore_PatchSVCs()
 {
 	static u8 orig_1[0x8] = {0xE0, 0x0F, 0x1F, 0xF8, 0x21, 0x00, 0x00, 0xD4}; //STR [sp, #-0x10]!; SVC #0x1
-	static u8 orig_2[0x8] = {0xE0, 0x0F, 0x1F, 0xF8, 0x21, 0x05, 0x00, 0xD4}; //STR [sp, #-0x10]!; SVC #0x29
 	static u8 patch[0x10] = {0x44, 0x00, 0x00, 0x58, 0x80, 0x00, 0x1F, 0xD6, 0x0F, 0xF0, 0x0F, 0xF0, 0x0F, 0xF0, 0x0F, 0xF0}; // LDR X4 #8; BR X4; ADRP X15, #0x1FE03000; ADRP X15, #0x1FE03000
 	u64 dst_1 = SaltySDCore_findCodeEx(orig_1, 8);
-	u64 dst_2 = SaltySDCore_findCodeEx(orig_2, 8);
 	
 	if (!dst_1)
 	{
@@ -279,19 +266,9 @@ void SaltySDCore_PatchSVCs()
 	else {
 		SaltySDCore_printf("SaltySD Core: Found svcSetHeapSize at address: 0x%lx!\n", dst_1);
 	}
-	if (!dst_2) {
-		SaltySDCore_printf("SaltySD Core: Failed to find svcGetInfo!\n");
-		return;		
-	}
-	else {
-		SaltySDCore_printf("SaltySD Core: Found svcGetInfo at address: 0x%lx!\n", dst_2);
-	}
 
 	*(u64*)&patch[8] = (u64)svcSetHeapSizeIntercept;
 	SaltySD_Memcpy(dst_1, (u64)patch, 0x10);
-	
-	*(u64*)&patch[8] = (u64)svcGetInfoIntercept;	
-	SaltySD_Memcpy(dst_2, (u64)patch, 0x10);
 }
 
 void** SaltySDCore_LoadPluginsInDir(char* path, void** entries, size_t* num_elfs)
