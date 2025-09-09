@@ -8,7 +8,7 @@
 
 ;YouTube
 ;Stucks in infinite loop
-X01003A400C3DA000
+01003A400C3DA000
 
 ;Alien: Isolation
 ;1.1_46609 - 1.1.4_60709 crash on first loading
