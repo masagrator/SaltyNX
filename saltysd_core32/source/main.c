@@ -196,19 +196,17 @@ void SaltySDCore_RegisterExistingModules()
 
 Result svcSetHeapSizeIntercept(u32 *out, u64 size)
 {
-	static bool Initialized = false;
 	Result ret = 1;
-	if (!Initialized)
-		size += ((elf_area_size+0x200000) & 0xffe00000);
+	size += ((elf_area_size+0x200000) & 0xffe00000);
 	ret = svcSetHeapSize((void*)out, size);
+	u64 out_64 = 0;
+	svcGetInfo(&out_64, InfoType_HeapRegionAddress, CUR_PROCESS_HANDLE, 0);
+	u32 out_32 = 0;
+	memcpy(&out_32, &out_64, 4);
+	out_32 += ((elf_area_size+0x200000) & 0xffe00000);
+	if (out_32 > *out) *out = out_32;
 	
 	//SaltySDCore_printf("SaltySD Core: svcSetHeapSize intercept %x %llx %llx\n", ret, *out, size+((elf_area_size+0x200000) & 0xffe00000));
-	
-	if (!ret && !Initialized)
-	{
-		*out += ((elf_area_size+0x200000) & 0xffe00000);
-		Initialized = true;
-	}
 	
 	return ret;
 }
@@ -220,10 +218,14 @@ Result svcGetInfoIntercept (u64 *out, u32 id0, Handle handle, u64 id1)
 
 	//SaltySDCore_printf("SaltySD Core: svcGetInfo intercept %p (%llx) %llx %x %llx ret %x\n", out, *out, id0, handle, id1, ret);	
 
-	if (id0 == 6 && id1 == 0 && handle == 0xffff8001)	
+	if (id1 == 0 && handle == 0xffff8001)	
 	{	
-		*out -= elf_area_size;
-	}		
+		switch(id0) {
+			case 6:
+				*out -= elf_area_size;
+				break;
+		}
+	}
 
 	return ret;	
 }
