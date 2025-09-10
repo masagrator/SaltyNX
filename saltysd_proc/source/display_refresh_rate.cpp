@@ -229,7 +229,7 @@ extern "C" __attribute__((noinline)) void correctOledGamma(uint32_t refresh_rate
     }
     else if (refresh_rate == 50) {
         if (last_refresh_rate == 50) return;
-        uint32_t values[4] = {4, 1, 0};
+        uint32_t values[4] = {3, 1, 0};
         memcpy(values_set, values, 16);
   
     }
