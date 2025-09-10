@@ -54,6 +54,7 @@ sdcard_out/atmosphere/contents/0000000000534C56/exefs.nsp: saltysd_core/saltysd_
 	@cp saltysd_bootstrap32/saltysd_bootstrap32_5k.dbg sdcard_debug/SaltySD/saltysd_bootstrap32_5k.dbg
 	@cp saltysd_proc/saltysd_proc.nsp sdcard_out/atmosphere/contents/0000000000534C56/exefs.nsp
 	@cp saltysd_proc/saltysd_proc.elf sdcard_debug/atmosphere/contents/0000000000534C56/exefs.elf
+	@cp -r exefs_patches/ sdcard_out/atmosphere/
 
 clean:
 	@rm -f saltysd_proc/data/*

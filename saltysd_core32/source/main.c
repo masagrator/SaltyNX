@@ -27,7 +27,7 @@ Handle orig_main_thread;
 void* orig_ctx;
 
 Handle sdcard;
-size_t elf_area_size = 0;
+size_t elf_area_size = 0x200000; //We assume that Core itself won't take more than 0x200000 bytes;
 
 ThreadVars vars_orig;
 ThreadVars vars_mine;
@@ -194,19 +194,17 @@ void SaltySDCore_RegisterExistingModules()
 	return;
 }
 
-Result svcSetHeapSizeIntercept(uintptr_t *out, size_t size)
-{
-	Result ret = 1;
-	size += ((elf_area_size+0x200000) & 0xffe00000);
-	ret = svcSetHeapSize((void*)out, size);
-	u64 out_64 = 0;
-	svcGetInfo(&out_64, InfoType_HeapRegionAddress, CUR_PROCESS_HANDLE, 0);
-	uintptr_t out_out = 0;
-	memcpy(&out_out, &out_64, sizeof(out_out));
-	out_out += ((elf_area_size+0x200000) & 0xffe00000);
-	if (out_out > *out) *out = out_out;
+Result svcSetHeapSizeIntercept(u64 *out, u64 size)
+{	
+	size_t addon = ((elf_area_size+0x1FFFFF) & ~0x1FFFFF);
+	Result ret = svcSetHeapSize((void*)out, size+addon);
 	
 	//SaltySDCore_printf("SaltySD Core: svcSetHeapSize intercept %x %llx %llx\n", ret, *out, size+((elf_area_size+0x200000) & 0xffe00000));
+	
+	if (!ret)
+	{
+		*out += addon;
+	}
 	
 	return ret;
 }
@@ -218,11 +216,11 @@ Result svcGetInfoIntercept (u64 *out, size_t id0, Handle handle, u64 id1)
 
 	//SaltySDCore_printf("SaltySD Core: svcGetInfo intercept %p (%llx) %llx %x %llx ret %x\n", out, *out, id0, handle, id1, ret);	
 
-	if (id1 == 0 && handle == 0xffff8001)	
+	if (id1 == 0 && handle == CUR_PROCESS_HANDLE)	
 	{	
 		switch(id0) {
-			case 6:
-				*out -= elf_area_size;
+			case InfoType_HeapRegionAddress:
+				*out += ((elf_area_size+0x1FFFFF) & ~0x1FFFFF);
 				break;
 		}
 	}

@@ -27,7 +27,7 @@ Handle orig_main_thread;
 void* orig_ctx;
 
 Handle sdcard;
-size_t elf_area_size = 0;
+size_t elf_area_size = 0x200000; //We assume that Core itself won't take more than 0x200000 bytes;
 
 ThreadVars vars_orig;
 ThreadVars vars_mine;
@@ -172,7 +172,7 @@ void setupELFHeap(void)
 	void* addr = NULL;
 	Result rc = 0;
 
-	rc = svcSetHeapSize(&addr, ((elf_area_size+0x200000) & 0xffe00000));
+	rc = svcSetHeapSize(&addr, ((elf_area_size+0x1FFFFF) & ~0x1FFFFF));
 
 	if (rc || addr == NULL)
 	{
@@ -180,7 +180,7 @@ void setupELFHeap(void)
 	}
 
 	g_heapAddr = (u64)addr;
-	g_heapSize = ((elf_area_size+0x200000) & 0xffe00000);
+	g_heapSize = ((elf_area_size+0x1FFFFF) & ~0x1FFFFF);
 }
 
 u64 find_next_elf_heap()
@@ -231,34 +231,35 @@ void SaltySDCore_RegisterExistingModules()
 }
 
 Result svcSetHeapSizeIntercept(u64 *out, u64 size)
-{
-	static bool Initialized = false;
-	Result ret = 1;
-	if (!Initialized)
-		size += ((elf_area_size+0x200000) & 0xffe00000);
-	ret = svcSetHeapSize((void*)out, size);
+{	
+	size_t addon = ((elf_area_size+0x1FFFFF) & ~0x1FFFFF);
+	Result ret = svcSetHeapSize((void*)out, size+addon);
 	
 	//SaltySDCore_printf("SaltySD Core: svcSetHeapSize intercept %x %llx %llx\n", ret, *out, size+((elf_area_size+0x200000) & 0xffe00000));
 	
-	if (!ret && !Initialized)
+	if (!ret)
 	{
-		*out += ((elf_area_size+0x200000) & 0xffe00000);
-		Initialized = true;
+		*out += addon;
 	}
 	
 	return ret;
 }
 
-Result svcGetInfoIntercept (u64 *out, u64 id0, Handle handle, u64 id1)	
+Result svcGetInfoIntercept (u64 *out, size_t id0, Handle handle, u64 id1)	
 {	
+
 	Result ret = svcGetInfo(out, id0, handle, id1);	
 
 	//SaltySDCore_printf("SaltySD Core: svcGetInfo intercept %p (%llx) %llx %x %llx ret %x\n", out, *out, id0, handle, id1, ret);	
 
-	if (id0 == 6 && id1 == 0 && handle == 0xffff8001)	
+	if (id1 == 0 && handle == CUR_PROCESS_HANDLE)	
 	{	
-		*out -= elf_area_size;
-	}		
+		switch(id0) {
+			case InfoType_HeapRegionAddress:
+				*out += ((elf_area_size+0x1FFFFF) & ~0x1FFFFF);
+				break;
+		}
+	}
 
 	return ret;	
 }

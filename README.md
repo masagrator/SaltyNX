@@ -56,9 +56,8 @@ Remember to restart Switch
 | CelDamage HD | plugins | 32-bit game, not supported |
 | Company of Heroes Collection | plugins | heap related |
 | DEADLY PREMONITION Origins | plugins | 32-bit game, not supported |
-| Death Road to Canada | all | heap related |
+| Death Road to Canada | plugins | 32-bit game, not supported |
 | Dies irae Amantes amentes For Nintendo Switch | plugins | 32-bit game, not supported |
-| Donkey Kong Country: Tropical Freeze | all | From second level heap issues |
 | EA SPORTS FC 24 | plugins | heap related |
 | Goat Simulator | plugins | 32-bit game, not supported |
 | Gothic | plugins | 32-bit game, not supported |
@@ -77,14 +76,14 @@ Remember to restart Switch
 | Monster Hunter XX Nintendo Switch Ver. | plugins | 32-bit game, not supported |
 | New Super Mario Bros. U Deluxe | plugins | 32-bit game, not supported |
 | Ni no Kuni: Wrath of the White Witch | plugins | 32-bit game, not supported |
-| Olympic Games Tokyo 2020 – The Official Video Game™ | all | Heap related |
+| Olympic Games Tokyo 2020 – The Official Video Game™ | plugins | heap related, exefs patch included to get it to work at all |
 | Pikmin 3 Deluxe | plugins | 32-bit game, not supported |
 | Planescape: Torment and Icewind Dale | plugins | 32-bit game, not supported |
 | Plants vs. Zombies: Battle for Neighborville | plugins | Heap related |
 | Radiant Silvergun | plugins | 32-bit game, not supported |
 | Sherlock Holmes and The Hound of The Baskervilles | plugins | 32-bit game, not supported |
 | Splatoon 3 | all | Crashes after online match |
-| Stubbs the Zombie in Rebel Without a Pulse | all | heap related |
+| Stubbs the Zombie in Rebel Without a Pulse | plugins | heap related, exefs patch included to get it to work at all |
 | The Lara Croft Collection | plugins | heap related |
 | Tokyo Mirage Session #FE Encore | plugins | 32-bit game, not supported |
 | Valkyria Chronicles | plugins | 32-bit game, not supported |
