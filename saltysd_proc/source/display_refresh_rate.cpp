@@ -217,26 +217,29 @@ extern "C" __attribute__((noinline)) void correctOledGamma(uint32_t refresh_rate
     #define loop_amount 5
     
     uint32_t offsets[] = {0x1A, 0x24, 0x25};
-    uint32_t values_set[4] = {2, 0, 0x83};
+    uint32_t values_set[] = {2, 0, 0x83};
     if (refresh_rate == 60) {
         if (last_refresh_rate == 60) return;
     }
     else if (refresh_rate == 45) {
         if (last_refresh_rate == 45) return;
-        uint32_t values[4] = {4, 1, 0};
-        memcpy(values_set, values, 16);
+        uint32_t values[] = {4, 1, 0};
+        static_assert(sizeof(values) == sizeof(values_set));
+        memcpy(values_set, values, sizeof(values));
 
     }
     else if (refresh_rate == 50) {
         if (last_refresh_rate == 50) return;
-        uint32_t values[4] = {3, 1, 0};
-        memcpy(values_set, values, 16);
+        uint32_t values[] = {3, 1, 0};
+        static_assert(sizeof(values) == sizeof(values_set));
+        memcpy(values_set, values, sizeof(values));
   
     }
     else if (refresh_rate == 55) {
         if (last_refresh_rate == 55) return;
-        uint32_t values[4] = {3, 1, 0};
-        memcpy(values_set, values, 16);
+        uint32_t values[] = {3, 1, 0};
+        static_assert(sizeof(values) == sizeof(values_set));
+        memcpy(values_set, values, sizeof(values));
     }
     else return;
     for (size_t i = 0; i < loop_amount; i++) {
