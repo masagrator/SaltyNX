@@ -222,20 +222,23 @@ extern "C" __attribute__((noinline)) void correctOledGamma(uint32_t refresh_rate
         if (last_refresh_rate == 60) return;
     }
     else if (refresh_rate == 45) {
-        uint32_t values[4] = {4, 1, 0, 3};
         if (last_refresh_rate == 45) return;
+        uint32_t values[4] = {4, 1, 0, 3};
+        if (file_or_directory_exists("sdmc:/SaltySD/flags/oled_maxbrightness.flag")) values[3] = 0;
         memcpy(values_set, values, 16);
 
     }
     else if (refresh_rate == 50) {
         if (last_refresh_rate == 50) return;
         uint32_t values[4] = {4, 1, 0, 2};
+        if (file_or_directory_exists("sdmc:/SaltySD/flags/oled_maxbrightness.flag")) values[3] = 0;
         memcpy(values_set, values, 16);
   
     }
     else if (refresh_rate == 55) {
         if (last_refresh_rate == 55) return;
         uint32_t values[4] = {3, 1, 0, 2};
+        if (file_or_directory_exists("sdmc:/SaltySD/flags/oled_maxbrightness.flag")) values[3] = 0;
         memcpy(values_set, values, 16);
     }
     else return;
