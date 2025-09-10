@@ -82,7 +82,6 @@ Remember to restart Switch
 | Plants vs. Zombies: Battle for Neighborville | plugins | Heap related |
 | Radiant Silvergun | plugins | 32-bit game, not supported |
 | Sherlock Holmes and The Hound of The Baskervilles | plugins | 32-bit game, not supported |
-| Splatoon 3 | all | Crashes after online match |
 | Stubbs the Zombie in Rebel Without a Pulse | plugins | heap related, exefs patch included to get it to work at all |
 | The Lara Croft Collection | plugins | heap related |
 | Tokyo Mirage Session #FE Encore | plugins | 32-bit game, not supported |
