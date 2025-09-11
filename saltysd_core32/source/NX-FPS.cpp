@@ -229,6 +229,7 @@ struct {
 #else
 	uint64_t systemtickfrequency = 0;
 #endif
+static_assert(systemtickfrequency != 0);
 
 typedef void (*nvnQueuePresentTexture_0)(const void* _this, const void* unk2_1, const int index);
 typedef uintptr_t (*GetProcAddress)(const void* unk1_a, const char * nvnFunction_a);
@@ -292,16 +293,6 @@ namespace Utils {
 			return tick << 5;
 		#else
 			return uint64_t((double)tick / ((double)(systemtickfrequency) / 1000000000.d));
-		#endif
-	}
-
-	inline uint64_t _getSystemTickFrequency() {
-		#if defined(SWITCH) || defined(SWITCH32)
-			return 19200000;
-		#elif defined(OUNCE) || defined(OUNCE32)
-			return 31250000;
-		#else
-			#error "Compiling for platform with undefined tick frequency!"
 		#endif
 	}
 
@@ -1118,10 +1109,6 @@ extern "C" {
 				SaltySDCore_ReplaceImport("_ZN2nn2fs6detail12FileAccessor4ReadEPjxPvjRKNS0_10ReadOptionE", (void*)nn::FileAccessorRead);
 			}
 			else SaltySDCore_fclose(readFlag);
-			
-			#if !defined(SWITCH) && !defined(SWITCH32)
-			systemtickfrequency = Utils::_getSystemTickFrequency();
-			#endif
 
 			uint64_t titleid = 0;
 			svcGetInfo(&titleid, InfoType_TitleId, CUR_PROCESS_HANDLE, 0);	
