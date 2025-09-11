@@ -8,8 +8,6 @@
 #define NVDISP_VALIDATE_MODE2 0xC03C021D
 #define NVDISP_GET_MODE_DB2 0xEF20021E
 #define DSI_CLOCK_HZ 234000000llu
-#define NVDISP_GET_AVI_INFOFRAME 0x80600210
-#define NVDISP_SET_AVI_INFOFRAME 0x40600211
 #define NVDISP_GET_PANEL_DATA 0xC01C0226
 
 uint8_t dockedHighestRefreshRate = 60;
@@ -932,4 +930,5 @@ extern "C" bool GetDisplayRefreshRate(uint32_t* out_refreshRate, bool internal) 
     if (nx_fps)
         nx_fps -> currentRefreshRate = (uint8_t)value;
     return true;
+
 }
