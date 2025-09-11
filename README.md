@@ -1,27 +1,13 @@
 # SaltyNX
 
-Background process for the Nintendo Switch for file/code modification
+Sysmodule for injecting custom codes into retail games, by default it injects "Core" which incldues many useful features known as NX-FPS (tracking game performance statistics, unlocking FPS) and ReverseNX-RT (switching between docked and handheld graphics profiles).
 
-Created by: https://github.com/shinyquagsire23
+Original sysmodule was created by: https://github.com/shinyquagsire23
 
-This fork includes many QoL improvements and beside plugins support also supports patches. 
+This fork includes many new features, improvements and beside plugins support also supports patches for easy way to edit common functions.
 
 ![GitHub all releases](https://img.shields.io/github/downloads/masagrator/SaltyNX/total?style=for-the-badge)
 ---
-
-Patches pattern:
-- filename is symbol of function with filetype `.asm64` for 64-bit games, `.asm32` for 32-bit games,
-- inside file write with hex editor instructions that you want to put into this function,
-- put this file either to `SaltySD/patches` to make it work for every game, or to `SaltySD/patches/*titleid*` to make it work for specific game.
-
-
-To use ReverseNX-RT download newest overlay from [HERE](https://github.com/masagrator/ReverseNX-RT/releases)
-Tools utilizing SaltyNX:
-- [FPSLocker](https://github.com/masagrator/FPSLocker)
-- [ReverseNX-RT](https://github.com/masagrator/ReverseNX-RT)
-- [Status Monitor Overlay](https://github.com/masagrator/Status-Monitor-Overlay)
-
-For additional functions you need [SaltyNX-Tool](https://github.com/masagrator/SaltyNX-Tool)
 
 > [!CAUTION]
 > It is required to have FW installed at least 10.0.0 version
@@ -32,6 +18,19 @@ For additional functions you need [SaltyNX-Tool](https://github.com/masagrator/S
 > Known issues:
 > - Instability with some sysmodules (like emuiibo),
 > - Cheats using HEAP+offset address instead of MAIN+offset address chain may not work properly.
+
+Tools utilizing SaltyNX:
+- [FPSLocker](https://github.com/masagrator/FPSLocker)
+- [ReverseNX-RT](https://github.com/masagrator/ReverseNX-RT)
+- [Status Monitor Overlay](https://github.com/masagrator/Status-Monitor-Overlay)
+- And more
+
+For additional functions you need [SaltyNX-Tool](https://github.com/masagrator/SaltyNX-Tool)
+
+Patches pattern:
+- filename is symbol of function with filetype `.asm64` for 64-bit games, `.asm32` for 32-bit games,
+- inside file write with hex editor instructions that you want to put into this function,
+- put this file either to `SaltySD/patches` to make it work for every game, or to `SaltySD/patches/*titleid*` to make it work for specific game.
 
 # How to download release:
 
