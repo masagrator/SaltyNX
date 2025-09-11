@@ -31,9 +31,7 @@ For additional functions you need [SaltyNX-Tool](https://github.com/masagrator/S
 
 # How to download release:
 
-For Atmosphere >=0.10.1 just put folders from archive to root of your sdcard.
-
-For Atmosphere <=0.9.4 and any other CFW rename `contents` folder to `titles`
+Just put folders from archive to root of your sdcard.
 
 Remember to restart Switch
 
