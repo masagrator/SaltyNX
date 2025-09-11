@@ -262,7 +262,6 @@ struct {
 #else
 	uint64_t systemtickfrequency = 0;
 #endif
-static_assert(systemtickfrequency != 0);
 
 typedef void (*nvnQueuePresentTexture_0)(const void* _this, const void* unk2_1, int index);
 typedef uintptr_t (*GetProcAddress)(const void* unk1_a, const char * nvnFunction_a);
@@ -337,10 +336,6 @@ namespace Utils {
 		#else
 			return uint64_t((double)tick / ((double)(systemtickfrequency) / 1000000000.d));
 		#endif
-	}
-
-	constexpr uint64_t _getSystemTickFrequency() {
-		return systemtickfrequency;
 	}
 
 	inline AppletFocusState _getCurrentFocusState() {
@@ -1270,10 +1265,6 @@ extern "C" {
 				SaltySDCore_ReplaceImport("_ZN2nn2fs6detail12FileAccessor4ReadEPmlPvmRKNS0_10ReadOptionE", (void*)nn::FileAccessorRead);
 			}
 			else SaltySDCore_fclose(readFlag);
-			
-			#if !defined(SWITCH) && !defined(SWITCH32)
-			systemtickfrequency = Utils::_getSystemTickFrequency();
-			#endif
 
 			char titleid[17];
 			ltoa(titid, titleid, 16);
