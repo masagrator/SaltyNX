@@ -16,6 +16,10 @@ Patches pattern:
 
 
 To use ReverseNX-RT download newest overlay from [HERE](https://github.com/masagrator/ReverseNX-RT/releases)
+Tools utilizing SaltyNX:
+- [FPSLocker](https://github.com/masagrator/FPSLocker)
+- [ReverseNX-RT](https://github.com/masagrator/ReverseNX-RT)
+- [Status Monitor Overlay](https://github.com/masagrator/Status-Monitor-Overlay)
 
 For additional functions you need [SaltyNX-Tool](https://github.com/masagrator/SaltyNX-Tool)
 
