@@ -1,6 +1,6 @@
 # SaltyNX
 
-Sysmodule for injecting custom codes into retail games, by default it injects "Core" which incldues many useful features known as NX-FPS (tracking game performance statistics, unlocking FPS) and ReverseNX-RT (switching between docked and handheld graphics profiles). Sysmodule also manages custom refresh rates in both handheld and docked modes.
+Sysmodule for injecting custom codes into retail games, by default it injects "Core" which includes many useful features known as NX-FPS (tracking game performance statistics, unlocking FPS) and ReverseNX-RT (switching between docked and handheld graphics profiles). Sysmodule also manages custom refresh rates in both handheld and docked modes.
 
 Original sysmodule was created by: https://github.com/shinyquagsire23
 
