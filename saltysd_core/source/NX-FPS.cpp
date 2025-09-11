@@ -262,6 +262,7 @@ struct {
 #else
 	uint64_t systemtickfrequency = 0;
 #endif
+static_assert(systemtickfrequency != 0);
 
 typedef void (*nvnQueuePresentTexture_0)(const void* _this, const void* unk2_1, int index);
 typedef uintptr_t (*GetProcAddress)(const void* unk1_a, const char * nvnFunction_a);
