@@ -170,7 +170,7 @@ bool isModInstalled() {
 
 ptrdiff_t searchNxFpsSharedMemoryBlock(uintptr_t base) {
 	ptrdiff_t search_offset = 0;
-	while(search_offset < 0x1000) {
+	while(search_offset < shmem_size) {
 		uint32_t* MAGIC_shared = (uint32_t*)(base + search_offset);
 		if (*MAGIC_shared == 0x465053) {
 			return search_offset;
