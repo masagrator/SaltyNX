@@ -62,6 +62,7 @@ uintptr_t game_start_address = 0;
 #else 
     uint64_t systemtickfrequency = 0;
 #endif
+static_assert(systemtickfrequency != 0);
 
 void __libnx_initheap(void)
 {
