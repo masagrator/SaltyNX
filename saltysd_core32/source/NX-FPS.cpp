@@ -361,16 +361,12 @@ namespace NX_FPS_Math {
 		
 		FPS_temp++;
 		uint64_t deltatick = endtick - starttick;
-		uint64_t deltatick2 = endtick - starttick2;
 
 		Shared -> FPSticks[FPStickItr++] = framedelta;
 		FPStickItr %= 10;
 
-		if (deltatick2 > (systemtickfrequency / ((*sharedOperationMode == 1) ? 30 : 1))) {
-			starttick2 = Utils::_getSystemTick();
-			if (!configRC && FPSlock) {
-				LOCK::applyPatch(configBuffer, FPSlock, (Shared -> currentRefreshRate));
-			}
+		if (!configRC && FPSlock) {
+			LOCK::applyPatch(configBuffer, FPSlock, (Shared -> currentRefreshRate));
 		}
 
 		if (deltatick > systemtickfrequency) {
