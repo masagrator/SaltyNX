@@ -1,10 +1,10 @@
 # SaltyNX
 
-Sysmodule for injecting custom codes into retail games, by default it injects "Core" which incldues many useful features known as NX-FPS (tracking game performance statistics, unlocking FPS) and ReverseNX-RT (switching between docked and handheld graphics profiles).
+Sysmodule for injecting custom codes into retail games, by default it injects "Core" which incldues many useful features known as NX-FPS (tracking game performance statistics, unlocking FPS) and ReverseNX-RT (switching between docked and handheld graphics profiles). Sysmodule also manages custom refresh rates in both handheld and docked modes.
 
 Original sysmodule was created by: https://github.com/shinyquagsire23
 
-This fork includes many new features, improvements and beside plugins support also supports patches for easy way to edit common functions.
+This fork includes many new features (aforementioned NX-FPS and ReverseNX-RT), compatibility fixes, and beside plugins support also supports patches for easy way to edit common functions.
 
 ![GitHub all releases](https://img.shields.io/github/downloads/masagrator/SaltyNX/total?style=for-the-badge)
 ---
