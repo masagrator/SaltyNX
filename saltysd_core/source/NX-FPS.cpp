@@ -339,14 +339,8 @@ namespace Utils {
 		#endif
 	}
 
-	inline uint64_t _getSystemTickFrequency() {
-		#if defined(SWITCH) || defined(SWITCH32)
-			return 19200000;
-		#elif defined(OUNCE) || defined(OUNCE32)
-			return 31250000;
-		#else
-			#error "Compiling for platform with undefined tick frequency!"
-		#endif
+	constexpr uint64_t _getSystemTickFrequency() {
+		return systemtickfrequency;
 	}
 
 	inline AppletFocusState _getCurrentFocusState() {
