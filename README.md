@@ -28,9 +28,11 @@ Tools utilizing SaltyNX:
 For additional functions you need [SaltyNX-Tool](https://github.com/masagrator/SaltyNX-Tool)
 
 Patches pattern:
-- filename is symbol of function with filetype `.asm64` for 64-bit games, `.asm32` for 32-bit games,
+- filename is a function symbol with filetype `.asm64` for 64-bit games, `.asm32` for 32-bit games,
 - inside file write with hex editor instructions that you want to put into this function,
 - put this file either to `SaltySD/patches` to make it work for every game, or to `SaltySD/patches/*titleid*` to make it work for specific game.
+
+Examples of such patches can be find [HERE](https://github.com/masagrator/SaltyNX-Patches).
 
 # How to install release:
 
