@@ -32,7 +32,9 @@ Patches pattern:
 - inside file write with hex editor instructions that you want to put into this function,
 - put this file either to `SaltySD/patches` to make it work for every game, or to `SaltySD/patches/*titleid*` to make it work for specific game.
 
-# How to download release:
+# How to install release:
+
+Download newest version from [RELEASES](https://github.com/masagrator/SaltyNX/releases)
 
 Just put folders from archive to root of your sdcard.
 
