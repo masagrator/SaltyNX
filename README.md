@@ -34,9 +34,9 @@ Patches pattern:
 
 # How to install release:
 
-Download newest version from [RELEASES](https://github.com/masagrator/SaltyNX/releases), look for .zip file with name starting "SaltyNX"
+Download newest version from [RELEASES](https://github.com/masagrator/SaltyNX/releases), look for .zip file with name starting "SaltyNX", unpack it.
 
-Just put folders from archive to root of your sdcard.
+Put `atmosphere` and `SaltySD` folders unpacked from zip archive to root of your sdcard.
 
 Remember to restart Switch
 
