@@ -932,7 +932,7 @@ namespace NVN {
 		amountOfAvailableBuffers = numBufferedFrames;
 		if ((Shared -> SetBuffers) >= 2 && (Shared -> SetBuffers) <= numBufferedFrames) {
 			if (!setNumActiveTexturesDetected) numBufferedFrames = (Shared -> SetBuffers);
-			else Shared->expectedSetBuffers = d:\ASwitch\SaltyNX\saltysd_core\saltysd_core.elf
+			else Shared->expectedSetBuffers = (Shared -> SetBuffers);
 		}
 		(Shared -> ActiveBuffers) = numBufferedFrames;
 		return ((nvnBuilderSetTextures_0)(Address_weaks.nvnWindowBuilderSetTextures))(nvnWindowBuilder, numBufferedFrames, nvnTextures);
