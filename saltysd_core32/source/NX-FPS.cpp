@@ -1014,6 +1014,7 @@ namespace NVN {
 		else if (!strcmp("nvnWindowSetNumActiveTextures", nvnFunction)) {
 			if (!Address_weaks.nvnWindowSetNumActiveTextures) Address_weaks.nvnWindowSetNumActiveTextures = address;
 			setNumActiveTexturesDetected = true;
+			Shared->expectedSetBuffers = 0;
 			return (uintptr_t)&NVN::WindowSetNumActiveTextures;
 		}
 		else if (!strcmp("nvnWindowBuilderSetTextures", nvnFunction)) {
@@ -1095,6 +1096,7 @@ extern "C" {
 
 			Shared = (NxFpsSharedBlock*)((uintptr_t)shmemGetAddr(_sharedmemory) + SharedMemoryOffset);
 			Shared -> MAGIC = 0x465053;
+			Shared->expectedSetBuffers = -1;
 			
 			Address_weaks.nvnBootstrapLoader = SaltySDCore_FindSymbolBuiltin("nvnBootstrapLoader");
 			Address_weaks.eglSwapBuffers = SaltySDCore_FindSymbolBuiltin("eglSwapBuffers");
