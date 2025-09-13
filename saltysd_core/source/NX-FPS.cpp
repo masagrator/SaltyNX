@@ -28,6 +28,11 @@ struct NVNDevice {
 	char reserved[0x3000];
 };
 
+struct nvnWindowBuilder {
+	const char reserved[16];
+	uint8_t numBufferedFrames;
+};
+
 typedef int NVNtextureFlags;
 typedef int NVNtextureTarget;
 typedef int NVNformat;
@@ -72,6 +77,16 @@ typedef void* (*nvnCommandBufferSetRenderTargets_0)(const void* cmdBuf, int numT
 typedef void* (*nvnCommandBufferSetViewport_0)(const void* cmdBuf, int x, int y, int width, int height);
 typedef void* (*nvnCommandBufferSetViewports_0)(void* cmdBuf, int start, int count, const NVNViewport* viewports);
 typedef void* (*nvnCommandBufferSetDepthRange_0)(void* cmdBuf, float s0, float s1);
+typedef void (*nvnQueuePresentTexture_0)(const void* _this, const void* unk2_1, int index);
+typedef uintptr_t (*GetProcAddress)(const void* unk1_a, const char * nvnFunction_a);
+typedef void (*nvnBuilderSetTextures_0)(const nvnWindowBuilder* nvnWindowBuilder, int buffers, const NVNTexture** texturesBuffer);
+typedef void (*nvnWindowSetNumActiveTextures_0)(const NVNWindow* nvnWindow, int buffers);
+typedef bool (*nvnWindowInitialize_0)(const NVNWindow* nvnWindow, const struct nvnWindowBuilder* windowBuilder);
+typedef void* (*nvnWindowAcquireTexture_0)(const NVNWindow* nvnWindow, const void* nvnSync, const void* index);
+typedef void (*nvnSetPresentInterval_0)(const NVNWindow* nvnWindow, int mode);
+typedef int (*nvnGetPresentInterval_0)(const NVNWindow* nvnWindow);
+typedef void* (*nvnSyncWait_0)(const void* _this, uint64_t timeout_ns);
+typedef void (*nvnQueueFinish_0)(const void* nvnQueue);
 
 typedef bool (*eglSwapBuffers_0)(const void* EGLDisplay, const void* EGLSurface);
 typedef bool (*eglSwapInterval_0)(const void* EGLDisplay, int interval);
@@ -118,6 +133,7 @@ struct {
 	uintptr_t nvnCommandBufferSetViewport;
 	uintptr_t nvnCommandBufferSetViewports;
 	uintptr_t nvnCommandBufferSetDepthRange;
+	uintptr_t nvnQueueFinish;
 
 	uintptr_t eglSwapBuffers;
 	uintptr_t eglSwapInterval;
@@ -155,11 +171,6 @@ struct {
 	uintptr_t ConvertToTimeSpan;
 	uintptr_t SetUserInactivityDetectionTimeExtended;
 } Address_weaks;
-
-struct nvnWindowBuilder {
-	const char reserved[16];
-	uint8_t numBufferedFrames;
-};
 
 ptrdiff_t SharedMemoryOffset = 1234;
 uint8_t* configBuffer = 0;
@@ -267,18 +278,8 @@ struct {
 #endif
 static_assert(systemtickfrequency != 0);
 
-typedef void (*nvnQueuePresentTexture_0)(const void* _this, const void* unk2_1, int index);
-typedef uintptr_t (*GetProcAddress)(const void* unk1_a, const char * nvnFunction_a);
-
 bool changeFPS = false;
 bool changedFPS = false;
-typedef void (*nvnBuilderSetTextures_0)(const nvnWindowBuilder* nvnWindowBuilder, int buffers, const NVNTexture** texturesBuffer);
-typedef void (*nvnWindowSetNumActiveTextures_0)(const NVNWindow* nvnWindow, int buffers);
-typedef bool (*nvnWindowInitialize_0)(const NVNWindow* nvnWindow, const struct nvnWindowBuilder* windowBuilder);
-typedef void* (*nvnWindowAcquireTexture_0)(const NVNWindow* nvnWindow, const void* nvnSync, const void* index);
-typedef void (*nvnSetPresentInterval_0)(const NVNWindow* nvnWindow, int mode);
-typedef int (*nvnGetPresentInterval_0)(const NVNWindow* nvnWindow);
-typedef void* (*nvnSyncWait_0)(const void* _this, uint64_t timeout_ns);
 void* WindowSync = 0;
 uint64_t startFrameTick = 0;
 
@@ -928,20 +929,20 @@ namespace NVN {
 
 	void WindowBuilderSetTextures(const nvnWindowBuilder* nvnWindowBuilder, int numBufferedFrames, const NVNTexture** nvnTextures) {
 		(Shared -> Buffers) = numBufferedFrames;
+		amountOfAvailableBuffers = numBufferedFrames;
 		if ((Shared -> SetBuffers) >= 2 && (Shared -> SetBuffers) <= numBufferedFrames) {
-			numBufferedFrames = (Shared -> SetBuffers);
+			if (!setNumActiveTexturesDetected) numBufferedFrames = (Shared -> SetBuffers);
+			else Shared->expectedSetBuffers = d:\ASwitch\SaltyNX\saltysd_core\saltysd_core.elf
 		}
 		(Shared -> ActiveBuffers) = numBufferedFrames;
-		amountOfAvailableBuffers = numBufferedFrames;
 		return ((nvnBuilderSetTextures_0)(Address_weaks.nvnWindowBuilderSetTextures))(nvnWindowBuilder, numBufferedFrames, nvnTextures);
 	}
 
 	void WindowSetNumActiveTextures(const NVNWindow* nvnWindow, int numBufferedFrames) {
 		if (numBufferedFrames < 0) {
-			int trueNumBufferedFrames = numBufferedFrames * -1;
-			if (amountOfAvailableBuffers < trueNumBufferedFrames) return;
-			(Shared -> ActiveBuffers) = trueNumBufferedFrames;
-			return ((nvnWindowSetNumActiveTextures_0)(Address_weaks.nvnWindowSetNumActiveTextures))(nvnWindow, trueNumBufferedFrames);
+			numBufferedFrames *= -1;
+			(Shared -> ActiveBuffers) = numBufferedFrames;
+			return ((nvnWindowSetNumActiveTextures_0)(Address_weaks.nvnWindowSetNumActiveTextures))(nvnWindow, numBufferedFrames);
 		}
 		else {
 			(Shared -> SetActiveBuffers) = numBufferedFrames;
@@ -997,18 +998,21 @@ namespace NVN {
 			NX_FPS_Math::starttick = Utils::_getSystemTick();
 			NX_FPS_Math::starttick2 = NX_FPS_Math::starttick;
 		}
-		if (setNumActiveTexturesDetected) {
-			auto expectedBuffers = Shared->expectedSetBuffers;
-			if (expectedBuffers > 0 && expectedBuffers != (Shared->ActiveBuffers)) {
-				expectedBuffers *= -1;
-				WindowSetNumActiveTextures(nvnWindow, expectedBuffers);
-			}
-		}
 		NX_FPS_Math::PreFrame();
 		((nvnQueuePresentTexture_0)(Address_weaks.nvnQueuePresentTexture))(_this, nvnWindow, index);
 		NX_FPS_Math::PostFrame();
 
+		if (setNumActiveTexturesDetected) {
+			auto expectedBuffers = Shared->expectedSetBuffers;
+			if ((expectedBuffers > 0) && (amountOfAvailableBuffers >= expectedBuffers) && (expectedBuffers != (Shared->ActiveBuffers))) {
+				expectedBuffers *= -1;
+				((nvnQueueFinish_0)(Address_weaks.nvnQueueFinish))(_this);
+				WindowSetNumActiveTextures(nvnWindow, expectedBuffers);
+			}
+		}
+
 		(Shared -> FPSmode) = (uint8_t)((nvnGetPresentInterval_0)(Address_weaks.nvnWindowGetPresentInterval))(nvnWindow);
+
 
 		if (!NX_FPS_Math::new_fpslock) {
 			NX_FPS_Math::FPStiming = 0;
@@ -1138,8 +1142,8 @@ namespace NVN {
 		}
 		else if (!strcmp("nvnWindowSetNumActiveTextures", nvnFunction)) {
 			if (!Address_weaks.nvnWindowSetNumActiveTextures) Address_weaks.nvnWindowSetNumActiveTextures = address;
-			Shared -> expectedSetBuffers = 0;
 			setNumActiveTexturesDetected = true;
+			Shared->expectedSetBuffers = 0;
 			return (uintptr_t)&WindowSetNumActiveTextures;
 		}
 		else if (!strcmp("nvnWindowBuilderSetTextures", nvnFunction)) {
@@ -1174,6 +1178,9 @@ namespace NVN {
 		}
 		else if (!strcmp("nvnTextureGetFormat", nvnFunction)) {
 			Address_weaks.nvnTextureGetFormat = address;
+		}
+		else if (!strcmp("nvnQueueFinish", nvnFunction)) {
+			Address_weaks.nvnQueueFinish = address;
 		}
 		return address;
 	}
