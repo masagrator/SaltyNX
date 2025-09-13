@@ -948,6 +948,7 @@ namespace NVN {
 		}
 		else {
 			(Shared -> SetActiveBuffers) = numBufferedFrames;
+			if (Shared->expectedSetBuffers > 0) return;
 			if ((Shared -> SetBuffers) >= 2 && (Shared -> SetBuffers) <= (Shared -> Buffers)) {
 				numBufferedFrames = (Shared -> SetBuffers);
 			}
