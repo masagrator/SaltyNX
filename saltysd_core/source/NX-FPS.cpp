@@ -81,6 +81,7 @@ typedef void (*nvnQueuePresentTexture_0)(const void* _this, const void* unk2_1, 
 typedef uintptr_t (*GetProcAddress)(const void* unk1_a, const char * nvnFunction_a);
 typedef void (*nvnBuilderSetTextures_0)(const nvnWindowBuilder* nvnWindowBuilder, int buffers, const NVNTexture** texturesBuffer);
 typedef void (*nvnWindowSetNumActiveTextures_0)(const NVNWindow* nvnWindow, int buffers);
+typedef int (*nvnWindowGetNumActiveTextures_0)(const NVNWindow* nvnWindow);
 typedef bool (*nvnWindowInitialize_0)(const NVNWindow* nvnWindow, const struct nvnWindowBuilder* windowBuilder);
 typedef void* (*nvnWindowAcquireTexture_0)(const NVNWindow* nvnWindow, const void* nvnSync, const void* index);
 typedef void (*nvnSetPresentInterval_0)(const NVNWindow* nvnWindow, int mode);
@@ -125,6 +126,7 @@ struct {
 	uintptr_t nvnWindowAcquireTexture;
 	uintptr_t nvnSyncWait;
 	uintptr_t nvnWindowSetNumActiveTextures;
+	uintptr_t nvnWindowGetNumActiveTextures;
 	uintptr_t nvnWindowInitialize;
 	uintptr_t nvnTextureGetWidth;
 	uintptr_t nvnTextureGetHeight;
@@ -941,8 +943,8 @@ namespace NVN {
 	void WindowSetNumActiveTextures(const NVNWindow* nvnWindow, int numBufferedFrames) {
 		if (numBufferedFrames < 0) {
 			numBufferedFrames *= -1;
-			(Shared -> ActiveBuffers) = numBufferedFrames;
-			return ((nvnWindowSetNumActiveTextures_0)(Address_weaks.nvnWindowSetNumActiveTextures))(nvnWindow, numBufferedFrames);
+			((nvnWindowSetNumActiveTextures_0)(Address_weaks.nvnWindowSetNumActiveTextures))(nvnWindow, numBufferedFrames);
+			(Shared -> ActiveBuffers) = ((nvnWindowGetNumActiveTextures_0)(Address_weaks.nvnWindowGetNumActiveTextures))(nvnWindow);
 		}
 		else {
 			(Shared -> SetActiveBuffers) = numBufferedFrames;
@@ -1181,6 +1183,9 @@ namespace NVN {
 		}
 		else if (!strcmp("nvnQueueFinish", nvnFunction)) {
 			Address_weaks.nvnQueueFinish = address;
+		}
+		else if (!strcmp("nvnWindowGetNumActiveTextures", nvnFunction)) {
+			Address_weaks.nvnWindowGetNumActiveTextures = address;
 		}
 		return address;
 	}
