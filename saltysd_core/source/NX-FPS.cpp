@@ -324,7 +324,7 @@ inline uintptr_t getMainAddress() {
 
 namespace Utils {
 	inline uint64_t _getSystemTick() {
-		#if SWITCH
+		#if defined(SWITCH) || defined(OUNCE)
 			return armGetSystemTick();
 		#elif defined(SWITCH32) || defined(OUNCE32)
 			u64 tick = 0;
@@ -1194,7 +1194,6 @@ namespace NVN {
 	uintptr_t BootstrapLoader_1(const char* nvnName) {
 		if (strcmp(nvnName, "nvnDeviceGetProcAddress") == 0) {
 			Shared->API = 1;
-			Shared->expectedSetBuffers = -1;
 			if (!Address_weaks.nvnDeviceGetProcAddress) Address_weaks.nvnDeviceGetProcAddress = ((nvnBootstrapLoader_0)(Address_weaks.nvnBootstrapLoader))("nvnDeviceGetProcAddress");
 			return (uintptr_t)&GetProcAddress0;
 		}
@@ -1234,6 +1233,7 @@ extern "C" {
 
 			Shared = (NxFpsSharedBlock*)((uintptr_t)shmemGetAddr(_sharedmemory) + SharedMemoryOffset);
 			Shared -> MAGIC = 0x465053;
+			Shared->expectedSetBuffers = -1;
 
 			uint64_t titid = 0;
 			svcGetInfo(&titid, InfoType_TitleId, CUR_PROCESS_HANDLE, 0);
