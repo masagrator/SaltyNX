@@ -28,6 +28,11 @@ struct NVNDevice {
 	char reserved[0x3000];
 };
 
+struct nvnWindowBuilder {
+	const char reserved[16];
+	uint8_t numBufferedFrames;
+};
+
 typedef int NVNtextureFlags;
 typedef int NVNtextureTarget;
 typedef int NVNformat;
@@ -72,6 +77,17 @@ typedef void* (*nvnCommandBufferSetRenderTargets_0)(const void* cmdBuf, int numT
 typedef void* (*nvnCommandBufferSetViewport_0)(const void* cmdBuf, int x, int y, int width, int height);
 typedef void* (*nvnCommandBufferSetViewports_0)(void* cmdBuf, int start, int count, const NVNViewport* viewports);
 typedef void* (*nvnCommandBufferSetDepthRange_0)(void* cmdBuf, float s0, float s1);
+typedef void (*nvnQueuePresentTexture_0)(const void* _this, const void* unk2_1, int index);
+typedef uintptr_t (*GetProcAddress)(const void* unk1_a, const char * nvnFunction_a);
+typedef void (*nvnBuilderSetTextures_0)(const nvnWindowBuilder* nvnWindowBuilder, int buffers, const NVNTexture** texturesBuffer);
+typedef void (*nvnWindowSetNumActiveTextures_0)(const NVNWindow* nvnWindow, int buffers);
+typedef int (*nvnWindowGetNumActiveTextures_0)(const NVNWindow* nvnWindow);
+typedef bool (*nvnWindowInitialize_0)(const NVNWindow* nvnWindow, const struct nvnWindowBuilder* windowBuilder);
+typedef void* (*nvnWindowAcquireTexture_0)(const NVNWindow* nvnWindow, const void* nvnSync, const void* index);
+typedef void (*nvnSetPresentInterval_0)(const NVNWindow* nvnWindow, int mode);
+typedef int (*nvnGetPresentInterval_0)(const NVNWindow* nvnWindow);
+typedef void* (*nvnSyncWait_0)(const void* _this, uint64_t timeout_ns);
+typedef void (*nvnQueueFinish_0)(const void* nvnQueue);
 
 typedef bool (*eglSwapBuffers_0)(const void* EGLDisplay, const void* EGLSurface);
 typedef bool (*eglSwapInterval_0)(const void* EGLDisplay, int interval);
@@ -110,6 +126,7 @@ struct {
 	uintptr_t nvnWindowAcquireTexture;
 	uintptr_t nvnSyncWait;
 	uintptr_t nvnWindowSetNumActiveTextures;
+	uintptr_t nvnWindowGetNumActiveTextures;
 	uintptr_t nvnWindowInitialize;
 	uintptr_t nvnTextureGetWidth;
 	uintptr_t nvnTextureGetHeight;
@@ -118,6 +135,7 @@ struct {
 	uintptr_t nvnCommandBufferSetViewport;
 	uintptr_t nvnCommandBufferSetViewports;
 	uintptr_t nvnCommandBufferSetDepthRange;
+	uintptr_t nvnQueueFinish;
 
 	uintptr_t eglSwapBuffers;
 	uintptr_t eglSwapInterval;
@@ -155,11 +173,6 @@ struct {
 	uintptr_t ConvertToTimeSpan;
 	uintptr_t SetUserInactivityDetectionTimeExtended;
 } Address_weaks;
-
-struct nvnWindowBuilder {
-	const char reserved[16];
-	uint8_t numBufferedFrames;
-};
 
 ptrdiff_t SharedMemoryOffset = 1234;
 uint8_t* configBuffer = 0;
@@ -207,6 +220,8 @@ struct resolutionCalls {
 };
 
 bool resolutionLookup = false;
+bool setNumActiveTexturesDetected = false;
+uint8_t amountOfAvailableBuffers = 0;
 
 resolutionCalls m_resolutionRenderCalls[8] = {0};
 resolutionCalls m_resolutionViewportCalls[8] = {0};
@@ -243,9 +258,10 @@ struct NxFpsSharedBlock {
 	float readSpeedPerSecond;
 	uint8_t FPSlockedDocked;
 	uint64_t frameNumber;
+	int8_t expectedSetBuffers;
 } PACKED;
 
-static_assert(sizeof(NxFpsSharedBlock) == 173);
+static_assert(sizeof(NxFpsSharedBlock) == 174);
 
 NxFpsSharedBlock* Shared = 0;
 
@@ -264,18 +280,8 @@ struct {
 #endif
 static_assert(systemtickfrequency != 0);
 
-typedef void (*nvnQueuePresentTexture_0)(const void* _this, const void* unk2_1, int index);
-typedef uintptr_t (*GetProcAddress)(const void* unk1_a, const char * nvnFunction_a);
-
 bool changeFPS = false;
 bool changedFPS = false;
-typedef void (*nvnBuilderSetTextures_0)(const nvnWindowBuilder* nvnWindowBuilder, int buffers, const NVNTexture** texturesBuffer);
-typedef void (*nvnWindowSetNumActiveTextures_0)(const NVNWindow* nvnWindow, int buffers);
-typedef bool (*nvnWindowInitialize_0)(const NVNWindow* nvnWindow, const struct nvnWindowBuilder* windowBuilder);
-typedef void* (*nvnWindowAcquireTexture_0)(const NVNWindow* nvnWindow, const void* nvnSync, const void* index);
-typedef void (*nvnSetPresentInterval_0)(const NVNWindow* nvnWindow, int mode);
-typedef int (*nvnGetPresentInterval_0)(const NVNWindow* nvnWindow);
-typedef void* (*nvnSyncWait_0)(const void* _this, uint64_t timeout_ns);
 void* WindowSync = 0;
 uint64_t startFrameTick = 0;
 
@@ -318,7 +324,7 @@ inline uintptr_t getMainAddress() {
 
 namespace Utils {
 	inline uint64_t _getSystemTick() {
-		#if SWITCH
+		#if defined(SWITCH) || defined(OUNCE)
 			return armGetSystemTick();
 		#elif defined(SWITCH32) || defined(OUNCE32)
 			u64 tick = 0;
@@ -747,35 +753,36 @@ namespace EGL {
 		}
 		else {
 			changeFPS = true;
+			auto currentRefreshRate = (Shared -> currentRefreshRate);
 			NX_FPS_Math::FPSlock = ((*sharedOperationMode == 1) ? (Shared -> FPSlockedDocked) : (Shared -> FPSlocked));
-			if (NX_FPS_Math::new_fpslock <= ((Shared -> currentRefreshRate) ? ((Shared -> currentRefreshRate) / 4) : 15)) {
+			if (NX_FPS_Math::new_fpslock <= (currentRefreshRate ? (currentRefreshRate / 4) : 15)) {
 				if ((Shared -> FPSmode) != 4)
 					EGL::Interval(EGLDisplay, -4);
-				if (NX_FPS_Math::new_fpslock != ((Shared -> currentRefreshRate) ? ((Shared -> currentRefreshRate) / 4) : 15)) {
+				if (NX_FPS_Math::new_fpslock != (currentRefreshRate ? (currentRefreshRate / 4) : 15)) {
 					NX_FPS_Math::FPStiming = (systemtickfrequency/NX_FPS_Math::new_fpslock) - 6000;
 				}
 				else NX_FPS_Math::FPStiming = 0;			
 			}
-			else if (NX_FPS_Math::new_fpslock <= ((Shared -> currentRefreshRate) ? ((Shared -> currentRefreshRate) / 3) : 20)) {
+			else if (NX_FPS_Math::new_fpslock <= (currentRefreshRate ? (currentRefreshRate / 3) : 20)) {
 				if ((Shared -> FPSmode) != 3)
 					EGL::Interval(EGLDisplay, -3);
-				if (NX_FPS_Math::new_fpslock != ((Shared -> currentRefreshRate) ? ((Shared -> currentRefreshRate) / 3) : 20)) {
+				if (NX_FPS_Math::new_fpslock != (currentRefreshRate ? (currentRefreshRate / 3) : 20)) {
 					NX_FPS_Math::FPStiming = (systemtickfrequency/NX_FPS_Math::new_fpslock) - 6000;
 				}
 				else NX_FPS_Math::FPStiming = 0;			
 			}
-			else if (NX_FPS_Math::new_fpslock <= ((Shared -> currentRefreshRate) ? ((Shared -> currentRefreshRate) / 2) : 30)) {
+			else if (NX_FPS_Math::new_fpslock <= (currentRefreshRate ? (currentRefreshRate / 2) : 30)) {
 				if ((Shared -> FPSmode) != 2)
 					EGL::Interval(EGLDisplay, -2);
-				if (NX_FPS_Math::new_fpslock != ((Shared -> currentRefreshRate) ? ((Shared -> currentRefreshRate) / 2) : 30)) {
+				if (NX_FPS_Math::new_fpslock != (currentRefreshRate ? (currentRefreshRate / 2) : 30)) {
 					NX_FPS_Math::FPStiming = (systemtickfrequency/NX_FPS_Math::new_fpslock) - 6000;
 				}
 				else NX_FPS_Math::FPStiming = 0;			
 			}
-			else if (NX_FPS_Math::new_fpslock > ((Shared -> currentRefreshRate) ? ((Shared -> currentRefreshRate) / 2) : 30)) {
+			else if (NX_FPS_Math::new_fpslock > (currentRefreshRate ? (currentRefreshRate / 2) : 30)) {
 				if ((Shared -> FPSmode) != 1)
 					EGL::Interval(EGLDisplay, -1);
-				if (NX_FPS_Math::new_fpslock != ((Shared -> currentRefreshRate) ? (Shared -> currentRefreshRate) : 60)) {
+				if (NX_FPS_Math::new_fpslock != (currentRefreshRate ? currentRefreshRate : 60)) {
 					NX_FPS_Math::FPStiming = (systemtickfrequency/NX_FPS_Math::new_fpslock) - 6000;
 				}
 				else NX_FPS_Math::FPStiming = 0;
@@ -924,19 +931,29 @@ namespace NVN {
 
 	void WindowBuilderSetTextures(const nvnWindowBuilder* nvnWindowBuilder, int numBufferedFrames, const NVNTexture** nvnTextures) {
 		(Shared -> Buffers) = numBufferedFrames;
+		amountOfAvailableBuffers = numBufferedFrames;
 		if ((Shared -> SetBuffers) >= 2 && (Shared -> SetBuffers) <= numBufferedFrames) {
-			numBufferedFrames = (Shared -> SetBuffers);
+			if (!setNumActiveTexturesDetected) numBufferedFrames = (Shared -> SetBuffers);
+			else Shared->expectedSetBuffers = (Shared -> SetBuffers);
 		}
 		(Shared -> ActiveBuffers) = numBufferedFrames;
 		return ((nvnBuilderSetTextures_0)(Address_weaks.nvnWindowBuilderSetTextures))(nvnWindowBuilder, numBufferedFrames, nvnTextures);
 	}
 
 	void WindowSetNumActiveTextures(const NVNWindow* nvnWindow, int numBufferedFrames) {
-		(Shared -> SetActiveBuffers) = numBufferedFrames;
-		if ((Shared -> SetBuffers) >= 2 && (Shared -> SetBuffers) <= (Shared -> Buffers)) {
-			numBufferedFrames = (Shared -> SetBuffers);
+		if (numBufferedFrames < 0) {
+			numBufferedFrames *= -1;
+			((nvnWindowSetNumActiveTextures_0)(Address_weaks.nvnWindowSetNumActiveTextures))(nvnWindow, numBufferedFrames);
+			(Shared -> ActiveBuffers) = ((nvnWindowGetNumActiveTextures_0)(Address_weaks.nvnWindowGetNumActiveTextures))(nvnWindow);
 		}
-		(Shared -> ActiveBuffers) = numBufferedFrames;
+		else {
+			(Shared -> SetActiveBuffers) = numBufferedFrames;
+			if (Shared->expectedSetBuffers > 0) return;
+			if ((Shared -> SetBuffers) >= 2 && (Shared -> SetBuffers) <= (Shared -> Buffers)) {
+				numBufferedFrames = (Shared -> SetBuffers);
+			}
+			(Shared -> ActiveBuffers) = numBufferedFrames;
+		}
 		return ((nvnWindowSetNumActiveTextures_0)(Address_weaks.nvnWindowSetNumActiveTextures))(nvnWindow, numBufferedFrames);
 	}
 
@@ -988,7 +1005,17 @@ namespace NVN {
 		((nvnQueuePresentTexture_0)(Address_weaks.nvnQueuePresentTexture))(_this, nvnWindow, index);
 		NX_FPS_Math::PostFrame();
 
+		if (setNumActiveTexturesDetected) {
+			auto expectedBuffers = Shared->expectedSetBuffers;
+			if ((expectedBuffers > 0) && (amountOfAvailableBuffers >= expectedBuffers) && (expectedBuffers != (Shared->ActiveBuffers))) {
+				expectedBuffers *= -1;
+				((nvnQueueFinish_0)(Address_weaks.nvnQueueFinish))(_this);
+				WindowSetNumActiveTextures(nvnWindow, expectedBuffers);
+			}
+		}
+
 		(Shared -> FPSmode) = (uint8_t)((nvnGetPresentInterval_0)(Address_weaks.nvnWindowGetPresentInterval))(nvnWindow);
+
 
 		if (!NX_FPS_Math::new_fpslock) {
 			NX_FPS_Math::FPStiming = 0;
@@ -997,52 +1024,53 @@ namespace NVN {
 		}
 		else {
 			changeFPS = true;
+			auto currentRefreshRate = (Shared -> currentRefreshRate);
 			NX_FPS_Math::FPSlock = ((*sharedOperationMode == 1) ? (Shared -> FPSlockedDocked) : (Shared -> FPSlocked));
-			if (NX_FPS_Math::new_fpslock <= ((Shared -> currentRefreshRate) ? ((Shared -> currentRefreshRate) / 4) : 15)) {
+			if (NX_FPS_Math::new_fpslock <= (currentRefreshRate ? (currentRefreshRate / 4) : 15)) {
 				if (((nvnGetPresentInterval_0)(Address_weaks.nvnWindowGetPresentInterval))(nvnWindow) != 4)
 					NVN::SetPresentInterval(nvnWindow, -4);
-				if ((NX_FPS_Math::new_fpslock != ((Shared -> currentRefreshRate) ? ((Shared -> currentRefreshRate) / 4) : 15))
+				if ((NX_FPS_Math::new_fpslock != (currentRefreshRate ? (currentRefreshRate / 4) : 15))
 				|| (Shared -> ZeroSync)) {
 					NX_FPS_Math::FPStiming = (systemtickfrequency/NX_FPS_Math::new_fpslock) - 6000;
-					if (NX_FPS_Math::new_fpslock == ((Shared -> currentRefreshRate) ? ((Shared -> currentRefreshRate) / 4) : 15)) {
+					if (NX_FPS_Math::new_fpslock == (currentRefreshRate ? (currentRefreshRate / 4) : 15)) {
 						NX_FPS_Math::FPStiming -= 2000;
 					}
 				}
 				else NX_FPS_Math::FPStiming = 0;			
 			}
-			else if (NX_FPS_Math::new_fpslock <= ((Shared -> currentRefreshRate) ? ((Shared -> currentRefreshRate) / 3) : 20)) {
+			else if (NX_FPS_Math::new_fpslock <= (currentRefreshRate ? (currentRefreshRate / 3) : 20)) {
 				if (((nvnGetPresentInterval_0)(Address_weaks.nvnWindowGetPresentInterval))(nvnWindow) != 3)
 					NVN::SetPresentInterval(nvnWindow, -3);
-				if ((NX_FPS_Math::new_fpslock != ((Shared -> currentRefreshRate) ? ((Shared -> currentRefreshRate) / 3) : 20))
+				if ((NX_FPS_Math::new_fpslock != (currentRefreshRate ? (currentRefreshRate / 3) : 20))
 				|| (Shared -> ZeroSync)) {
 					NX_FPS_Math::FPStiming = (systemtickfrequency/NX_FPS_Math::new_fpslock) - 6000;
-					if (NX_FPS_Math::new_fpslock == ((Shared -> currentRefreshRate) ? ((Shared -> currentRefreshRate) / 3) : 20)) {
+					if (NX_FPS_Math::new_fpslock == (currentRefreshRate ? (currentRefreshRate / 3) : 20)) {
 						NX_FPS_Math::FPStiming -= 2000;
 					}
 				}
 				else NX_FPS_Math::FPStiming = 0;			
 			}
-			else if (NX_FPS_Math::new_fpslock <= ((Shared -> currentRefreshRate) ? ((Shared -> currentRefreshRate) / 2) : 30)) {
+			else if (NX_FPS_Math::new_fpslock <= (currentRefreshRate ? (currentRefreshRate / 2) : 30)) {
 				if (((nvnGetPresentInterval_0)(Address_weaks.nvnWindowGetPresentInterval))(nvnWindow) != 2)
 					NVN::SetPresentInterval(nvnWindow, -2);
-				if (NX_FPS_Math::new_fpslock != ((Shared -> currentRefreshRate) ? ((Shared -> currentRefreshRate) / 2) : 30)
+				if (NX_FPS_Math::new_fpslock != (currentRefreshRate ? (currentRefreshRate / 2) : 30)
 				|| (Shared -> ZeroSync)) {
 					NX_FPS_Math::FPStiming = (systemtickfrequency/NX_FPS_Math::new_fpslock) - 6000;
-					if (NX_FPS_Math::new_fpslock == ((Shared -> currentRefreshRate) ? ((Shared -> currentRefreshRate) / 2) : 30)) {
+					if (NX_FPS_Math::new_fpslock == (currentRefreshRate ? (currentRefreshRate / 2) : 30)) {
 						NX_FPS_Math::FPStiming -= 2000;
 					}
 				}
 				else NX_FPS_Math::FPStiming = 0;			
 			}
-			else if (NX_FPS_Math::new_fpslock > ((Shared -> currentRefreshRate) ? ((Shared -> currentRefreshRate) / 2) : 30)) {
+			else if (NX_FPS_Math::new_fpslock > (currentRefreshRate ? (currentRefreshRate / 2) : 30)) {
 				if (((nvnGetPresentInterval_0)(Address_weaks.nvnWindowGetPresentInterval))(nvnWindow) != 1) {
 					NVN::SetPresentInterval(nvnWindow, -2); //This allows in game with glitched interval to unlock 60 FPS, f.e. WRC Generations
 					NVN::SetPresentInterval(nvnWindow, -1);
 				}
-				if ((NX_FPS_Math::new_fpslock != ((Shared -> currentRefreshRate) ? (Shared -> currentRefreshRate) : 60))
+				if ((NX_FPS_Math::new_fpslock != (currentRefreshRate ? currentRefreshRate : 60))
 				|| (Shared -> ZeroSync)) {
 					NX_FPS_Math::FPStiming = (systemtickfrequency/NX_FPS_Math::new_fpslock) - 6000;
-					if (NX_FPS_Math::new_fpslock == ((Shared -> currentRefreshRate) ? (Shared -> currentRefreshRate) : 60)) {
+					if (NX_FPS_Math::new_fpslock == (currentRefreshRate ? currentRefreshRate : 60)) {
 						NX_FPS_Math::FPStiming -= 2000;
 					}
 				}
@@ -1117,6 +1145,8 @@ namespace NVN {
 		}
 		else if (!strcmp("nvnWindowSetNumActiveTextures", nvnFunction)) {
 			if (!Address_weaks.nvnWindowSetNumActiveTextures) Address_weaks.nvnWindowSetNumActiveTextures = address;
+			setNumActiveTexturesDetected = true;
+			Shared->expectedSetBuffers = 0;
 			return (uintptr_t)&WindowSetNumActiveTextures;
 		}
 		else if (!strcmp("nvnWindowBuilderSetTextures", nvnFunction)) {
@@ -1152,12 +1182,18 @@ namespace NVN {
 		else if (!strcmp("nvnTextureGetFormat", nvnFunction)) {
 			Address_weaks.nvnTextureGetFormat = address;
 		}
+		else if (!strcmp("nvnQueueFinish", nvnFunction)) {
+			Address_weaks.nvnQueueFinish = address;
+		}
+		else if (!strcmp("nvnWindowGetNumActiveTextures", nvnFunction)) {
+			Address_weaks.nvnWindowGetNumActiveTextures = address;
+		}
 		return address;
 	}
 
 	uintptr_t BootstrapLoader_1(const char* nvnName) {
 		if (strcmp(nvnName, "nvnDeviceGetProcAddress") == 0) {
-			(Shared -> API) = 1;
+			Shared->API = 1;
 			if (!Address_weaks.nvnDeviceGetProcAddress) Address_weaks.nvnDeviceGetProcAddress = ((nvnBootstrapLoader_0)(Address_weaks.nvnBootstrapLoader))("nvnDeviceGetProcAddress");
 			return (uintptr_t)&GetProcAddress0;
 		}
@@ -1197,6 +1233,7 @@ extern "C" {
 
 			Shared = (NxFpsSharedBlock*)((uintptr_t)shmemGetAddr(_sharedmemory) + SharedMemoryOffset);
 			Shared -> MAGIC = 0x465053;
+			Shared->expectedSetBuffers = -1;
 
 			uint64_t titid = 0;
 			svcGetInfo(&titid, InfoType_TitleId, CUR_PROCESS_HANDLE, 0);

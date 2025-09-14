@@ -1,1 +1,1 @@
-VERSION := 1.5.1-b2
+VERSION := 1.5.2

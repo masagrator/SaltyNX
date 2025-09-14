@@ -49,9 +49,11 @@ struct NxFpsSharedBlock {
 	uint8_t currentRefreshRate;
 	float readSpeedPerSecond;
 	uint8_t FPSlockedDocked;
+	uint64_t frameNumber;
+	int8_t expectedSetBuffers;
 } NX_PACKED;
 
-static_assert(sizeof(struct NxFpsSharedBlock) == 165);
+static_assert(sizeof(struct NxFpsSharedBlock) == 174);
 
 #ifdef SWITCH
     #define systemtickfrequency 19200000
