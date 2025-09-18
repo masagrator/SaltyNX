@@ -282,7 +282,6 @@ static_assert(systemtickfrequency != 0);
 
 bool changeFPS = false;
 bool changedFPS = false;
-void* WindowSync = 0;
 uint64_t startFrameTick = 0;
 
 size_t fileBytesRead = 0;
@@ -392,7 +391,7 @@ namespace NX_FPS_Math {
 
 		Shared -> FPSticks[FPStickItr++] = framedelta;
 		FPStickItr %= 10;
-		
+
 		frameavg = ((9*frameavg) + framedelta) / 10;
 		Stats.FPSavg = systemtickfrequency / (float)frameavg;
 
@@ -918,6 +917,8 @@ namespace EGL {
 }
 
 namespace NVN {
+	void* WindowSync = 0;
+
 	bool WindowInitialize(const NVNWindow* nvnWindow, struct nvnWindowBuilder* windowBuilder) {
 		if (!(Shared -> Buffers)) {
 			(Shared -> Buffers) = windowBuilder -> numBufferedFrames;
