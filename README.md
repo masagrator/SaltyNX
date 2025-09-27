@@ -42,7 +42,9 @@ Download newest version from [RELEASES](https://github.com/masagrator/SaltyNX/re
 
 Put `atmosphere` and `SaltySD` folders unpacked from zip archive to root of your sdcard.
 
-Remember to restart Switch
+Remember to restart Switch. 
+
+In case of any issues after updating, remove whole SaltySD folder and put fresh one from release.
 
 ---
 
