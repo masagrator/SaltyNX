@@ -44,7 +44,8 @@ Put `atmosphere` and `SaltySD` folders unpacked from zip archive to root of your
 
 Remember to restart Switch. 
 
-In case of any issues after updating, remove whole SaltySD folder and put fresh one from release.
+> [!IMPORTANT]
+> In case of any issues after updating, remove whole SaltySD folder and put fresh one from release.
 
 ---
 
