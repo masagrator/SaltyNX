@@ -391,7 +391,7 @@ namespace NX_FPS_Math {
 
 		Shared -> FPSticks[FPStickItr++] = framedelta;
 		FPStickItr %= 10;
-
+		
 		frameavg = ((9*frameavg) + framedelta) / 10;
 		Stats.FPSavg = systemtickfrequency / (float)frameavg;
 
@@ -917,7 +917,9 @@ namespace EGL {
 }
 
 namespace NVN {
+
 	void* WindowSync = 0;
+	bool blockWindowSet = true;
 
 	bool WindowInitialize(const NVNWindow* nvnWindow, struct nvnWindowBuilder* windowBuilder) {
 		if (!(Shared -> Buffers)) {
@@ -1146,8 +1148,10 @@ namespace NVN {
 		}
 		else if (!strcmp("nvnWindowSetNumActiveTextures", nvnFunction)) {
 			if (!Address_weaks.nvnWindowSetNumActiveTextures) Address_weaks.nvnWindowSetNumActiveTextures = address;
-			setNumActiveTexturesDetected = true;
-			Shared->expectedSetBuffers = 0;
+			if (!blockWindowSet) {
+				setNumActiveTexturesDetected = true;
+				Shared->expectedSetBuffers = 0;
+			}
 			return (uintptr_t)&WindowSetNumActiveTextures;
 		}
 		else if (!strcmp("nvnWindowBuilderSetTextures", nvnFunction)) {
@@ -1304,6 +1308,12 @@ extern "C" {
 				SaltySDCore_ReplaceImport("_ZN2nn2fs6detail12FileAccessor4ReadEPmlPvmRKNS0_10ReadOptionE", (void*)nn::FileAccessorRead);
 			}
 			else SaltySDCore_fclose(readFlag);
+
+			FILE* sync_file = SaltySDCore_fopen("sdmc:/SaltySD/flags/nvnUnblockWindowSet.flag", "rb");
+			if  (sync_file) {
+				SaltySDCore_fclose(sync_file);
+				NVN::blockWindowSet = false;
+			}
 
 			char titleid[17];
 			ltoa(titid, titleid, 16);
