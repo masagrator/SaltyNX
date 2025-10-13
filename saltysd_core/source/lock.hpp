@@ -145,7 +145,12 @@ namespace LOCK {
 		}
 		for (int i = 0; i < offsets_count; i++) {
 			uint32_t temp_offset = read32(buffer);
-			address += (int64_t)temp_offset;
+			if (region > 0 && region < 4) {
+				int32_t temp_offset_int = 0;
+				memcpy(&temp_offset_int, &temp_offset, 4);
+				address += (int64_t)temp_offset_int;
+			}
+			else address += (int64_t)temp_offset;
 			if (i+1 < offsets_count) {
 				if (unsafe_address && !isAddressValid(*(int64_t*)address)) return -2;
 				address = *(uint64_t*)address;
