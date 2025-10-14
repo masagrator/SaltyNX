@@ -41,7 +41,7 @@ EXEFS_SRC	:=	exefs_src
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
-ARCH			:=	-march=armv8-a+simd -mtune=cortex-a57 -mtp=soft -fPIE -mfloat-abi=softfp -fno-plt
+ARCH			:=	-march=armv6k -mtune=cortex-a57 -mtp=soft -fPIE -mfloat-abi=hard -fno-plt
 
 CFLAGS			:=	-Wall -Wno-pointer-to-int-cast -O2 \
 					-ffast-math -ffunction-sections \
