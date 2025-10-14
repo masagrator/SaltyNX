@@ -36,6 +36,13 @@ uint64_t tid = 0;
 
 static uint32_t sharedOperationMode = 0;
 
+typedef double (*strtod_0)(const char* str, char** endptr);
+uintptr_t strtod_ptr = 0;
+
+double strtod(const char* str, char** endptr) {
+	return ((strtod_0)(strtod_ptr))(str, endptr);
+}
+
 void __libnx_init(void* ctx, Handle main_thread, void* saved_lr)
 {
 	extern char* fake_heap_start;
@@ -288,6 +295,8 @@ int main(int argc, char *argv[])
 	Result ret;
 
 	SaltySDCore_RegisterExistingModules();
+
+	strtod_ptr = SaltySDCore_FindSymbolBuiltin("strtod");
 	
 	SaltySD_Init();
 	
