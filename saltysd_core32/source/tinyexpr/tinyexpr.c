@@ -237,6 +237,9 @@ static double divide(double a, double b) {return a / b;}
 static double negate(double a) {return -a;}
 static double comma(double a, double b) {(void)a; return b;}
 
+#define LINKABLE __attribute__ ((weak))
+extern double strtod(const char* str, char** endptr) LINKABLE;
+
 void next_token(state *s) {
     s->type = TOK_NULL;
 

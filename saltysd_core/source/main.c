@@ -381,7 +381,7 @@ void QueryMemoryInfo(void* memoryinfo) {
 }
 
 typedef double (*strtod_0)(const char* str, char** endptr);
-uint64_t strtod_ptr = 0;
+uintptr_t strtod_ptr = 0;
 
 double strtod(const char* str, char** endptr) {
 	return ((strtod_0)(strtod_ptr))(str, endptr);
