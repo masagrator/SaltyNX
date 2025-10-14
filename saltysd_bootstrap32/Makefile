@@ -39,7 +39,7 @@ EXEFS_SRC	:=	exefs_src
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
-ARCH			:=	-march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIC
+ARCH			:=	-march=armv6k -mtune=cortex-a57 -mtp=soft -fPIC
 
 CFLAGS				:=	-Wall -Wno-pointer-to-int-cast -O3 \
 					-ffast-math \
