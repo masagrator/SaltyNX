@@ -547,7 +547,7 @@ namespace vk {
 	}
 
 	namespace Common {
-		int32_t QueuePresent(const void* VkQueue_T, const void* VkPresentInfoKHR, uintptr_t pointer) {
+		NOINLINE int32_t QueuePresent(const void* VkQueue_T, const void* VkPresentInfoKHR, uintptr_t pointer) {
 
 			static bool check_redirection = false;
 			//Fix for games in which subsdk redirects internally vkQueuePresentKHR to nv::Swapchain
@@ -582,7 +582,7 @@ namespace vk {
 			return vulkanResult;
 		}
 
-		int32_t CreateSwapchain(void* Device, VkSwapchainCreateInfoKHR* pCreateInfo, const void* pAllocator, const void** pSwapchain, uintptr_t pointer) {
+		NOINLINE int32_t CreateSwapchain(void* Device, VkSwapchainCreateInfoKHR* pCreateInfo, const void* pAllocator, const void** pSwapchain, uintptr_t pointer) {
 			if ((Shared -> SetBuffers) > 0) {
 				pCreateInfo -> minImageCount = (Shared -> SetBuffers);
 			}
@@ -595,7 +595,7 @@ namespace vk {
 			return vulkanResult;
 		}
 
-		void* GetDeviceProcAddr(void* device, const char* vkFunction, uintptr_t pointer) {
+		NOINLINE void* GetDeviceProcAddr(void* device, const char* vkFunction, uintptr_t pointer) {
 			uintptr_t address = (uintptr_t)((vkGetDeviceProcAddr_0)(pointer))(device, vkFunction);
 			if (!strcmp("vkQueuePresentKHR", vkFunction)) {
 				if (!Address_weaks.vkQueuePresentKHR) Address_weaks.vkQueuePresentKHR = address;
@@ -624,7 +624,7 @@ namespace vk {
 			return (void*)address;
 		}
 
-		void* GetInstanceProcAddr(void* instance, const char* vkFunction, uintptr_t pointer) {
+		NOINLINE void* GetInstanceProcAddr(void* instance, const char* vkFunction, uintptr_t pointer) {
 			uintptr_t address = (uintptr_t)((_vkGetInstanceProcAddr_0)(pointer))(instance, vkFunction);
 			if (!strcmp("vkQueuePresentKHR", vkFunction)) {
 				if (!Address_weaks.vkQueuePresentKHR) Address_weaks.vkQueuePresentKHR = address;
@@ -792,7 +792,7 @@ namespace EGL {
 	}
 
 	namespace Common {
-		void ViewportArrayv(uint firstViewport, uint viewportCount, const glViewportArray* pViewports, uintptr_t pointer) {
+		NOINLINE void ViewportArrayv(uint firstViewport, uint viewportCount, const glViewportArray* pViewports, uintptr_t pointer) {
 			if (resolutionLookup) for (uint i = firstViewport; i < firstViewport+viewportCount; i++) {
 				if (pViewports[i].height > 1.f && pViewports[i].width > 1.f && pViewports[i].x == 0.f && pViewports[i].y == 0.f) {
 					NX_FPS_Math::addResToViewports(pViewports[i].width, pViewports[i].height);
@@ -801,14 +801,14 @@ namespace EGL {
 			return ((glViewportArrayv_0)(pointer))(firstViewport, viewportCount, pViewports);
 		}
 
-		void ViewportIndexedf(uint index, float x, float y, float width, float height, uintptr_t pointer) {
+		NOINLINE void ViewportIndexedf(uint index, float x, float y, float width, float height, uintptr_t pointer) {
 			if (resolutionLookup && height > 1.f && width > 1.f && !x && !y) {
 				NX_FPS_Math::addResToViewports(width, height);
 			}
 			return ((glViewportIndexedf_0)(pointer))(index, x, y, width, height);
 		}
 
-		void ViewportIndexedfv(uint i, const glViewportArray* pViewports, uintptr_t pointer) {
+		NOINLINE void ViewportIndexedfv(uint i, const glViewportArray* pViewports, uintptr_t pointer) {
 			if (resolutionLookup) {
 				if (pViewports[i].height > 1.f && pViewports[i].width > 1.f && pViewports[i].x == 0.f && pViewports[i].y == 0.f) {
 					NX_FPS_Math::addResToViewports(pViewports[i].width, pViewports[i].height);
