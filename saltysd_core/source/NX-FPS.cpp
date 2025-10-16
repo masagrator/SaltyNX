@@ -45,6 +45,13 @@ struct NVNViewport {
 	float height;
 };
 
+struct NVNScissor {
+	int x;
+	int y;
+	int width;
+	int height;
+};
+
 struct VkViewport {
 	float    x;
 	float    y;
@@ -76,6 +83,8 @@ typedef u32 (*nvnTextureGetFormat_0)(const NVNTexture* texture);
 typedef void* (*nvnCommandBufferSetRenderTargets_0)(const void* cmdBuf, int numTextures, const NVNTexture** texture, const NVNTextureView** textureView, const NVNTexture* depth, const NVNTextureView* depthView);
 typedef void* (*nvnCommandBufferSetViewport_0)(const void* cmdBuf, int x, int y, int width, int height);
 typedef void* (*nvnCommandBufferSetViewports_0)(void* cmdBuf, int start, int count, const NVNViewport* viewports);
+typedef void* (*nvnCommandBufferSetScissor_0)(const void* cmdBuf, int x, int y, int width, int height);
+typedef void* (*nvnCommandBufferSetScissors_0)(void* cmdBuf, int start, int count, const NVNScissor* viewports);
 typedef void* (*nvnCommandBufferSetDepthRange_0)(void* cmdBuf, float s0, float s1);
 typedef void (*nvnQueuePresentTexture_0)(const void* _this, const void* unk2_1, int index);
 typedef uintptr_t (*GetProcAddress)(const void* unk1_a, const char * nvnFunction_a);
@@ -134,6 +143,8 @@ struct {
 	uintptr_t nvnCommandBufferSetRenderTargets;
 	uintptr_t nvnCommandBufferSetViewport;
 	uintptr_t nvnCommandBufferSetViewports;
+	uintptr_t nvnCommandBufferSetScissor;
+	uintptr_t nvnCommandBufferSetScissors;
 	uintptr_t nvnCommandBufferSetDepthRange;
 	uintptr_t nvnQueueFinish;
 
@@ -1096,10 +1107,14 @@ namespace NVN {
 		char reserved[0x80];
 	};
 
-	void* CommandBufferSetViewports(nvnCommandBuffer* cmdBuf, int start, int count, NVNViewport* viewports) {
+	std::pair<int, int> last_viewport = {0, 0};
+
+	void* CommandBufferSetViewports(nvnCommandBuffer* cmdBuf, int start, int count, const NVNViewport* viewports) {
 		if (resolutionLookup) for (int i = start; i < start+count; i++) {
 			if (viewports[i].height > 1.f && viewports[i].width > 1.f && viewports[i].x == 0.f && viewports[i].y == 0.f) {
 				NX_FPS_Math::addResToViewports(viewports[i].width, viewports[i].height);
+				last_viewport.first = (int)viewports[i].width;
+				last_viewport.second = (int)viewports[i].height;
 			}
 		}
 		return ((nvnCommandBufferSetViewports_0)(Address_weaks.nvnCommandBufferSetViewports))(cmdBuf, start, count, viewports);
@@ -1108,8 +1123,26 @@ namespace NVN {
 	void* CommandBufferSetViewport(const nvnCommandBuffer* cmdBuf, int x, int y, int width, int height) {
 		if (resolutionLookup && height > 1 && width > 1 && !x && !y) {
 			NX_FPS_Math::addResToViewports(width, height);
+				last_viewport.first = width;
+				last_viewport.second = height;
 		}
 		return ((nvnCommandBufferSetViewport_0)(Address_weaks.nvnCommandBufferSetViewport))(cmdBuf, x, y, width, height);
+	}
+
+	void* CommandBufferSetScissors(nvnCommandBuffer* cmdBuf, int start, int count, const NVNScissor* viewports) {
+		if (resolutionLookup) for (int i = start; i < start+count; i++) {
+			if (viewports[i].height > 1 && viewports[i].width > 1 && viewports[i].x == 0 && viewports[i].y == 0 && viewports[i].height != last_viewport.second && viewports[i].width != last_viewport.first) {
+				NX_FPS_Math::addResToViewports(viewports[i].width, viewports[i].height);
+			}
+		}
+		return ((nvnCommandBufferSetScissors_0)(Address_weaks.nvnCommandBufferSetScissors))(cmdBuf, start, count, viewports);
+	}
+
+	void* CommandBufferSetScissor(const nvnCommandBuffer* cmdBuf, int x, int y, int width, int height) {
+		if (resolutionLookup && height > 1 && width > 1 && !x && !y && width != last_viewport.first && height != last_viewport.second) {
+			NX_FPS_Math::addResToViewports(width, height);
+		}
+		return ((nvnCommandBufferSetScissor_0)(Address_weaks.nvnCommandBufferSetScissor))(cmdBuf, x, y, width, height);
 	}
 
 	void* CommandBufferSetRenderTargets(const nvnCommandBuffer* cmdBuf, int numTextures, const NVNTexture** texture, const NVNTextureView** textureView, const NVNTexture* depthTexture, const NVNTextureView* depthView) {
@@ -1174,6 +1207,14 @@ namespace NVN {
 		else if (!strcmp("nvnCommandBufferSetViewports", nvnFunction)) {
 			if (!Address_weaks.nvnCommandBufferSetViewports) Address_weaks.nvnCommandBufferSetViewports = address;
 			return (uintptr_t)&CommandBufferSetViewports;
+		}
+		else if (!strcmp("nvnCommandBufferSetScissor", nvnFunction)) {
+			if (!Address_weaks.nvnCommandBufferSetScissor) Address_weaks.nvnCommandBufferSetScissor = address;
+			return (uintptr_t)&CommandBufferSetScissor;
+		}
+		else if (!strcmp("nvnCommandBufferSetScissors", nvnFunction)) {
+			if (!Address_weaks.nvnCommandBufferSetScissors) Address_weaks.nvnCommandBufferSetScissors = address;
+			return (uintptr_t)&CommandBufferSetScissors;
 		}
 		else if (!strcmp("nvnTextureGetWidth", nvnFunction)) {
 			Address_weaks.nvnTextureGetWidth = address;
