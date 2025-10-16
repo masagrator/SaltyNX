@@ -37,7 +37,6 @@ SOURCES		:=	source
 DATA		:=	data
 INCLUDES	:=	include
 EXEFS_SRC	:=	exefs_src
-OUTPUT_FILE :=  toolbox.json
 
 #---------------------------------------------------------------------------------
 # options for code generation
@@ -160,8 +159,7 @@ $(BUILD):
 #---------------------------------------------------------------------------------
 clean:
 	@echo clean ...
-	@rm -fr $(BUILD) $(TARGET).nsp $(TARGET).npdm $(TARGET).pfs0 $(TARGET).nso $(TARGET).nro $(OUTPUT).kip $(TARGET).nsp $(TARGET).nacp $(TARGET).elf $(DATA)/*.elf
-	@rm -f $(OUTPUT_FILE)
+	@rm -fr $(BUILD) $(TARGET).nsp $(TARGET).npdm $(TARGET).pfs0 $(TARGET).nso $(TARGET).nro $(OUTPUT).kip $(TARGET).nsp $(TARGET).nacp $(TARGET).elf $(DATA)/*.elf toolbox.json
 
 
 #---------------------------------------------------------------------------------
