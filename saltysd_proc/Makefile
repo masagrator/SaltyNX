@@ -37,6 +37,7 @@ SOURCES		:=	source
 DATA		:=	data
 INCLUDES	:=	include
 EXEFS_SRC	:=	exefs_src
+OUTPUT_FILE :=  toolbox.json
 
 #---------------------------------------------------------------------------------
 # options for code generation
@@ -154,11 +155,13 @@ all: $(BUILD)
 $(BUILD):
 	@[ -d $@ ] || mkdir -p $@
 	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
+	@echo "{\n  \"name\": \"SaltyNX\",\n  \"tid\": \"0000000000534C56\",\n  \"requires_reboot\": true,\n  \"version\": \"$(VERSION)\"\n}" > toolbox.json
 
 #---------------------------------------------------------------------------------
 clean:
 	@echo clean ...
 	@rm -fr $(BUILD) $(TARGET).nsp $(TARGET).npdm $(TARGET).pfs0 $(TARGET).nso $(TARGET).nro $(OUTPUT).kip $(TARGET).nsp $(TARGET).nacp $(TARGET).elf $(DATA)/*.elf
+	@rm -f $(OUTPUT_FILE)
 
 
 #---------------------------------------------------------------------------------
