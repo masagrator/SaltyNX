@@ -41,7 +41,6 @@ sdcard_out/atmosphere/contents/0000000000534C56/exefs.nsp: saltysd_core/saltysd_
 	@mkdir -p sdcard_debug/atmosphere/contents/0000000000534C56/
 	@touch sdcard_out/SaltySD/flags/log.flag
 	@cp exceptions.txt sdcard_out/SaltySD/exceptions.txt
-	@cp toolbox.json sdcard_out/atmosphere/contents/0000000000534C56/toolbox.json
 	@cp saltysd_core32/saltysd_core32.elf sdcard_out/SaltySD/saltysd_core32.elf
 	@cp saltysd_core32/saltysd_core32.dbg sdcard_debug/SaltySD/saltysd_core32.dbg
 	@cp saltysd_core/saltysd_core.elf sdcard_out/SaltySD/saltysd_core.elf
@@ -54,6 +53,7 @@ sdcard_out/atmosphere/contents/0000000000534C56/exefs.nsp: saltysd_core/saltysd_
 	@cp saltysd_bootstrap32/saltysd_bootstrap32_5k.dbg sdcard_debug/SaltySD/saltysd_bootstrap32_5k.dbg
 	@cp saltysd_proc/saltysd_proc.nsp sdcard_out/atmosphere/contents/0000000000534C56/exefs.nsp
 	@cp saltysd_proc/saltysd_proc.elf sdcard_debug/atmosphere/contents/0000000000534C56/exefs.elf
+	@cp saltysd_proc/toolbox.json sdcard_out/atmosphere/contents/0000000000534C56/toolbox.json
 	@cp -r exefs_patches/ sdcard_out/atmosphere/
 
 clean:
