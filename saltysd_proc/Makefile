@@ -154,8 +154,13 @@ all: $(BUILD)
 $(BUILD):
 	@[ -d $@ ] || mkdir -p $@
 	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
-	@echo "{\n  \"name\": \"SaltyNX\",\n  \"tid\": \"0000000000534C56\",\n  \"requires_reboot\": true,\n  \"version\": \"$(VERSION)\"\n}" > toolbox.json
-
+# Doing it in one line results in wrong output on Arch Linux
+	@echo "{" > toolbox.json
+	@echo "    \"name\": \"SaltyNX\"," >> toolbox.json
+	@echo "    \"tid\": \"0000000000534C56\"," >> toolbox.json
+	@echo "    \"requires_reboot\": true," >> toolbox.json
+	@echo "    \"version\": \"$(VERSION)\"" >> toolbox.json
+	@echo "}" >> toolbox.json
 #---------------------------------------------------------------------------------
 clean:
 	@echo clean ...
