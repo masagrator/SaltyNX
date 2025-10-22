@@ -502,7 +502,7 @@ namespace NX_FPS_Math {
 	}
 
 	template <typename T> void addResToRender(T m_width, T m_height) {
-		if (m_height <= (T)160  || (m_height > (T)1440)) return;
+		if ((m_height <= (T)160) || (m_height > (T)1440)) return;
 		T ratio = (m_width * 10) / m_height;
 		if (ratio >= (T)6 && ratio <= (T)18) {
 			union {
