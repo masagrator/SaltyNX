@@ -50,7 +50,7 @@ struct {
 	uintptr_t InitializeMultiWaitHolderForSystemEvent;
 	uintptr_t LinkMultiWaitHolder;
 	uintptr_t WaitAny;
-	uintptr_t TimedWaitAny;	
+	uintptr_t TimedWaitAny;
 } Address_weaks;
 
 enum res_mode {
@@ -69,7 +69,7 @@ std::pair<int, int> resolutions[] = {{0 ,0}, {854, 480}, {960, 540}, {1120, 630}
 
 struct Shared {
 	uint32_t MAGIC;
-	bool isDocked;
+	int8_t isDocked;
 	bool def;
 	bool pluginActive;
 	struct {
@@ -378,7 +378,7 @@ extern "C" {
 				ReverseNX_RT->def = false;
 			}
 			else {
-				ReverseNX_RT->isDocked = false;
+				ReverseNX_RT->isDocked = ReverseNX_Switch_Invalid;
 				ReverseNX_RT->def = true;				
 			}
 			Address_weaks.GetPerformanceMode = SaltySDCore_FindSymbolBuiltin("_ZN2nn2oe18GetPerformanceModeEv");
