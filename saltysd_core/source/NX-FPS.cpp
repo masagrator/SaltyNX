@@ -414,7 +414,7 @@ namespace NX_FPS_Math {
 		for (size_t i = 0; i < MemoryAllocator.amount; i++) {
 			totalFreeSize += ((_ZNK2nn3mem17StandardAllocator16GetTotalFreeSizeEv_0)(Address_weaks.StandardAllocatorGetTotalFreeSize))(MemoryAllocator.addresses[i]);
 		}
-		Shared->unusedHeap = (unsigned int)totalFreeSize;
+		Shared->unusedHeap = totalFreeSize;
 		Shared->frameNumber++;
 		uint64_t endtick = Utils::_getSystemTick();
 		uint64_t framedelta = endtick - frameend;
