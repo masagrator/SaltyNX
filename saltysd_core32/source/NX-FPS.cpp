@@ -51,6 +51,11 @@ struct glViewportArray {
 	float height;
 };
 
+struct {
+	uintptr_t addresses[16];
+	uint8_t amount;
+} MemoryAllocator;
+
 typedef u32 (*nvnBootstrapLoader_0)(const char * nvnName);
 typedef void* (*nvnCommandBufferSetRenderTargets_0)(void* cmdBuf, int numTextures, NVNTexture** texture, NVNTextureView** textureView, NVNTexture* depth, NVNTextureView* depthView);
 typedef void* (*nvnCommandBufferSetViewport_0)(void* cmdBuf, int x, int y, int width, int height);
@@ -97,6 +102,9 @@ typedef u64 (*_ZN2nn2os22GetSystemTickFrequencyEv_0)();
 typedef void (*_ZN2nn2os22GetSystemTickFrequencyEv_1)(u64* tickfrequency);
 typedef AppletFocusState (*GetCurrentFocusState_0)();
 typedef u32 (*FileAccessorRead_0)(void* fileHandle, size_t* bytesRead, int64_t position, void* buffer, size_t readBytes, unsigned int* ReadOption);
+typedef void (*_ZN2nn3mem17StandardAllocator10InitializeEPvjb_0)(uintptr_t _this, void* buffer, size_t size, bool unk);
+typedef void (*_ZN2nn3mem17StandardAllocator8FinalizeEv_0)(uintptr_t _this);
+typedef size_t (*_ZNK2nn3mem17StandardAllocator16GetTotalFreeSizeEv_0)(uintptr_t _this);
 
 struct {
 	uintptr_t nvnBootstrapLoader;
@@ -144,6 +152,9 @@ struct {
 	uintptr_t ReferSymbol;
 	uintptr_t GetCurrentFocusState;
 	uintptr_t FileAccessorRead;
+	uintptr_t StandardAllocatorInitialize;
+	uintptr_t StandardAllocatorFinalize;
+	uintptr_t StandardAllocatorGetTotalFreeSize;
 } Address_weaks;
 
 ptrdiff_t SharedMemoryOffset = 1234;
@@ -228,9 +239,11 @@ struct NxFpsSharedBlock {
 	uint8_t FPSlockedDocked;
 	uint64_t frameNumber;
 	int8_t expectedSetBuffers;
+	uint32_t unusedHeap;
+	bool tooLowAmount;
 } PACKED;
 
-static_assert(sizeof(NxFpsSharedBlock) == 174);
+static_assert(sizeof(NxFpsSharedBlock) == 179);
 
 NxFpsSharedBlock* Shared = 0;
 
@@ -345,6 +358,11 @@ namespace NX_FPS_Math {
 	}
 
 	void PostFrame() {
+		size_t totalFreeSize = 0;
+		for (size_t i = 0; i < MemoryAllocator.amount; i++) {
+			totalFreeSize += ((_ZNK2nn3mem17StandardAllocator16GetTotalFreeSizeEv_0)(Address_weaks.StandardAllocatorGetTotalFreeSize))(MemoryAllocator.addresses[i]);
+		}
+		Shared->unusedHeap = totalFreeSize;
 		Shared->frameNumber++;
 		endtick = Utils::_getSystemTick();
 		uint64_t framedelta = endtick - frameend;
@@ -1081,6 +1099,26 @@ namespace nn {
 		fileBytesRead += *bytesRead;
 		return ret;
 	}
+
+	void StandardAllocatorInitialize(uintptr_t _this, void* buffer, size_t size, bool unk) {
+		((_ZN2nn3mem17StandardAllocator10InitializeEPvjb_0)(Address_weaks.StandardAllocatorInitialize))(_this, buffer, size, unk);
+		if (MemoryAllocator.amount < 16) {
+			MemoryAllocator.addresses[MemoryAllocator.amount] = _this;
+			MemoryAllocator.amount++;
+		}
+		else Shared->tooLowAmount = true;
+	}
+
+	void StandardAllocatorFinalize(uintptr_t _this) {
+		((_ZN2nn3mem17StandardAllocator8FinalizeEv_0)(Address_weaks.StandardAllocatorFinalize))(_this);
+		for (size_t i = 0; i < MemoryAllocator.amount; i++) {
+			if (MemoryAllocator.addresses[i] == _this) {
+				std::copy(&MemoryAllocator.addresses[i+1], &MemoryAllocator.addresses[MemoryAllocator.amount], &MemoryAllocator.addresses[i]);
+				MemoryAllocator.amount--;
+				break;
+			}
+		}
+	}
 }
 
 extern "C" {
@@ -1120,6 +1158,13 @@ extern "C" {
 			Address_weaks.glViewportIndexedf = SaltySDCore_FindSymbolBuiltin("glViewportIndexedf");
 			Address_weaks.glViewportIndexedfv = SaltySDCore_FindSymbolBuiltin("glViewportIndexedfv");
 			Address_weaks.GetCurrentFocusState = SaltySDCore_FindSymbolBuiltin("_ZN2nn2oe20GetCurrentFocusStateEv");
+			#if defined(SWITCH32) || defined(OUNCE32)
+			Address_weaks.StandardAllocatorInitialize = SaltySDCore_FindSymbolBuiltin("_ZN2nn3mem17StandardAllocator10InitializeEPvjb");
+			#else
+			Address_weaks.StandardAllocatorInitialize = SaltySDCore_FindSymbolBuiltin("_ZN2nn3mem17StandardAllocator10InitializeEPvmb");
+			#endif
+			Address_weaks.StandardAllocatorFinalize = SaltySDCore_FindSymbolBuiltin("_ZN2nn3mem17StandardAllocator8FinalizeEv");
+			Address_weaks.StandardAllocatorGetTotalFreeSize = SaltySDCore_FindSymbolBuiltin("_ZNK2nn3mem17StandardAllocator16GetTotalFreeSizeEv");
 			SaltySDCore_ReplaceImport("nvnBootstrapLoader", (void*)NVN::BootstrapLoader_1);
 			SaltySDCore_ReplaceImport("eglSwapBuffers", (void*)EGL::Swap);
 			SaltySDCore_ReplaceImport("eglSwapInterval", (void*)EGL::Interval);
@@ -1137,11 +1182,21 @@ extern "C" {
 			SaltySDCore_ReplaceImport("vkQueuePresentKHR", (void*)vk::QueuePresent);
 			SaltySDCore_ReplaceImport("_ZN11NvSwapchain15QueuePresentKHREP9VkQueue_TPK16VkPresentInfoKHR", (void*)vk::nvSwapchain::QueuePresent);
 			SaltySDCore_ReplaceImport("vkGetInstanceProcAddr", (void*)vk::GetInstanceProcAddr);
+			#if defined(SWITCH32) || defined(OUNCE32)
+			SaltySDCore_ReplaceImport("_ZN2nn3mem17StandardAllocator10InitializeEPvjb", (void*)nn::StandardAllocatorInitialize);
+			#else
+			SaltySDCore_ReplaceImport("_ZN2nn3mem17StandardAllocator10InitializeEPvmb", (void*)nn::StandardAllocatorInitialize);
+			#endif
+			SaltySDCore_ReplaceImport("_ZN2nn3mem17StandardAllocator8FinalizeEv", (void*)nn::StandardAllocatorFinalize);
 			FILE* readFlag = SaltySDCore_fopen("sdmc:/SaltySD/flags/blockfilestats.flag", "rb");
 			if (!readFlag) {
-				//For 32-bit it's different
+				#if defined(SWITCH32) || defined(OUNCE32)
 				Address_weaks.FileAccessorRead = SaltySDCore_FindSymbolBuiltin("_ZN2nn2fs6detail12FileAccessor4ReadEPjxPvjRKNS0_10ReadOptionE");		
 				SaltySDCore_ReplaceImport("_ZN2nn2fs6detail12FileAccessor4ReadEPjxPvjRKNS0_10ReadOptionE", (void*)nn::FileAccessorRead);
+				#else
+				Address_weaks.FileAccessorRead = SaltySDCore_FindSymbolBuiltin("_ZN2nn2fs6detail12FileAccessor4ReadEPmlPvmRKNS0_10ReadOptionE");		
+				SaltySDCore_ReplaceImport("_ZN2nn2fs6detail12FileAccessor4ReadEPmlPvmRKNS0_10ReadOptionE", (void*)nn::FileAccessorRead);
+				#endif
 			}
 			else SaltySDCore_fclose(readFlag);
 
