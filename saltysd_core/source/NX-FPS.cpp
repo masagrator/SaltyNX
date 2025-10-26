@@ -1401,9 +1401,13 @@ extern "C" {
 			}
 			FILE* readFlag = SaltySDCore_fopen("sdmc:/SaltySD/flags/blockfilestats.flag", "rb");
 			if (!readFlag) {
-				//For 32-bit it's different
+				#if defined(SWITCH32) || defined(OUNCE32)
+				Address_weaks.FileAccessorRead = SaltySDCore_FindSymbolBuiltin("_ZN2nn2fs6detail12FileAccessor4ReadEPjxPvjRKNS0_10ReadOptionE");		
+				SaltySDCore_ReplaceImport("_ZN2nn2fs6detail12FileAccessor4ReadEPjxPvjRKNS0_10ReadOptionE", (void*)nn::FileAccessorRead);
+				#else
 				Address_weaks.FileAccessorRead = SaltySDCore_FindSymbolBuiltin("_ZN2nn2fs6detail12FileAccessor4ReadEPmlPvmRKNS0_10ReadOptionE");		
 				SaltySDCore_ReplaceImport("_ZN2nn2fs6detail12FileAccessor4ReadEPmlPvmRKNS0_10ReadOptionE", (void*)nn::FileAccessorRead);
+				#endif
 			}
 			else SaltySDCore_fclose(readFlag);
 
