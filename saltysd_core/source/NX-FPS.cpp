@@ -1141,10 +1141,6 @@ namespace NVN {
 
 	void* CommandBufferSetViewport(const nvnCommandBuffer* cmdBuf, int x, int y, int width, int height) {
 		if (resolutionLookup && height > 1 && width > 1 && !x && !y) {
-			if (width == 1600 && height == 900) {
-				width = 1920;
-				height = 1080;
-			}
 			NX_FPS_Math::addResToViewports(width, height);
 				last_viewport.first = width;
 				last_viewport.second = height;
@@ -1163,10 +1159,6 @@ namespace NVN {
 
 	void* CommandBufferSetScissor(const nvnCommandBuffer* cmdBuf, int x, int y, int width, int height) {
 		if (resolutionLookup && height > 1 && width > 1 && !x && !y && width != last_viewport.first && height != last_viewport.second) {
-			if (width == 1600 && height == 900) {
-				width = 1920;
-				height = 1080;
-			}
 			NX_FPS_Math::addResToViewports(width, height);
 		}
 		return ((nvnCommandBufferSetScissor_0)(Address_weaks.nvnCommandBufferSetScissor))(cmdBuf, x, y, width, height);
