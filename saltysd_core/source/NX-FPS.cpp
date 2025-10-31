@@ -1342,7 +1342,7 @@ extern "C" {
 			SaltySDCore_ReplaceImport("vkCmdSetViewport", (void*)vk::CmdSetViewport);
 			SaltySDCore_ReplaceImport("vkCmdSetViewportWithCount", (void*)vk::CmdSetViewportWithCount);
 			SaltySDCore_ReplaceImport("vkCreateSwapchainKHR", (void*)vk::CreateSwapchain);
-			SaltySDCore_ReplaceImport("_ZN2nn2oe20GetCurrentFocusStateEv", (void*)nn::getCurrentFocusState)
+			SaltySDCore_ReplaceImport("_ZN2nn2oe20GetCurrentFocusStateEv", (void*)nn::getCurrentFocusState);
 			if (Address_weaks.vkGetInstanceProcAddr) {
 				//Minecraft is using nn::ro::LookupSymbol to search for Vulkan functions
 				SaltySDCore_ReplaceImport("_ZN2nn2ro12LookupSymbolEPmPKc", (void*)vk::LookupSymbol);

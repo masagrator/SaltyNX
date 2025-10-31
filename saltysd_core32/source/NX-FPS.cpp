@@ -228,9 +228,10 @@ struct NxFpsSharedBlock {
 	uint8_t FPSlockedDocked;
 	uint64_t frameNumber;
 	int8_t expectedSetBuffers;
+	uint8_t currentFocusState;
 } PACKED;
 
-static_assert(sizeof(NxFpsSharedBlock) == 174);
+static_assert(sizeof(NxFpsSharedBlock) == 175);
 
 NxFpsSharedBlock* Shared = 0;
 
@@ -280,6 +281,23 @@ inline uintptr_t getMainAddress() {
 	return 0;
 }
 
+namespace nn {
+	Result FileAccessorRead(void* fileHandle, size_t* bytesRead, int64_t position, void* buffer, size_t readBytes, unsigned int* ReadOption) {
+		size_t bytesRead_impl = 0;
+		if (!bytesRead)
+			bytesRead = &bytesRead_impl;
+		Result ret = ((FileAccessorRead_0)(Address_weaks.FileAccessorRead))(fileHandle, bytesRead, position, buffer, readBytes, ReadOption);
+		fileBytesRead += *bytesRead;
+		return ret;
+	}
+
+	AppletFocusState getCurrentFocusState() {
+		AppletFocusState state = ((GetCurrentFocusState_0)(Address_weaks.GetCurrentFocusState))();
+		if (Shared->currentFocusState != state) Shared->currentFocusState = state;
+		return state;
+	}
+}
+
 namespace Utils {
 	inline uint64_t _getSystemTick() {
 		#if SWITCH
@@ -304,7 +322,7 @@ namespace Utils {
 	}
 
 	inline AppletFocusState _getCurrentFocusState() {
-		return ((GetCurrentFocusState_0)(Address_weaks.GetCurrentFocusState))();
+		return nn::getCurrentFocusState();
 	}
 }
 
@@ -1072,17 +1090,6 @@ namespace NVN {
 	}
 }
 
-namespace nn {
-	Result FileAccessorRead(void* fileHandle, size_t* bytesRead, int64_t position, void* buffer, size_t readBytes, unsigned int* ReadOption) {
-		size_t bytesRead_impl = 0;
-		if (!bytesRead)
-			bytesRead = &bytesRead_impl;
-		Result ret = ((FileAccessorRead_0)(Address_weaks.FileAccessorRead))(fileHandle, bytesRead, position, buffer, readBytes, ReadOption);
-		fileBytesRead += *bytesRead;
-		return ret;
-	}
-}
-
 extern "C" {
 
 	void NX_FPS(SharedMemory* _sharedmemory, uint32_t* _sharedOperationMode) {
@@ -1137,6 +1144,7 @@ extern "C" {
 			SaltySDCore_ReplaceImport("vkQueuePresentKHR", (void*)vk::QueuePresent);
 			SaltySDCore_ReplaceImport("_ZN11NvSwapchain15QueuePresentKHREP9VkQueue_TPK16VkPresentInfoKHR", (void*)vk::nvSwapchain::QueuePresent);
 			SaltySDCore_ReplaceImport("vkGetInstanceProcAddr", (void*)vk::GetInstanceProcAddr);
+			SaltySDCore_ReplaceImport("_ZN2nn2oe20GetCurrentFocusStateEv", (void*)nn::getCurrentFocusState);
 			FILE* readFlag = SaltySDCore_fopen("sdmc:/SaltySD/flags/blockfilestats.flag", "rb");
 			if (!readFlag) {
 				//For 32-bit it's different
