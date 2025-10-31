@@ -270,9 +270,10 @@ struct NxFpsSharedBlock {
 	uint8_t FPSlockedDocked;
 	uint64_t frameNumber;
 	int8_t expectedSetBuffers;
+	uint8_t currentFocusState;
 } PACKED;
 
-static_assert(sizeof(NxFpsSharedBlock) == 174);
+static_assert(sizeof(NxFpsSharedBlock) == 175);
 
 NxFpsSharedBlock* Shared = 0;
 
@@ -332,6 +333,27 @@ inline uintptr_t getMainAddress() {
 	return 0;
 }
 
+namespace nn {
+	Result FileAccessorRead(void* fileHandle, size_t* bytesRead, int64_t position, void* buffer, size_t readBytes, unsigned int* ReadOption) {
+		size_t bytesRead_impl = 0;
+		if (!bytesRead)
+			bytesRead = &bytesRead_impl;
+		Result ret = ((FileAccessorRead_0)(Address_weaks.FileAccessorRead))(fileHandle, bytesRead, position, buffer, readBytes, ReadOption);
+		fileBytesRead += *bytesRead;
+		return ret;
+	}
+
+	Result SetUserInactivityDetectionTimeExtended(bool isTrue) {
+		return ((SetUserInactivityDetectionTimeExtended_0)(Address_weaks.SetUserInactivityDetectionTimeExtended))(isTrue);
+	}
+
+	AppletFocusState getCurrentFocusState() {
+		AppletFocusState state = ((GetCurrentFocusState_0)(Address_weaks.GetCurrentFocusState))();
+		if (Shared->currentFocusState != state) Shared->currentFocusState = state;
+		return state;
+	}
+}
+
 namespace Utils {
 	inline uint64_t _getSystemTick() {
 		#if defined(SWITCH) || defined(OUNCE)
@@ -356,7 +378,7 @@ namespace Utils {
 	}
 
 	inline AppletFocusState _getCurrentFocusState() {
-		return ((GetCurrentFocusState_0)(Address_weaks.GetCurrentFocusState))();
+		return nn::getCurrentFocusState();
 	}
 }
 
@@ -1245,21 +1267,6 @@ namespace NVN {
 	}
 }
 
-namespace nn {
-	Result FileAccessorRead(void* fileHandle, size_t* bytesRead, int64_t position, void* buffer, size_t readBytes, unsigned int* ReadOption) {
-		size_t bytesRead_impl = 0;
-		if (!bytesRead)
-			bytesRead = &bytesRead_impl;
-		Result ret = ((FileAccessorRead_0)(Address_weaks.FileAccessorRead))(fileHandle, bytesRead, position, buffer, readBytes, ReadOption);
-		fileBytesRead += *bytesRead;
-		return ret;
-	}
-
-	Result SetUserInactivityDetectionTimeExtended(bool isTrue) {
-		return ((SetUserInactivityDetectionTimeExtended_0)(Address_weaks.SetUserInactivityDetectionTimeExtended))(isTrue);
-	}
-}
-
 extern "C" {
 
 	void NX_FPS(SharedMemory* _sharedmemory, uint32_t* _sharedOperationMode) {
@@ -1335,6 +1342,7 @@ extern "C" {
 			SaltySDCore_ReplaceImport("vkCmdSetViewport", (void*)vk::CmdSetViewport);
 			SaltySDCore_ReplaceImport("vkCmdSetViewportWithCount", (void*)vk::CmdSetViewportWithCount);
 			SaltySDCore_ReplaceImport("vkCreateSwapchainKHR", (void*)vk::CreateSwapchain);
+			SaltySDCore_ReplaceImport("_ZN2nn2oe20GetCurrentFocusStateEv", (void*)nn::getCurrentFocusState)
 			if (Address_weaks.vkGetInstanceProcAddr) {
 				//Minecraft is using nn::ro::LookupSymbol to search for Vulkan functions
 				SaltySDCore_ReplaceImport("_ZN2nn2ro12LookupSymbolEPmPKc", (void*)vk::LookupSymbol);
