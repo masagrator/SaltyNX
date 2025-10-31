@@ -297,6 +297,13 @@ namespace nn {
 	bool focusHandlingOverwrite = false;
 
 	void setFocusHandlingMode(AppletFocusHandlingMode mode) {
+		static AppletFocusHandlingMode last_mode = AppletFocusHandlingMode_SuspendHomeSleep;
+		static bool Initialized = false;
+		if (!Initialized) {
+			Initialized = true;
+		}
+		else if (last_mode == mode) return;
+		last_mode = mode;
 		if (!focusHandlingOverwrite) defaultFocusHandlingMode = mode;
 		return ((SetFocusHandlingMode_0)(Address_weaks.SetFocusHandlingMode))(mode);
 	}
