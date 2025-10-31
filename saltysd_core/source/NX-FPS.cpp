@@ -115,6 +115,7 @@ typedef s32 (*vkGetSwapchainImagesKHR_0)(void* Device, void* VkSwapchainKHR, uin
 typedef s32 (*vkQueuePresentKHR_0)(const void* vkQueue, const void* VkPresentInfoKHR);
 
 typedef AppletFocusState (*GetCurrentFocusState_0)();
+typedef void (*SetFocusHandlingMode_0)(AppletFocusHandlingMode mode);
 typedef u32 (*FileAccessorRead_0)(void* fileHandle, size_t* bytesRead, int64_t position, void* buffer, size_t readBytes, unsigned int* ReadOption);
 typedef u64 (*_ZN2nn2os17ConvertToTimeSpanENS0_4TickE_0)(u64 tick);
 typedef u64 (*_ZN2nn2os13GetSystemTickEv_0)();
@@ -180,6 +181,7 @@ struct {
 	uintptr_t GetSystemTick;
 	uintptr_t GetSystemTickFrequency;
 	uintptr_t GetCurrentFocusState;
+	uintptr_t SetFocusHandlingMode;
 	uintptr_t FileAccessorRead;
 	uintptr_t ConvertToTimeSpan;
 	uintptr_t SetUserInactivityDetectionTimeExtended;
@@ -270,9 +272,10 @@ struct NxFpsSharedBlock {
 	uint8_t FPSlockedDocked;
 	uint64_t frameNumber;
 	int8_t expectedSetBuffers;
+	uint8_t currentFocusState;
 } PACKED;
 
-static_assert(sizeof(NxFpsSharedBlock) == 174);
+static_assert(sizeof(NxFpsSharedBlock) == 175);
 
 NxFpsSharedBlock* Shared = 0;
 
@@ -332,6 +335,42 @@ inline uintptr_t getMainAddress() {
 	return 0;
 }
 
+namespace nn {
+	Result FileAccessorRead(void* fileHandle, size_t* bytesRead, int64_t position, void* buffer, size_t readBytes, unsigned int* ReadOption) {
+		size_t bytesRead_impl = 0;
+		if (!bytesRead)
+			bytesRead = &bytesRead_impl;
+		Result ret = ((FileAccessorRead_0)(Address_weaks.FileAccessorRead))(fileHandle, bytesRead, position, buffer, readBytes, ReadOption);
+		fileBytesRead += *bytesRead;
+		return ret;
+	}
+
+	Result SetUserInactivityDetectionTimeExtended(bool isTrue) {
+		return ((SetUserInactivityDetectionTimeExtended_0)(Address_weaks.SetUserInactivityDetectionTimeExtended))(isTrue);
+	}
+
+	AppletFocusHandlingMode defaultFocusHandlingMode = AppletFocusHandlingMode_SuspendHomeSleep;
+	bool focusHandlingOverwrite = false;
+
+	void setFocusHandlingMode(AppletFocusHandlingMode mode) {
+		static AppletFocusHandlingMode last_mode = AppletFocusHandlingMode_SuspendHomeSleep;
+		static bool Initialized = false;
+		if (!Initialized) {
+			Initialized = true;
+		}
+		else if (last_mode == mode) return;
+		last_mode = mode;
+		if (!focusHandlingOverwrite) defaultFocusHandlingMode = mode;
+		return ((SetFocusHandlingMode_0)(Address_weaks.SetFocusHandlingMode))(mode);
+	}
+
+	AppletFocusState getCurrentFocusState() {
+		AppletFocusState state = ((GetCurrentFocusState_0)(Address_weaks.GetCurrentFocusState))();
+		if (Shared->currentFocusState != state) Shared->currentFocusState = state;
+		return state;
+	}
+}
+
 namespace Utils {
 	inline uint64_t _getSystemTick() {
 		#if defined(SWITCH) || defined(OUNCE)
@@ -356,7 +395,7 @@ namespace Utils {
 	}
 
 	inline AppletFocusState _getCurrentFocusState() {
-		return ((GetCurrentFocusState_0)(Address_weaks.GetCurrentFocusState))();
+		return nn::getCurrentFocusState();
 	}
 }
 
@@ -423,6 +462,25 @@ namespace NX_FPS_Math {
 		FPS_temp++;
 		uint64_t deltatick = endtick - starttick;
 		LOCK::overwriteRefreshRate = 0;
+		nn::focusHandlingOverwrite = true;
+		AppletFocusState state = Utils::_getCurrentFocusState();
+		if (state == AppletFocusState_NotFocusedHomeSleep) {
+			if (!Shared->forceSuspend) {
+				nn::setFocusHandlingMode(nn::defaultFocusHandlingMode);
+			}
+			else {
+				nn::setFocusHandlingMode(AppletFocusHandlingMode_SuspendHomeSleep);
+			}
+			svcSleepThread(1);
+		}
+		else if (state == AppletFocusState_NotFocusedLibraryApplet) {
+			nn::setFocusHandlingMode(nn::defaultFocusHandlingMode);
+			svcSleepThread(1);
+		}
+		else {
+			nn::setFocusHandlingMode(AppletFocusHandlingMode_NoSuspend);
+		}
+		nn::focusHandlingOverwrite = false;
 		if (!configRC && FPSlock) {
 			LOCK::applyPatch(configBuffer, FPSlock, (Shared -> currentRefreshRate));
 		}
@@ -446,10 +504,6 @@ namespace NX_FPS_Math {
 			}
 			if (!configRC && FPSlock) {
 				(Shared -> patchApplied) = 1;
-			}
-			if (Shared -> forceSuspend) {
-				while (Utils::_getCurrentFocusState() == AppletFocusState_NotFocusedHomeSleep)
-					svcSleepThread(16000000);
 			}
 		}
 
@@ -1245,21 +1299,6 @@ namespace NVN {
 	}
 }
 
-namespace nn {
-	Result FileAccessorRead(void* fileHandle, size_t* bytesRead, int64_t position, void* buffer, size_t readBytes, unsigned int* ReadOption) {
-		size_t bytesRead_impl = 0;
-		if (!bytesRead)
-			bytesRead = &bytesRead_impl;
-		Result ret = ((FileAccessorRead_0)(Address_weaks.FileAccessorRead))(fileHandle, bytesRead, position, buffer, readBytes, ReadOption);
-		fileBytesRead += *bytesRead;
-		return ret;
-	}
-
-	Result SetUserInactivityDetectionTimeExtended(bool isTrue) {
-		return ((SetUserInactivityDetectionTimeExtended_0)(Address_weaks.SetUserInactivityDetectionTimeExtended))(isTrue);
-	}
-}
-
 extern "C" {
 
 	void NX_FPS(SharedMemory* _sharedmemory, uint32_t* _sharedOperationMode) {
@@ -1311,6 +1350,7 @@ extern "C" {
 			Address_weaks.GetSystemTick = SaltySDCore_FindSymbolBuiltin("_ZN2nn2os13GetSystemTickEv");
 			Address_weaks.GetSystemTickFrequency = SaltySDCore_FindSymbolBuiltin("_ZN2nn2os22GetSystemTickFrequencyEv");
 			Address_weaks.GetCurrentFocusState = SaltySDCore_FindSymbolBuiltin("_ZN2nn2oe20GetCurrentFocusStateEv");
+			Address_weaks.SetFocusHandlingMode = SaltySDCore_FindSymbolBuiltin("_ZN2nn2oe20SetFocusHandlingModeENS0_17FocusHandlingModeE");
 			Address_weaks.LookupSymbol = SaltySDCore_FindSymbolBuiltin("_ZN2nn2ro12LookupSymbolEPmPKc");
 			Address_weaks.SetUserInactivityDetectionTimeExtended = SaltySDCore_FindSymbolBuiltin("_ZN2nn2oe44SetUserInactivityDetectionTimeExtendedUnsafeEb");
 
@@ -1335,6 +1375,8 @@ extern "C" {
 			SaltySDCore_ReplaceImport("vkCmdSetViewport", (void*)vk::CmdSetViewport);
 			SaltySDCore_ReplaceImport("vkCmdSetViewportWithCount", (void*)vk::CmdSetViewportWithCount);
 			SaltySDCore_ReplaceImport("vkCreateSwapchainKHR", (void*)vk::CreateSwapchain);
+			SaltySDCore_ReplaceImport("_ZN2nn2oe20GetCurrentFocusStateEv", (void*)nn::getCurrentFocusState);
+			SaltySDCore_ReplaceImport("_ZN2nn2oe20SetFocusHandlingModeENS0_17FocusHandlingModeE", (void*)nn::setFocusHandlingMode);
 			if (Address_weaks.vkGetInstanceProcAddr) {
 				//Minecraft is using nn::ro::LookupSymbol to search for Vulkan functions
 				SaltySDCore_ReplaceImport("_ZN2nn2ro12LookupSymbolEPmPKc", (void*)vk::LookupSymbol);

@@ -85,7 +85,6 @@ void __appExit(void)
     smExit();
     setsysExit();
     nvExit();
-    pdmqryExit();
 }
 
 void ABORT_IF_FAILED(Result rc, uint8_t ID) {
@@ -181,28 +180,9 @@ ptrdiff_t searchNxFpsSharedMemoryBlock(uintptr_t base) {
 }
 
 Result isApplicationOutOfFocus(bool* outOfFocus) {
-    //hosVersionSet must be used for it to work!
-    PdmPlayStatistics stats;
-    Result rc = pdmqryQueryPlayStatisticsByApplicationId(TIDnow, true, &stats);
-    if (R_FAILED(rc)) return rc;
-
-    static u32 old_entry_index = 0;
-    static bool isOutOfFocus = false;
-    if (stats.last_entry_index == old_entry_index) {
-        *outOfFocus = isOutOfFocus;
-        return 0;
-    }
-
-    old_entry_index = stats.last_entry_index;
-    PdmAppletEvent event;
-    s32 total = 0;
-    rc = pdmqryQueryAppletEvent(stats.last_entry_index, true, &event, 1, &total);
-    if (R_FAILED(rc)) return rc;
-    if (!total) return 1;
-    
-    bool isOut = event.event_type == PdmAppletEventType_OutOfFocus || event.event_type == PdmAppletEventType_OutOfFocus4;
-    *outOfFocus = isOut;
-    isOutOfFocus = isOut;
+    if (!nx_fps) return 1;
+    AppletFocusState state = nx_fps->currentFocusState;
+    *outOfFocus = (state == AppletFocusState_Background);
     return 0;
 }
 
@@ -1113,8 +1093,6 @@ int main(int argc, char *argv[])
     serviceClone(ldrDmntSrv, &ldrDmntClone);
     serviceClose(ldrDmntSrv);
     memcpy(ldrDmntSrv, &ldrDmntClone, sizeof(Service));
-
-    ABORT_IF_FAILED(pdmqryInitialize(), 8);
 
     if (file_or_directory_exists("sdmc:/SaltySD/flags/displaysync.flag")) {
         displaySync = true;
