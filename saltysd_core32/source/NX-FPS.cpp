@@ -95,9 +95,7 @@ typedef u64 (*_ZN2nn2os13GetSystemTickEv_0)();
 typedef void (*_ZN2nn2os13GetSystemTickEv_1)(u64* tick);
 typedef u64 (*_ZN2nn2os22GetSystemTickFrequencyEv_0)();
 typedef void (*_ZN2nn2os22GetSystemTickFrequencyEv_1)(u64* tickfrequency);
-typedef AppletFocusState (*GetCurrentFocusState_0)();
 typedef void (*SetFocusHandlingMode_0)(AppletFocusHandlingMode mode);
-typedef void (*SetResumeNotificationEnabled_0)(bool isTrue);
 typedef u32 (*FileAccessorRead_0)(void* fileHandle, size_t* bytesRead, int64_t position, void* buffer, size_t readBytes, unsigned int* ReadOption);
 
 struct {
@@ -144,9 +142,7 @@ struct {
 	uintptr_t GetSystemTick;
 	uintptr_t GetSystemTickFrequency;
 	uintptr_t ReferSymbol;
-	uintptr_t GetCurrentFocusState;
 	uintptr_t SetFocusHandlingMode;
-	uintptr_t SetResumeNotificationEnabled;
 	uintptr_t FileAccessorRead;
 } Address_weaks;
 
@@ -156,7 +152,6 @@ size_t configSize = 0;
 Result configRC = 1;
 
 static uint32_t* sharedOperationMode = 0;
-static bool* focusModeChanged = 0;
 
 Result readConfig(const char* path, uint8_t** output_buffer) {
 	FILE* patch_file = SaltySDCore_fopen(path, "rb");
@@ -233,10 +228,9 @@ struct NxFpsSharedBlock {
 	uint8_t FPSlockedDocked;
 	uint64_t frameNumber;
 	int8_t expectedSetBuffers;
-	uint8_t currentFocusState;
 } PACKED;
 
-static_assert(sizeof(NxFpsSharedBlock) == 175);
+static_assert(sizeof(NxFpsSharedBlock) == 174);
 
 NxFpsSharedBlock* Shared = 0;
 
@@ -308,16 +302,7 @@ namespace nn {
 		else if (last_mode == mode) return;
 		last_mode = mode;
 		if (!focusHandlingOverwrite) defaultFocusHandlingMode = mode;
-		if (mode == AppletFocusHandlingMode_NoSuspend) {
-			((SetResumeNotificationEnabled_0)(Address_weaks.SetResumeNotificationEnabled))(true);
-		}
 		return ((SetFocusHandlingMode_0)(Address_weaks.SetFocusHandlingMode))(mode);
-	}
-
-	AppletFocusState getCurrentFocusState() {
-		AppletFocusState state = ((GetCurrentFocusState_0)(Address_weaks.GetCurrentFocusState))();
-		if (Shared->currentFocusState != state) Shared->currentFocusState = state;
-		return state;
 	}
 }
 
@@ -342,10 +327,6 @@ namespace Utils {
 		#else
 			return uint64_t((double)tick / ((double)(systemtickfrequency) / 1000000000.d));
 		#endif
-	}
-
-	inline AppletFocusState _getCurrentFocusState() {
-		return nn::getCurrentFocusState();
 	}
 }
 
@@ -413,35 +394,19 @@ namespace NX_FPS_Math {
 		Shared -> FPSticks[FPStickItr++] = framedelta;
 		FPStickItr %= 10;
 
-		nn::focusHandlingOverwrite = true;
-		static AppletFocusState state = AppletFocusState_Focused;
-		if (*focusModeChanged) {
-			state = Utils::_getCurrentFocusState();
-			*focusModeChanged = false;
+		if (!configRC && FPSlock) {
+			LOCK::applyPatch(configBuffer, FPSlock, (Shared -> currentRefreshRate));
 		}
-		if (state == AppletFocusState_NotFocusedHomeSleep) {
+
+		if (deltatick > systemtickfrequency) {
+			nn::focusHandlingOverwrite = true;
 			if (!Shared->forceSuspend) {
 				nn::setFocusHandlingMode(nn::defaultFocusHandlingMode);
 			}
 			else {
 				nn::setFocusHandlingMode(AppletFocusHandlingMode_SuspendHomeSleep);
 			}
-			svcSleepThread(1);
-		}
-		else if (state == AppletFocusState_NotFocusedLibraryApplet) {
-			nn::setFocusHandlingMode(nn::defaultFocusHandlingMode);
-			svcSleepThread(1);
-		}
-		else {
-			nn::setFocusHandlingMode(AppletFocusHandlingMode_NoSuspend);
-		}
-		nn::focusHandlingOverwrite = false;
-
-		if (!configRC && FPSlock) {
-			LOCK::applyPatch(configBuffer, FPSlock, (Shared -> currentRefreshRate));
-		}
-
-		if (deltatick > systemtickfrequency) {
+			nn::focusHandlingOverwrite = false;
 			if (Address_weaks.FileAccessorRead) {
 				float seconds = (float)(Utils::_convertToTimeSpan(deltatick)) / 1000000000.f;
 				float readSpeedPerSecond = (float)fileBytesRead / seconds;
@@ -1135,9 +1100,8 @@ namespace NVN {
 
 extern "C" {
 
-	void NX_FPS(SharedMemory* _sharedmemory, uint32_t* _sharedOperationMode, bool* _focusModeChanged) {
+	void NX_FPS(SharedMemory* _sharedmemory, uint32_t* _sharedOperationMode) {
 		sharedOperationMode = _sharedOperationMode;
-		focusModeChanged = _focusModeChanged;
 		SaltySDCore_printf("NX-FPS: alive\n");
 		LOCK::mappings.main_start = getMainAddress();
 		SaltySDCore_printf("NX-FPS: found main at: 0x%lX\n", LOCK::mappings.main_start);
@@ -1170,9 +1134,7 @@ extern "C" {
 			Address_weaks.glViewportArrayv = SaltySDCore_FindSymbolBuiltin("glViewportArrayv");
 			Address_weaks.glViewportIndexedf = SaltySDCore_FindSymbolBuiltin("glViewportIndexedf");
 			Address_weaks.glViewportIndexedfv = SaltySDCore_FindSymbolBuiltin("glViewportIndexedfv");
-			Address_weaks.GetCurrentFocusState = SaltySDCore_FindSymbolBuiltin("_ZN2nn2oe20GetCurrentFocusStateEv");
 			Address_weaks.SetFocusHandlingMode = SaltySDCore_FindSymbolBuiltin("_ZN2nn2oe20SetFocusHandlingModeENS0_17FocusHandlingModeE");
-			Address_weaks.SetResumeNotificationEnabled = SaltySDCore_FindSymbolBuiltin("_ZN2nn2oe28SetResumeNotificationEnabledEb");
 			SaltySDCore_ReplaceImport("nvnBootstrapLoader", (void*)NVN::BootstrapLoader_1);
 			SaltySDCore_ReplaceImport("eglSwapBuffers", (void*)EGL::Swap);
 			SaltySDCore_ReplaceImport("eglSwapInterval", (void*)EGL::Interval);
@@ -1190,7 +1152,6 @@ extern "C" {
 			SaltySDCore_ReplaceImport("vkQueuePresentKHR", (void*)vk::QueuePresent);
 			SaltySDCore_ReplaceImport("_ZN11NvSwapchain15QueuePresentKHREP9VkQueue_TPK16VkPresentInfoKHR", (void*)vk::nvSwapchain::QueuePresent);
 			SaltySDCore_ReplaceImport("vkGetInstanceProcAddr", (void*)vk::GetInstanceProcAddr);
-			SaltySDCore_ReplaceImport("_ZN2nn2oe20GetCurrentFocusStateEv", (void*)nn::getCurrentFocusState);
 			SaltySDCore_ReplaceImport("_ZN2nn2oe20SetFocusHandlingModeENS0_17FocusHandlingModeE", (void*)nn::setFocusHandlingMode);
 			FILE* readFlag = SaltySDCore_fopen("sdmc:/SaltySD/flags/blockfilestats.flag", "rb");
 			if (!readFlag) {

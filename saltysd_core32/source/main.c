@@ -35,7 +35,6 @@ ThreadVars vars_mine;
 uint64_t tid = 0;
 
 static uint32_t sharedOperationMode = 0;
-static bool focusModeChanged = false;
 
 typedef double (*strtod_0)(const char* str, char** endptr);
 uintptr_t strtod_ptr = 0;
@@ -328,11 +327,11 @@ int main(int argc, char *argv[])
 		shmemLoadRemote(&_sharedmemory, remoteSharedMemory, 0x1000, Perm_Rw);
 		shmemMapRc = shmemMap(&_sharedmemory);
 		if (R_SUCCEEDED(shmemMapRc)) {
-			NX_FPS(&_sharedmemory, &sharedOperationMode, &focusModeChanged);
+			NX_FPS(&_sharedmemory, &sharedOperationMode);
 
 			uint64_t titid = 0;
 			svcGetInfo(&titid, 18, CUR_PROCESS_HANDLE, 0);
-			ReverseNX(&_sharedmemory, &sharedOperationMode, &focusModeChanged);
+			ReverseNX(&_sharedmemory, &sharedOperationMode);
 		}
 		else {
 			SaltySDCore_printf("SaltySD Core: shmemMap failed: 0x%lX\n", shmemMapRc);
