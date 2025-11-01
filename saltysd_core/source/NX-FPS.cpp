@@ -270,10 +270,9 @@ struct NxFpsSharedBlock {
 	uint8_t FPSlockedDocked;
 	uint64_t frameNumber;
 	int8_t expectedSetBuffers;
-	uint8_t currentFocusState;
 } PACKED;
 
-static_assert(sizeof(NxFpsSharedBlock) == 175);
+static_assert(sizeof(NxFpsSharedBlock) == 174);
 
 NxFpsSharedBlock* Shared = 0;
 
