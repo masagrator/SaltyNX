@@ -97,6 +97,7 @@ typedef u64 (*_ZN2nn2os22GetSystemTickFrequencyEv_0)();
 typedef void (*_ZN2nn2os22GetSystemTickFrequencyEv_1)(u64* tickfrequency);
 typedef AppletFocusState (*GetCurrentFocusState_0)();
 typedef void (*SetFocusHandlingMode_0)(AppletFocusHandlingMode mode);
+typedef void (*SetResumeNotificationEnabled_0)(bool isTrue);
 typedef u32 (*FileAccessorRead_0)(void* fileHandle, size_t* bytesRead, int64_t position, void* buffer, size_t readBytes, unsigned int* ReadOption);
 
 struct {
@@ -145,6 +146,7 @@ struct {
 	uintptr_t ReferSymbol;
 	uintptr_t GetCurrentFocusState;
 	uintptr_t SetFocusHandlingMode;
+	uintptr_t SetResumeNotificationEnabled;
 	uintptr_t FileAccessorRead;
 } Address_weaks;
 
@@ -154,6 +156,7 @@ size_t configSize = 0;
 Result configRC = 1;
 
 static uint32_t* sharedOperationMode = 0;
+static bool* focusModeChanged = 0;
 
 Result readConfig(const char* path, uint8_t** output_buffer) {
 	FILE* patch_file = SaltySDCore_fopen(path, "rb");
@@ -305,6 +308,9 @@ namespace nn {
 		else if (last_mode == mode) return;
 		last_mode = mode;
 		if (!focusHandlingOverwrite) defaultFocusHandlingMode = mode;
+		if (mode == AppletFocusHandlingMode_NoSuspend) {
+			((SetResumeNotificationEnabled_0)(Address_weaks.SetResumeNotificationEnabled))(true);
+		}
 		return ((SetFocusHandlingMode_0)(Address_weaks.SetFocusHandlingMode))(mode);
 	}
 
@@ -408,7 +414,11 @@ namespace NX_FPS_Math {
 		FPStickItr %= 10;
 
 		nn::focusHandlingOverwrite = true;
-		AppletFocusState state = Utils::_getCurrentFocusState();
+		static AppletFocusState state = AppletFocusState_Focused;
+		if (*focusModeChanged) {
+			state = Utils::_getCurrentFocusState();
+			*focusModeChanged = false;
+		}
 		if (state == AppletFocusState_NotFocusedHomeSleep) {
 			if (!Shared->forceSuspend) {
 				nn::setFocusHandlingMode(nn::defaultFocusHandlingMode);
@@ -1125,8 +1135,9 @@ namespace NVN {
 
 extern "C" {
 
-	void NX_FPS(SharedMemory* _sharedmemory, uint32_t* _sharedOperationMode) {
+	void NX_FPS(SharedMemory* _sharedmemory, uint32_t* _sharedOperationMode, bool* _focusModeChanged) {
 		sharedOperationMode = _sharedOperationMode;
+		focusModeChanged = _focusModeChanged;
 		SaltySDCore_printf("NX-FPS: alive\n");
 		LOCK::mappings.main_start = getMainAddress();
 		SaltySDCore_printf("NX-FPS: found main at: 0x%lX\n", LOCK::mappings.main_start);
@@ -1161,6 +1172,7 @@ extern "C" {
 			Address_weaks.glViewportIndexedfv = SaltySDCore_FindSymbolBuiltin("glViewportIndexedfv");
 			Address_weaks.GetCurrentFocusState = SaltySDCore_FindSymbolBuiltin("_ZN2nn2oe20GetCurrentFocusStateEv");
 			Address_weaks.SetFocusHandlingMode = SaltySDCore_FindSymbolBuiltin("_ZN2nn2oe20SetFocusHandlingModeENS0_17FocusHandlingModeE");
+			Address_weaks.SetResumeNotificationEnabled = SaltySDCore_FindSymbolBuiltin("_ZN2nn2oe28SetResumeNotificationEnabledEb");
 			SaltySDCore_ReplaceImport("nvnBootstrapLoader", (void*)NVN::BootstrapLoader_1);
 			SaltySDCore_ReplaceImport("eglSwapBuffers", (void*)EGL::Swap);
 			SaltySDCore_ReplaceImport("eglSwapInterval", (void*)EGL::Interval);
