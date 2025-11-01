@@ -1,1 +1,1 @@
-void ReverseNX(SharedMemory* _sharedmemory, uint32_t* _sharedOperationMode, bool* focusModeChanged);
+void ReverseNX(SharedMemory* _sharedmemory, uint32_t* _sharedOperationMode);
