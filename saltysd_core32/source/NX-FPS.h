@@ -1,1 +1,1 @@
-void NX_FPS(SharedMemory* _sharedmemory, uint32_t* _sharedOperationMode);
+void NX_FPS(SharedMemory* _sharedmemory, uint32_t* _sharedOperationMode, bool* focusModeChanged);

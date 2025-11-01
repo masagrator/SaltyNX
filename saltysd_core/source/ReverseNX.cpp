@@ -25,7 +25,7 @@ struct SystemEvent {
 
 typedef u32 (*_ZN2nn2oe18GetPerformanceModeEv)();
 typedef u8 (*_ZN2nn2oe16GetOperationModeEv)();
-typedef bool (*_ZN2nn2oe25TryPopNotificationMessageEPj)(int &Message);
+typedef bool (*_ZN2nn2oe25TryPopNotificationMessageEPj)(int* Message);
 typedef int (*_ZN2nn2oe22PopNotificationMessageEv)();
 typedef void (*_ZN2nn2oe27GetDefaultDisplayResolutionEPiS1_)(int* width, int* height);
 typedef void (*_ZN2nn2oe38GetDefaultDisplayResolutionChangeEventEPNS_2os11SystemEventE)(SystemEvent* systemEvent);
@@ -92,6 +92,7 @@ void* multiWaitCopy = 0;
 bool multiWaitHack = false;
 
 static uint32_t* sharedOperationMode = 0;
+static bool* focusModeChanged = 0;
 
 ReverseNX_state loadSave() {
 	char path[128];
@@ -143,7 +144,7 @@ ReverseNX_state loadSave() {
 	}
 }
 
-bool TryPopNotificationMessage(int &msg) {
+bool TryPopNotificationMessage(int* msg) {
 
 	static bool check1 = true;
 	static bool check2 = true;
@@ -155,46 +156,62 @@ bool TryPopNotificationMessage(int &msg) {
 	if (ReverseNX_RT->def) {
 		if (!check1) {
 			check1 = true;
-			msg = 0x1f;
+			*msg = AppletNotificationMessage_PerformanceModeChanged;
 			return true;
 		}
 		else if (!check2) {
 			check2 = true;
-			msg = 0x1e;
+			*msg = AppletNotificationMessage_OperationModeChanged;
 			return true;
 		}
 		else if (multiWaitHack == true) {
 			multiWaitHack = false;
-			msg = 0xFF;
+			*msg = 0xFF;
 			return true;
 		}
-		else return ((_ZN2nn2oe25TryPopNotificationMessageEPj)(Address_weaks.TryPopNotificationMessage))(msg);
+		else {
+			bool check = ((_ZN2nn2oe25TryPopNotificationMessageEPj)(Address_weaks.TryPopNotificationMessage))(msg);
+			if (*msg == AppletNotificationMessage_FocusStateChanged && check) {
+				*focusModeChanged = true;
+			}
+			else if (*msg == AppletNotificationMessage_Restart && check) {
+				*focusModeChanged = true;
+			}
+			return check;
+		}
 	}
 	
 	check1 = false;
 	check2 = false;
 	if (compare2 != ReverseNX_RT->isDocked) {
 		compare2 = ReverseNX_RT->isDocked;
-		msg = 0x1f;
+		*msg = AppletNotificationMessage_PerformanceModeChanged;
 		return true;
 	}
 	if (compare != ReverseNX_RT->isDocked) {
 		compare = ReverseNX_RT->isDocked;
-		msg = 0x1e;
+		*msg = AppletNotificationMessage_OperationModeChanged;
 		return true;
 	}
 	if (multiWaitHack == true) {
 		multiWaitHack = false;
-		msg = 0xFF;
+		*msg = 0xFF;
 		return true;
 	}
-	return ((_ZN2nn2oe25TryPopNotificationMessageEPj)(Address_weaks.TryPopNotificationMessage))(msg);
+	bool check = ((_ZN2nn2oe25TryPopNotificationMessageEPj)(Address_weaks.TryPopNotificationMessage))(msg);
+	if (*msg == AppletNotificationMessage_FocusStateChanged && check) {
+		*focusModeChanged = true;
+	}
+	else if (*msg == AppletNotificationMessage_Restart && check) {
+		*focusModeChanged = true;
+	}
+	return check;
 }
 
 int PopNotificationMessage() {
 	while (true) {
 		int msg = 0;
-		if (TryPopNotificationMessage(msg)) {
+		if (TryPopNotificationMessage(&msg)) {
 			return msg;
 		}
 		svcSleepThread(1000000);
@@ -361,8 +378,9 @@ void* WaitAny(void* MultiWaitType) {
 }
 
 extern "C" {
-	void ReverseNX(SharedMemory* _sharedmemory, uint32_t* _sharedOperationMode) {
+	void ReverseNX(SharedMemory* _sharedmemory, uint32_t* _sharedOperationMode, bool* _focusModeChanged) {
 		sharedOperationMode = _sharedOperationMode;
+		focusModeChanged = _focusModeChanged;
 		SaltySDCore_printf("ReverseNX: alive\n");
 		Result ret = SaltySD_CheckIfSharedMemoryAvailable(&SharedMemoryOffset2, 7);
 		SaltySDCore_printf("ReverseNX: SharedMemory ret: 0x%X\n", ret);
