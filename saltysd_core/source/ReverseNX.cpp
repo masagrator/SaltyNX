@@ -92,7 +92,6 @@ void* multiWaitCopy = 0;
 bool multiWaitHack = false;
 
 static uint32_t* sharedOperationMode = 0;
-static bool* focusModeChanged = 0;
 
 ReverseNX_state loadSave() {
 	char path[128];
@@ -169,16 +168,7 @@ bool TryPopNotificationMessage(int* msg) {
 			*msg = 0xFF;
 			return true;
 		}
-		else {
-			bool check = ((_ZN2nn2oe25TryPopNotificationMessageEPj)(Address_weaks.TryPopNotificationMessage))(msg);
-			if (*msg == AppletNotificationMessage_FocusStateChanged && check) {
-				*focusModeChanged = true;
-			}
-			else if (*msg == AppletNotificationMessage_Restart && check) {
-				*focusModeChanged = true;
-			}
-			return check;
-		}
+		else return ((_ZN2nn2oe25TryPopNotificationMessageEPj)(Address_weaks.TryPopNotificationMessage))(msg);
 	}
 	
 	check1 = false;
@@ -198,14 +188,7 @@ bool TryPopNotificationMessage(int* msg) {
 		*msg = 0xFF;
 		return true;
 	}
-	bool check = ((_ZN2nn2oe25TryPopNotificationMessageEPj)(Address_weaks.TryPopNotificationMessage))(msg);
-	if (*msg == AppletNotificationMessage_FocusStateChanged && check) {
-		*focusModeChanged = true;
-	}
-	else if (*msg == AppletNotificationMessage_Restart && check) {
-		*focusModeChanged = true;
-	}
-	return check;
+	return ((_ZN2nn2oe25TryPopNotificationMessageEPj)(Address_weaks.TryPopNotificationMessage))(msg);
 }
 
 int PopNotificationMessage() {
@@ -378,9 +361,8 @@ void* WaitAny(void* MultiWaitType) {
 }
 
 extern "C" {
-	void ReverseNX(SharedMemory* _sharedmemory, uint32_t* _sharedOperationMode, bool* _focusModeChanged) {
+	void ReverseNX(SharedMemory* _sharedmemory, uint32_t* _sharedOperationMode) {
 		sharedOperationMode = _sharedOperationMode;
-		focusModeChanged = _focusModeChanged;
 		SaltySDCore_printf("ReverseNX: alive\n");
 		Result ret = SaltySD_CheckIfSharedMemoryAvailable(&SharedMemoryOffset2, 7);
 		SaltySDCore_printf("ReverseNX: SharedMemory ret: 0x%X\n", ret);

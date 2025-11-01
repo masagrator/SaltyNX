@@ -191,7 +191,6 @@ size_t configSize = 0;
 Result configRC = 1;
 
 static uint32_t* sharedOperationMode = 0;
-static bool* focusModeChanged = 0;
 
 Result readConfig(const char* path, uint8_t** output_buffer) {
 	FILE* patch_file = SaltySDCore_fopen(path, "rb");
@@ -1279,9 +1278,8 @@ namespace NVN {
 
 extern "C" {
 
-	void NX_FPS(SharedMemory* _sharedmemory, uint32_t* _sharedOperationMode, bool* _focusModeChanged) {
+	void NX_FPS(SharedMemory* _sharedmemory, uint32_t* _sharedOperationMode) {
 		sharedOperationMode = _sharedOperationMode;
-		focusModeChanged = _focusModeChanged;
 		SaltySDCore_printf("NX-FPS: alive\n");
 		LOCK::mappings.main_start = getMainAddress();
 		LOCK::mappings.variables_start = (int64_t)&variables_buffer[0];
