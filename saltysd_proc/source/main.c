@@ -181,7 +181,6 @@ ptrdiff_t searchNxFpsSharedMemoryBlock(uintptr_t base) {
 }
 
 __attribute__((noinline)) Result isApplicationOutOfFocus(bool* outOfFocus) {
-    //hosVersionSet must be used for it to work!
     static s32 last_total_entries = 0;
     static bool isOutOfFocus = false;
     s32 total_entries = 0;
