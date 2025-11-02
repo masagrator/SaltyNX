@@ -180,27 +180,54 @@ ptrdiff_t searchNxFpsSharedMemoryBlock(uintptr_t base) {
 	return -1;
 }
 
-Result isApplicationOutOfFocus(bool* outOfFocus) {
+__attribute__((noinline)) Result isApplicationOutOfFocus(bool* outOfFocus) {
     //hosVersionSet must be used for it to work!
-    PdmPlayStatistics stats;
-    Result rc = pdmqryQueryPlayStatisticsByApplicationId(TIDnow, true, &stats);
-    if (R_FAILED(rc)) return rc;
-
-    static u32 old_entry_index = 0;
+    static s32 last_total_entries = 0;
     static bool isOutOfFocus = false;
-    if (stats.last_entry_index == old_entry_index) {
+    s32 total_entries = 0;
+    s32 start_entry_index = 0;
+    s32 end_entry_index = 0;
+    Result rc = pdmqryGetAvailablePlayEventRange(&total_entries, &start_entry_index, &end_entry_index);
+    if (R_FAILED(rc)) return rc;
+    if (total_entries == last_total_entries) {
         *outOfFocus = isOutOfFocus;
         return 0;
     }
+    last_total_entries = total_entries;
 
-    old_entry_index = stats.last_entry_index;
-    PdmAppletEvent event;
-    s32 total = 0;
-    rc = pdmqryQueryAppletEvent(stats.last_entry_index, true, &event, 1, &total);
+    PdmPlayEvent events[16];
+    s32 out = 0;
+    s32 start_entry = end_entry_index - 15;
+    if (start_entry < 0) start_entry = 0;
+    rc = pdmqryQueryPlayEvent(start_entry, events, sizeof(events) / sizeof(events[0]), &out);
     if (R_FAILED(rc)) return rc;
-    if (!total) return 1;
-    
-    bool isOut = event.event_type == PdmAppletEventType_OutOfFocus || event.event_type == PdmAppletEventType_OutOfFocus4;
+    if (out == 0) return 1;
+
+    int itr = -1;
+    for (int i = out-1; i >= 0; i--) {
+        if (events[i].play_event_type != PdmPlayEventType_Applet)
+            continue;
+        if (events[i].event_data.applet.applet_id != AppletId_application)
+            continue;
+        union {
+            struct {
+                uint32_t part[2];
+            } parts;
+            uint64_t full;
+        } TID;
+        TID.parts.part[0] = events[i].event_data.applet.program_id[1];
+        TID.parts.part[1] = events[i].event_data.applet.program_id[0];
+
+        if (TID.full != TIDnow)
+            continue;
+        else {
+            itr = i;
+            break;
+        }
+    }
+    if (itr == -1) return 1;
+
+    bool isOut = events[itr].event_data.applet.event_type == PdmAppletEventType_OutOfFocus || events[itr].event_data.applet.event_type == PdmAppletEventType_OutOfFocus4;
     *outOfFocus = isOut;
     isOutOfFocus = isOut;
     return 0;
