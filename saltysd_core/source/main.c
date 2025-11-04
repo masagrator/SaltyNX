@@ -27,7 +27,7 @@ Handle orig_main_thread;
 void* orig_ctx;
 
 Handle sdcard;
-volatile size_t elf_area_size = 0xDEADBEEF; //We assume that Core itself won't take more than 0x200000 bytes;
+volatile size_t elf_area_size = 0xDEADBEEF; //MAGIC number to be replaced after code gets compiled
 
 ThreadVars vars_orig;
 ThreadVars vars_mine;
