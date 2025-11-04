@@ -146,12 +146,13 @@ $(BUILD):
 	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
 	@$(OBJCOPY) --only-keep-debug $(CURDIR)/$(TARGET).elf $(CURDIR)/$(TARGET).dbg
 	@$(OBJCOPY) --add-gnu-debuglink=$(CURDIR)/$(TARGET).dbg --strip-debug --strip-unneeded $(CURDIR)/$(TARGET).elf
-	
-
+	@$(DEVKITPRO)/devkitA64/bin/aarch64-none-elf-size $(CURDIR)/$(TARGET).elf | awk 'NR==2 {print $$4}' > size.txt
+	@python3 patch_size.py
+	@rm -fr size.txt
 #---------------------------------------------------------------------------------
 clean:
 	@echo clean ...
-	@rm -fr $(BUILD) $(TARGET).pfs0 $(TARGET).nso $(TARGET).nro $(TARGET).nsp $(TARGET).nacp $(TARGET).elf $(TARGET).dbg .map
+	@rm -fr size.txt $(BUILD) $(TARGET).pfs0 $(TARGET).nso $(TARGET).nro $(TARGET).nsp $(TARGET).nacp $(TARGET).elf $(TARGET).dbg .map
 
 
 #---------------------------------------------------------------------------------
