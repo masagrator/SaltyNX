@@ -269,8 +269,8 @@ void SaltySDCore_PatchSVCs()
 	static u8 orig_1[0x8] = {0xE0, 0x0F, 0x1F, 0xF8, 0x21, 0x00, 0x00, 0xD4}; //STR [sp, #-0x10]!; SVC #0x1
 	static u8 orig_2[0x8] = {0xE0, 0x0F, 0x1F, 0xF8, 0x21, 0x05, 0x00, 0xD4}; //STR [sp, #-0x10]!; SVC #0x29
 	static u8 patch[0x10] = {0x44, 0x00, 0x00, 0x58, 0x80, 0x00, 0x1F, 0xD6, 0x0F, 0xF0, 0x0F, 0xF0, 0x0F, 0xF0, 0x0F, 0xF0}; // LDR X4 #8; BR X4; ADRP X15, #0x1FE03000; ADRP X15, #0x1FE03000
-	u64 dst_1 = SaltySDCore_findCodeEx(orig_1, 8);
-	u64 dst_2 = SaltySDCore_findCodeEx(orig_2, 8);
+	u64 dst_1 = SaltySDCore_findCodeEx(orig_1, sizeof(orig_1));
+	u64 dst_2 = SaltySDCore_findCodeEx(orig_2, sizeof(orig_2));
 	
 	if (!dst_1)
 	{
@@ -289,10 +289,10 @@ void SaltySDCore_PatchSVCs()
 	}
 
 	*(u64*)&patch[8] = (u64)svcSetHeapSizeIntercept;
-	SaltySD_Memcpy(dst_1, (u64)patch, 0x10);
+	SaltySD_Memcpy(dst_1, (u64)patch, sizeof(patch));
 	
 	*(u64*)&patch[8] = (u64)svcGetInfoIntercept;	
-	SaltySD_Memcpy(dst_2, (u64)patch, 0x10);
+	SaltySD_Memcpy(dst_2, (u64)patch, sizeof(patch));
 }
 
 void** SaltySDCore_LoadPluginsInDir(char* path, void** entries, size_t* num_elfs)
