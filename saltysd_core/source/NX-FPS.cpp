@@ -424,7 +424,7 @@ namespace NX_FPS_Math {
 					range++;
 				}
 			}
-			else if ((std::lround(Stats.FPSavg) == new_fpslock) && (Stats.FPSavg < (float)new_fpslock)) {
+			else if (((uint32_t)std::lround(Stats.FPSavg) == new_fpslock) && (Stats.FPSavg < (float)new_fpslock)) {
 				if (range > 0) {
 					range--;
 				}

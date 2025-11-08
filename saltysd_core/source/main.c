@@ -239,10 +239,10 @@ void SaltySDCore_RegisterExistingModules()
 		
 		if (info.perm == Perm_Rx)
 		{
-			SaltySDCore_RegisterModule((void*)info.addr);
+			SaltySDCore_RegisterModule((uintptr_t)info.addr);
 			uintptr_t compaddr = info.addr;
-			if ((uintptr_t*)compaddr != (uintptr_t*)_start)
-				SaltySDCore_RegisterBuiltinModule((void*)info.addr);
+			if (compaddr != (uintptr_t)_start)
+				SaltySDCore_RegisterBuiltinModule((uintptr_t)info.addr);
 		}
 
 		addr = info.addr + info.size;
@@ -349,8 +349,6 @@ void SaltySDCore_PatchSVCs()
 	SaltySD_Memcpy(dst_2, (u64)patch, sizeof(patch));
 }
 
-#endif
-
 void** SaltySDCore_LoadPluginsInDir(char* path, void** entries, size_t* num_elfs)
 {
 	char* tmp = malloc(0x100);
@@ -411,6 +409,8 @@ void SaltySDCore_LoadPlugins()
 	
 	return;
 }
+
+#endif
 
 typedef void (*nnosQueryMemoryInfo)(void* memoryinfo);
 uintptr_t Address_weak_QueryMemoryInfo = 0;

@@ -202,7 +202,6 @@ namespace LOCK {
 
 	}
 
-#if defined(SWITCH) || defined(OUNCE)
 	Result processBytes(FILE* file) {
 		uint32_t main_offset = 0;
 		SaltySDCore_fread(&main_offset, 4, 1, file);
@@ -216,6 +215,8 @@ namespace LOCK {
 		free(temp_buffer);
 		return 0;
 	}
+
+#if defined(SWITCH) || defined(OUNCE)
 
 	Result processVariables(FILE* file) {
 		uint32_t main_offset = 0;

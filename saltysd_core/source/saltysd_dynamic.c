@@ -131,16 +131,16 @@ uintptr_t SaltySDCore_FindSymbolBuiltin(const char* name)
 	return 0;
 }
 
-void SaltySDCore_RegisterModule(void* base)
+void SaltySDCore_RegisterModule(uintptr_t base)
 {
 	elfs = realloc(elfs, ++num_elfs * sizeof(void*));
-	elfs[num_elfs-1] = base;
+	elfs[num_elfs-1] = (void*)base;
 }
 
-void SaltySDCore_RegisterBuiltinModule(void* base)
+void SaltySDCore_RegisterBuiltinModule(uintptr_t base)
 {
 	builtin_elfs = realloc(builtin_elfs, ++num_builtin_elfs * sizeof(void*));
-	builtin_elfs[num_builtin_elfs-1] = base;
+	builtin_elfs[num_builtin_elfs-1] = (void*)base;
 }
 
 void SaltySDCore_ReplaceModuleImport(void* base, const char* name, void* newfunc, bool update)
@@ -148,7 +148,7 @@ void SaltySDCore_ReplaceModuleImport(void* base, const char* name, void* newfunc
 	
 	#if defined(SWITCH32) || defined(OUNCE32)
 	const Elf32_Dyn* dyn = NULL;
-	const Elf32_Rela* rela = NULL;
+	const Elf32_Rel* rela = NULL;
 	const Elf32_Sym* symtab = NULL;
 	#else
 	const Elf64_Dyn* dyn = NULL;
@@ -172,7 +172,7 @@ void SaltySDCore_ReplaceModuleImport(void* base, const char* name, void* newfunc
 		{
 			case DT_SYMTAB:
 				#if defined(SWITCH32) || defined(OUNCE32)
-
+				symtab = (const Elf32_Sym*)(base + dyn->d_un.d_ptr);
 				#else
 				symtab = (const Elf64_Sym*)(base + dyn->d_un.d_ptr);
 				#endif
@@ -202,7 +202,7 @@ void SaltySDCore_ReplaceModuleImport(void* base, const char* name, void* newfunc
 			#endif
 			case DT_PLTRELSZ:
 				#if defined(SWITCH32) || defined(OUNCE32)
-				relasz += dyn->d_un.d_val / sizeof(Elf32_Rela);
+				relasz += dyn->d_un.d_val / sizeof(Elf32_Rel);
 				#else
 				relasz += dyn->d_un.d_val / sizeof(Elf64_Rela);
 				#endif
@@ -350,7 +350,7 @@ void SaltySDCore_DynamicLinkModule(void* base)
 			#endif
 			case DT_PLTRELSZ:
 				#if defined(SWITCH32) || defined(OUNCE32)
-				relsz += dyn->d_un.d_val / sizeof(Elf32_Rela);
+				relsz += dyn->d_un.d_val / sizeof(Elf32_Rel);
 				#else
 				relasz += dyn->d_un.d_val / sizeof(Elf64_Rela);
 				#endif
@@ -451,13 +451,14 @@ void SaltySDCore_fillRoLoadModule() {
 	return;
 }
 
-#if defined(SWITCH) || defined(OUNCE)
-
 bool SaltySDCore_isRelrAvailable() {
+	#if defined(SWITCH) || defined(OUNCE)
 	return relr_available;
-}
+	#else
+	return false;
+	#endif
 
-#endif
+}
 
 void SaltySDCore_getDataForUpdate(uint32_t* num_builtin_elfs_ptr, int32_t* num_replaced_symbols_ptr, struct ReplacedSymbol** replaced_symbols_ptr, void*** builtin_elfs_ptr) {
 	*num_builtin_elfs_ptr = num_builtin_elfs;

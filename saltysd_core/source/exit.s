@@ -2,7 +2,7 @@
 .type   __nx_exit_clear, %function
 __nx_exit_clear:
     // restore stack pointer
-	#if defined(SWITCH32) || defined(OUNCE32)
+#if defined(__arm__)
     ldr  r8, =__stack_top
     ldr  sp, [r8]
     
@@ -22,7 +22,7 @@ __nx_exit_clear:
 
     // jump back to loader
     bx lr
-	#else
+#elif defined(__aarch64__)
     adrp x8, __stack_top
     ldr  x8, [x8, #:lo12:__stack_top]
     mov  sp, x8
@@ -59,4 +59,4 @@ __nx_exit_clear:
 
     // jump back to loader
     ret
-	#endif
+#endif
