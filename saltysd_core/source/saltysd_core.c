@@ -4,20 +4,20 @@
 #include <errno.h>
 
 extern void _start();
-u64 code_start = 0;
+uintptr_t code_start = 0;
 
-u64 SaltySDCore_getCodeStart()
+uintptr_t SaltySDCore_getCodeStart()
 {
 	if (code_start) return code_start;
 
-	u64 addr = 0;
+	uintptr_t addr = 0;
 	while (1)
 	{
 		MemoryInfo info;
 		u32 pageinfo;
 		Result ret = svcQueryMemory(&info, &pageinfo, addr);
 		
-		if (info.addr != (u64)_start && info.perm == Perm_Rx)
+		if (info.addr != (uintptr_t)_start && info.perm == Perm_Rx)
 		{
 			addr = info.addr;
 			break;
@@ -32,7 +32,7 @@ u64 SaltySDCore_getCodeStart()
 	return addr;
 }
 
-u64 SaltySDCore_getCodeSize()
+size_t SaltySDCore_getCodeSize()
 {
 	MemoryInfo info;
 	u32 pageinfo;
@@ -43,16 +43,16 @@ u64 SaltySDCore_getCodeSize()
 	return info.size;
 }
 
-u64 SaltySDCore_findCode(u8* code, size_t size)
+uintptr_t SaltySDCore_findCode(u8* code, size_t size)
 {
 	Result ret = 0;
-	u64 addr = SaltySDCore_getCodeStart();
-	u64 addr_size = SaltySDCore_getCodeSize();
+	uintptr_t addr = SaltySDCore_getCodeStart();
+	size_t addr_size = SaltySDCore_getCodeSize();
 
 	while (1)
 	{
 		void* out = boyer_moore_search((void*)addr, addr_size, code, size);
-		if (out) return (u64)out;
+		if (out) return (uintptr_t)out;
 		
 		addr += addr_size;
 
@@ -81,16 +81,16 @@ u64 SaltySDCore_findCode(u8* code, size_t size)
 	return 0;
 }
 
-u64 SaltySDCore_findCodeEx(u8* code, size_t size)
+uintptr_t SaltySDCore_findCodeEx(u8* code, size_t size)
 {
 	Result ret = 0;
-	u64 addr = SaltySDCore_getCodeStart();
-	u64 addr_size = SaltySDCore_getCodeSize();
+	uintptr_t addr = SaltySDCore_getCodeStart();
+	size_t addr_size = SaltySDCore_getCodeSize();
 
 	while (1)
 	{
 		void* out = boyer_moore_search((void*)addr, addr_size, code, size);
-		if (out) return (u64)out;
+		if (out) return (uintptr_t)out;
 		
 		addr += addr_size;
 
@@ -143,7 +143,7 @@ int SaltySDCore_fseek(FILE* stream, int64_t offset, int origin)
 	return 0;
 }
 
-long int SaltySDCore_ftell(FILE* stream) {
+size_t SaltySDCore_ftell(FILE* stream) {
 	return ftell(stream);
 }
 
