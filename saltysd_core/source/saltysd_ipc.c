@@ -165,7 +165,7 @@ Result SaltySD_LoadELF(u64 heap, u64* elf_addr, u64* elf_size, char* name)
 	return ret;
 }
 
-Result SaltySD_Memcpy(u64 to, u64 from, u64 size)
+Result SaltySD_Memcpy(uintptr_t to, uintptr_t from, size_t size)
 {
 	Result ret;
 	IpcCommand c;
@@ -336,7 +336,7 @@ Result SaltySD_print(char* out)
 	return ret;
 }
 
-Result SaltySD_CheckIfSharedMemoryAvailable(ptrdiff_t *new_offset, u64 new_size)
+Result SaltySD_CheckIfSharedMemoryAvailable(ptrdiff_t *new_offset, size_t new_size)
 {
 	Result ret = 0;
 
