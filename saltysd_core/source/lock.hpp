@@ -130,7 +130,7 @@ namespace LOCK {
 		int8_t offsets_count = read8(buffer);
 		uint8_t region = read8(buffer);
 		offsets_count -= 1;
-		intptr_t address = 0;
+		int64_t address = 0;
 		switch(region) {
 			case 0:
 				break;
@@ -171,7 +171,7 @@ namespace LOCK {
 			}
 			else address += (int64_t)temp_offset;
 			if (i+1 < offsets_count) {
-				if (unsafe_address && !isAddressValid(*(int64_t*)address)) return -2;
+				if (unsafe_address && !isAddressValid(*(uintptr_t*)address)) return -2;
 				address = *(uintptr_t*)address;
 			}
 			#endif
