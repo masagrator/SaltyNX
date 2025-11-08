@@ -114,12 +114,12 @@ void setupAppHeap(void)
 
 	rc = svcSetHeapSize(&addr, 0x200000);
 
-	#if defined(SWITCH) || defined(OUNCE)
 	if (rc || addr == 0)
 	{
+		#if defined(SWITCH) || defined(OUNCE)
 		write_log("SaltySD Bootstrap: svcSetHeapSize failed with err %x\n", rc);
+		#endif
 	}
-	#endif
 
 	g_heapAddr = (uintptr_t)addr;
 	g_heapSize = 0x200000;
