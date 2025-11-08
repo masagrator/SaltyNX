@@ -1,6 +1,9 @@
 #include <elf.h>
+
+#if defined(SWITCH) || defined(OUNCE)
 #define DT_RELRENT	37
 typedef Elf64_Xword Elf64_Relr;
+#endif
 
 #include <switch_min.h>
 #include <stdlib.h>
@@ -32,31 +35,44 @@ struct ReplacedSymbol
 	const char* name;
 };
 
-uint64_t roLoadModule = 0;
+uintptr_t roLoadModule = 0;
 
 struct ReplacedSymbol* replaced_symbols = NULL;
 int32_t num_replaced_symbols = 0;
 
 bool relr_available = false;
 
-uint64_t SaltySDCore_GetSymbolAddr(void* base, const char* name)
+uintptr_t SaltySDCore_GetSymbolAddr(void* base, const char* name)
 {
+	#if defined(SWITCH32) || defined(OUNCE32)
+	const Elf32_Dyn* dyn = NULL;
+	const Elf32_Sym* symtab = NULL;
+	#else
 	const Elf64_Dyn* dyn = NULL;
 	const Elf64_Sym* symtab = NULL;
+	#endif
 	const char* strtab = NULL;
 	
 	uint64_t numsyms = 0;
 	
 	struct nso_header* header = (struct nso_header*)base;
 	struct mod0_header* modheader = (struct mod0_header*)(base + header->mod);
+	#if defined(SWITCH32) || defined(OUNCE32)
+	dyn = (const Elf32_Dyn*)((void*)modheader + modheader->dynamic);
+	#else
 	dyn = (const Elf64_Dyn*)((void*)modheader + modheader->dynamic);
+	#endif
 
 	for (; dyn->d_tag != DT_NULL; dyn++)
 	{
 		switch (dyn->d_tag)
 		{
 			case DT_SYMTAB:
+				#if defined(SWITCH32) || defined(OUNCE32)
+				symtab = (const Elf32_Sym*)(base + dyn->d_un.d_ptr);
+				#else
 				symtab = (const Elf64_Sym*)(base + dyn->d_un.d_ptr);
+				#endif
 				break;
 			case DT_STRTAB:
 				strtab = (const char*)(base + dyn->d_un.d_ptr);
@@ -72,8 +88,12 @@ uint64_t SaltySDCore_GetSymbolAddr(void* base, const char* name)
 		}
 	}
 	
+	#if defined(SWITCH32) || defined(OUNCE32)
+	numsyms = ((void*)strtab - (void*)symtab) / sizeof(Elf32_Sym);
+	#else
 	numsyms = ((void*)strtab - (void*)symtab) / sizeof(Elf64_Sym);
-	
+	#endif
+
 	for (int i = 0; i < numsyms; i++)
 	{
 		if (!strcmp(strtab + symtab[i].st_name, name) && symtab[i].st_value)
@@ -85,26 +105,26 @@ uint64_t SaltySDCore_GetSymbolAddr(void* base, const char* name)
 	return 0;
 }
 
-uint64_t SaltySDCore_FindSymbol(const char* name)
+uintptr_t SaltySDCore_FindSymbol(const char* name)
 {
 	if (!elfs) return 0;
 
 	for (int i = 0; i < num_elfs; i++)
 	{
-		uint64_t ptr = SaltySDCore_GetSymbolAddr(elfs[i], name);
+		uintptr_t ptr = SaltySDCore_GetSymbolAddr(elfs[i], name);
 		if (ptr) return ptr;
 	}
 	
 	return 0;
 }
 
-uint64_t SaltySDCore_FindSymbolBuiltin(const char* name)
+uintptr_t SaltySDCore_FindSymbolBuiltin(const char* name)
 {
 	if (!builtin_elfs) return 0;
 
 	for (int i = 0; i < num_builtin_elfs; i++)
 	{
-		uint64_t ptr = SaltySDCore_GetSymbolAddr(builtin_elfs[i], name);
+		uintptr_t ptr = SaltySDCore_GetSymbolAddr(builtin_elfs[i], name);
 		if (ptr) return ptr;
 	}
 	
@@ -125,26 +145,49 @@ void SaltySDCore_RegisterBuiltinModule(void* base)
 
 void SaltySDCore_ReplaceModuleImport(void* base, const char* name, void* newfunc, bool update)
 {
+	
+	#if defined(SWITCH32) || defined(OUNCE32)
+	const Elf32_Dyn* dyn = NULL;
+	const Elf32_Rela* rela = NULL;
+	const Elf32_Sym* symtab = NULL;
+	#else
 	const Elf64_Dyn* dyn = NULL;
 	const Elf64_Rela* rela = NULL;
 	const Elf64_Sym* symtab = NULL;
+	#endif
 	char* strtab = NULL;
 	uint64_t relasz = 0;
 	
 	struct nso_header* header = (struct nso_header*)base;
 	struct mod0_header* modheader = (struct mod0_header*)(base + header->mod);
+	#if defined(SWITCH32) || defined(OUNCE32)
+	dyn = (const Elf32_Dyn*)((void*)modheader + modheader->dynamic);
+	#else
 	dyn = (const Elf64_Dyn*)((void*)modheader + modheader->dynamic);
+	#endif
 
 	for (; dyn->d_tag != DT_NULL; dyn++)
 	{
 		switch (dyn->d_tag)
 		{
 			case DT_SYMTAB:
+				#if defined(SWITCH32) || defined(OUNCE32)
+
+				#else
 				symtab = (const Elf64_Sym*)(base + dyn->d_un.d_ptr);
+				#endif
 				break;
 			case DT_STRTAB:
 				strtab = (char*)(base + dyn->d_un.d_ptr);
 				break;
+			#if defined(SWITCH32) || defined(OUNCE32)
+			case DT_REL:
+				rela = (const Elf32_Rel*)(base + dyn->d_un.d_ptr);
+				break;
+			case DT_RELSZ:
+				relasz += dyn->d_un.d_val / sizeof(Elf32_Rel);
+				break;
+			#else
 			case DT_RELA:
 				rela = (const Elf64_Rela*)(base + dyn->d_un.d_ptr);
 				break;
@@ -156,8 +199,13 @@ void SaltySDCore_ReplaceModuleImport(void* base, const char* name, void* newfunc
 			case DT_RELASZ:
 				relasz += dyn->d_un.d_val / sizeof(Elf64_Rela);
 				break;
+			#endif
 			case DT_PLTRELSZ:
+				#if defined(SWITCH32) || defined(OUNCE32)
+				relasz += dyn->d_un.d_val / sizeof(Elf32_Rela);
+				#else
 				relasz += dyn->d_un.d_val / sizeof(Elf64_Rela);
+				#endif
 				break;
 		}
 	}
@@ -167,7 +215,11 @@ void SaltySDCore_ReplaceModuleImport(void* base, const char* name, void* newfunc
 		return;
 	}
 	
-	uint64_t numsyms = ((void*)strtab - (void*)symtab) / sizeof(Elf64_Sym);
+	#if defined(SWITCH32) || defined(OUNCE32)
+	size_t numsyms = ((void*)strtab - (void*)symtab) / sizeof(Elf32_Sym);
+	#else
+	size_t numsyms = ((void*)strtab - (void*)symtab) / sizeof(Elf64_Sym);
+	#endif
 
 	if (!update) {
 		bool detected = false;
@@ -188,17 +240,31 @@ void SaltySDCore_ReplaceModuleImport(void* base, const char* name, void* newfunc
 		}
 	}
 
-	int rela_idx = 0;
-	for (; relasz--; rela++, rela_idx++)
+	
+	for (int rela_idx = 0; relasz--; rela++, rela_idx++)
 	{
+		#if defined(SWITCH32) || defined(OUNCE32)
+		if (ELF32_R_TYPE(rela->r_info) == R_ARM_RELATIVE) continue;
+		uint32_t sym_idx = ELF32_R_SYM(rela->r_info);
+		#else
 		if (ELF64_R_TYPE(rela->r_info) == R_AARCH64_RELATIVE) continue;
-		
 		uint32_t sym_idx = ELF64_R_SYM(rela->r_info);
+		#endif
+		
 		if (sym_idx >= numsyms) continue;
 
 		char* rel_name = strtab + symtab[sym_idx].st_name;
 		if (strcmp(name, rel_name)) continue;
-		
+		#if defined(SWITCH32) || defined(OUNCE32)
+		SaltySDCore_printf("SaltySD Core: %x %x %x %s to %p, %p + %x = %p\n", symtab[sym_idx].st_value, (uint32_t)rela - (uint32_t)base, rela_idx, rel_name, newfunc, base, rela->r_offset, base + rela->r_offset);
+		Elf32_Rel replacement;
+		replacement.r_offset = rela->r_offset;
+		replacement.r_info = 0x17;
+
+		SaltySD_Memcpy((u32)rela, (u32)&replacement, sizeof(Elf32_Rel));
+		*(void**)(base + rela->r_offset) = newfunc;
+
+		#else
 		SaltySDCore_printf("SaltySD Core: %x %s to %p, %llx %p\n", rela_idx, rel_name, newfunc, rela->r_offset, base + rela->r_offset);
 		
 		if (!update) {
@@ -210,6 +276,7 @@ void SaltySDCore_ReplaceModuleImport(void* base, const char* name, void* newfunc
 		else {
 			*(void**)(base + rela->r_offset) = newfunc;
 		}
+		#endif
 	}
 }
 
@@ -225,26 +292,50 @@ void SaltySDCore_ReplaceImport(const char* name, void* newfunc)
 
 void SaltySDCore_DynamicLinkModule(void* base)
 {
+	#if defined(SWITCH32) || defined(OUNCE32)
+	const Elf32_Dyn* dyn = NULL;
+	const Elf32_Rel* rel = NULL;
+	const Elf32_Sym* symtab = NULL;
+	uint64_t relsz = 0;
+	#else
 	const Elf64_Dyn* dyn = NULL;
 	const Elf64_Rela* rela = NULL;
 	const Elf64_Sym* symtab = NULL;
-	char* strtab = NULL;
 	uint64_t relasz = 0;
+	#endif
+	char* strtab = NULL;
 	
 	struct nso_header* header = (struct nso_header*)base;
 	struct mod0_header* modheader = (struct mod0_header*)(base + header->mod);
+
+	#if defined(SWITCH32) || defined(OUNCE32)
+	dyn = (const Elf32_Dyn*)((void*)modheader + modheader->dynamic);
+	#else
 	dyn = (const Elf64_Dyn*)((void*)modheader + modheader->dynamic);
+	#endif
 
 	for (; dyn->d_tag != DT_NULL; dyn++)
 	{
 		switch (dyn->d_tag)
 		{
 			case DT_SYMTAB:
+				#if defined(SWITCH32) || defined(OUNCE32)
+				symtab = (const Elf32_Sym*)(base + dyn->d_un.d_ptr);
+				#else
 				symtab = (const Elf64_Sym*)(base + dyn->d_un.d_ptr);
+				#endif
 				break;
 			case DT_STRTAB:
 				strtab = (char*)(base + dyn->d_un.d_ptr);
 				break;
+			#if defined(SWITCH32) || defined(OUNCE32)
+			case DT_REL:
+				rel = (const Elf32_Rel*)(base + dyn->d_un.d_ptr);
+				break;
+			case DT_RELSZ:
+				relsz += dyn->d_un.d_val / sizeof(Elf32_Rel);
+				break;
+			#else
 			case DT_RELA:
 				rela = (const Elf64_Rela*)(base + dyn->d_un.d_ptr);
 				break;
@@ -256,12 +347,54 @@ void SaltySDCore_DynamicLinkModule(void* base)
 				break;
 			case DT_RELRSZ:
 				break;
+			#endif
 			case DT_PLTRELSZ:
+				#if defined(SWITCH32) || defined(OUNCE32)
+				relsz += dyn->d_un.d_val / sizeof(Elf32_Rela);
+				#else
 				relasz += dyn->d_un.d_val / sizeof(Elf64_Rela);
+				#endif
 				break;
 		}
 	}
 
+	#if defined(SWITCH32) || defined(OUNCE32)
+	if (rel == NULL)
+	{
+		return;
+	}
+
+	for (; relsz--; rel++)
+	{
+		if (ELF32_R_TYPE(rel->r_info) == R_ARM_RELATIVE) continue;
+
+		uint32_t sym_idx = ELF32_R_SYM(rel->r_info);
+		char* name = strtab + symtab[sym_idx].st_name;
+
+		uint32_t sym_val = (uint32_t)base + symtab[sym_idx].st_value;
+		if (!symtab[sym_idx].st_value)
+			sym_val = 0;
+
+		if (!symtab[sym_idx].st_shndx && sym_idx)
+			sym_val = SaltySDCore_FindSymbol(name);
+
+		uint32_t sym_val_and_addend = sym_val + 0;
+
+		SaltySDCore_printf("SaltySD Core: %x %llx->%llx %s\n", sym_idx, symtab[sym_idx].st_value + 0, sym_val_and_addend, name);
+
+		switch (ELF32_R_TYPE(rel->r_info))
+		{
+			case R_ARM_GLOB_DAT:
+			case R_ARM_JUMP_SLOT:
+			case R_ARM_ABS32:
+			{
+				uint64_t* ptr = (uint64_t*)(base + rel->r_offset);
+				*ptr = sym_val_and_addend;
+				break;
+			}
+		}
+	}	
+	#else
 	if (rela == NULL)
 	{
 		return;
@@ -296,7 +429,8 @@ void SaltySDCore_DynamicLinkModule(void* base)
 				break;
 			}
 		}
-	}	
+	}
+	#endif
 }
 
 struct Object {
@@ -317,9 +451,13 @@ void SaltySDCore_fillRoLoadModule() {
 	return;
 }
 
+#if defined(SWITCH) || defined(OUNCE)
+
 bool SaltySDCore_isRelrAvailable() {
 	return relr_available;
 }
+
+#endif
 
 void SaltySDCore_getDataForUpdate(uint32_t* num_builtin_elfs_ptr, int32_t* num_replaced_symbols_ptr, struct ReplacedSymbol** replaced_symbols_ptr, void*** builtin_elfs_ptr) {
 	*num_builtin_elfs_ptr = num_builtin_elfs;
