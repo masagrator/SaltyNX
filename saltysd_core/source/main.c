@@ -375,7 +375,7 @@ void** SaltySDCore_LoadPluginsInDir(char* path, void** entries, size_t* num_elfs
 				entries = realloc(entries, *num_elfs * sizeof(void*));
 				entries[*num_elfs-1] = (void*)elf_addr;
 
-				SaltySDCore_RegisterModule(entries[*num_elfs-1]);
+				SaltySDCore_RegisterModule((uintptr_t)entries[*num_elfs-1]);
 				elf_area_size += elf_size;
 			}
 		}
