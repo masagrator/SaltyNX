@@ -117,7 +117,7 @@ typedef void (*SetFocusHandlingMode_0)(AppletFocusHandlingMode mode);
 typedef u32 (*FileAccessorRead_0)(void* fileHandle, size_t* bytesRead, int64_t position, void* buffer, size_t readBytes, unsigned int* ReadOption);
 typedef u64 (*_ZN2nn2os17ConvertToTimeSpanENS0_4TickE_0)(u64 tick);
 typedef u64 (*_ZN2nn2os13GetSystemTickEv_0)();
-typedef u32 (*_ZN2nn2ro12LookupSymbolEPmPKc_0)(uintptr_t* pOutAddress, const char* name);
+typedef u32 (*nnroLookupSymbol_0)(uintptr_t* pOutAddress, const char* name);
 typedef void (*_ZN2nn2os13GetSystemTickEv_1)(u64* tick);
 typedef u64 (*_ZN2nn2os22GetSystemTickFrequencyEv_0)();
 typedef void (*_ZN2nn2os22GetSystemTickFrequencyEv_1)(u64* tickfrequency);
@@ -718,17 +718,17 @@ namespace vk {
 	u32 LookupSymbol(uintptr_t* pOutAddress, const char* name) {
 		if (!strcmp("vkGetInstanceProcAddr", name)) {
 			if (!Address_weaks.vkGetInstanceProcAddr)
-				((_ZN2nn2ro12LookupSymbolEPmPKc_0)(Address_weaks.LookupSymbol))(&Address_weaks.vkGetInstanceProcAddr, name);
+				((nnroLookupSymbol_0)(Address_weaks.LookupSymbol))(&Address_weaks.vkGetInstanceProcAddr, name);
 			*pOutAddress = (uintptr_t)&GetInstanceProcAddr;
 			return 0;
 		}
 		if (!strcmp("vkGetDeviceProcAddr", name)) {
 			if (!Address_weaks.vkGetDeviceProcAddr)
-				((_ZN2nn2ro12LookupSymbolEPmPKc_0)(Address_weaks.LookupSymbol))(&Address_weaks.vkGetDeviceProcAddr, name);
+				((nnroLookupSymbol_0)(Address_weaks.LookupSymbol))(&Address_weaks.vkGetDeviceProcAddr, name);
 			*pOutAddress = (uintptr_t)&GetDeviceProcAddr;
 			return 0;
 		}
-		return ((_ZN2nn2ro12LookupSymbolEPmPKc_0)(Address_weaks.LookupSymbol))(pOutAddress, name);
+		return ((nnroLookupSymbol_0)(Address_weaks.LookupSymbol))(pOutAddress, name);
 	}
 }
 
@@ -1311,7 +1311,11 @@ extern "C" {
 			Address_weaks.GetSystemTick = SaltySDCore_FindSymbolBuiltin("_ZN2nn2os13GetSystemTickEv");
 			Address_weaks.GetSystemTickFrequency = SaltySDCore_FindSymbolBuiltin("_ZN2nn2os22GetSystemTickFrequencyEv");
 			Address_weaks.SetFocusHandlingMode = SaltySDCore_FindSymbolBuiltin("_ZN2nn2oe20SetFocusHandlingModeENS0_17FocusHandlingModeE");
+			#if defined(SWITCH32) || defined(OUNCE32)
+			Address_weaks.LookupSymbol = SaltySDCore_FindSymbolBuiltin("_ZN2nn2ro12LookupSymbolEPjPKc");
+			#else
 			Address_weaks.LookupSymbol = SaltySDCore_FindSymbolBuiltin("_ZN2nn2ro12LookupSymbolEPmPKc");
+			#endif
 			Address_weaks.SetUserInactivityDetectionTimeExtended = SaltySDCore_FindSymbolBuiltin("_ZN2nn2oe44SetUserInactivityDetectionTimeExtendedUnsafeEb");
 
 			SaltySDCore_ReplaceImport("nvnBootstrapLoader", (void*)NVN::BootstrapLoader_1);
@@ -1338,7 +1342,11 @@ extern "C" {
 			SaltySDCore_ReplaceImport("_ZN2nn2oe20SetFocusHandlingModeENS0_17FocusHandlingModeE", (void*)nn::setFocusHandlingMode);
 			if (Address_weaks.vkGetInstanceProcAddr) {
 				//Minecraft is using nn::ro::LookupSymbol to search for Vulkan functions
+				#if defined(SWITCH32) || defined(OUNCE32)
+				SaltySDCore_ReplaceImport("_ZN2nn2ro12LookupSymbolEPjPKc", (void*)vk::LookupSymbol);
+				#else
 				SaltySDCore_ReplaceImport("_ZN2nn2ro12LookupSymbolEPmPKc", (void*)vk::LookupSymbol);
+				#endif
 			}
 			FILE* readFlag = SaltySDCore_fopen("sdmc:/SaltySD/flags/blockfilestats.flag", "rb");
 			if (!readFlag) {
