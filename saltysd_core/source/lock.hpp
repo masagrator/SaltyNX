@@ -3,6 +3,7 @@
 #include "tinyexpr/tinyexpr.h"
 #include <array>
 
+#if defined(SWITCH) || defined(OUNCE)
 //We need to define something in that section and reference its pointer to not get whole section discarded by garbage collector
 void __attribute__ ((section(".codecave"))) codeCave() {}
 
@@ -20,6 +21,8 @@ namespace nn {
 	Result SetUserInactivityDetectionTimeExtended(bool isTrue);
 }
 
+#endif
+
 namespace LOCK {
 
 	uint32_t offset = 0;
@@ -27,16 +30,16 @@ namespace LOCK {
 	uint8_t gen = 3;
 	bool MasterWriteApplied = false;
 	double overwriteRefreshRate = 0;
-	uint64_t DockedRefreshRateDelay = 4000000000;
+	size_t DockedRefreshRateDelay = 4000000000;
 	uint8_t masterWrite = 0;
 	uint32_t compiledSize = 0;
 
 	struct {
-		int64_t main_start;
-		uint64_t alias_start;
-		uint64_t heap_start;
-		int64_t variables_start;
-		int64_t codeCave_start;
+		intptr_t main_start;
+		uintptr_t alias_start;
+		uintptr_t heap_start;
+		intptr_t variables_start;
+		intptr_t codeCave_start;
 	} mappings;
 
 	template <typename T>
@@ -95,18 +98,24 @@ namespace LOCK {
 	}
 
 	template <typename T>
-	void writeValue(T value, int64_t address) {
+	void writeValue(T value, uintptr_t address) {
 		if (*(T*)address != value)
 			*(T*)address = value;
 	}
 
 	bool unsafeCheck = false;
 
-	bool NOINLINE isAddressValid(int64_t address) {
+	bool NOINLINE isAddressValid(uintptr_t address_in) {
+
+		int64_t address = address_in;
 		MemoryInfo memoryinfo = {0};
 		u32 pageinfo = 0;
 
+		#if defined(SWITCH32) || defined(OUNCE32)
+		if (address < 0x200000 || address > 0xFFFFFFFF) return false;
+		#else
 		if ((address < 0x8000000) || (address >= 0x8000000000)) return false;
+		#endif
 
 		Result rc = svcQueryMemory(&memoryinfo, &pageinfo, address);
 		if (R_FAILED(rc)) return false;
@@ -115,7 +124,7 @@ namespace LOCK {
 		return false;
 	}
 
-	int64_t NOINLINE getAddress(uint8_t* buffer) {
+	intptr_t NOINLINE getAddress(uint8_t* buffer) {
 		bool unsafe_address = !unsafeCheck;
 		if (gen == 4) unsafe_address = (bool)read8(buffer);
 		int8_t offsets_count = read8(buffer);
@@ -134,16 +143,26 @@ namespace LOCK {
 			case 3:
 				address = mappings.alias_start;
 				break;
+			#if defined(SWITCH) || defined(OUNCE)
 			case 4:
 				address = mappings.variables_start;
 				break;
 			case 5:
 				address = mappings.codeCave_start;
 				break;
+			#endif
 			default:
 				return -1;
 		}
 		for (int i = 0; i < offsets_count; i++) {
+			#if defined(SWITCH32) || defined(OUNCE32)
+			int32_t temp_offset = (int32_t)read32(buffer);
+			address += temp_offset;
+			if (i+1 < offsets_count) {
+				if (unsafe_address && !isAddressValid(*(uintptr_t*)address)) return -2;
+				address = *(uintptr_t*)address;
+			}
+			#else
 			uint32_t temp_offset = read32(buffer);
 			if (region > 0 && region < 4) {
 				int32_t temp_offset_int = 0;
@@ -152,9 +171,10 @@ namespace LOCK {
 			}
 			else address += (int64_t)temp_offset;
 			if (i+1 < offsets_count) {
-				if (unsafe_address && !isAddressValid(*(int64_t*)address)) return -2;
-				address = *(uint64_t*)address;
+				if (unsafe_address && !isAddressValid(*(uintptr_t*)address)) return -2;
+				address = *(uintptr_t*)address;
 			}
+			#endif
 		}
 		return address;
 	}
@@ -177,7 +197,7 @@ namespace LOCK {
 		if (masterWrite) start_offset += 4;
 		if (*(uint32_t*)(&(buffer[8])) != start_offset)
 			return false;
-		compiledSize = buffer[6] * buffer[6];
+		compiledSize = (uint32_t)buffer[6] * buffer[6];
 		return true;
 
 	}
@@ -195,6 +215,8 @@ namespace LOCK {
 		free(temp_buffer);
 		return 0;
 	}
+
+#if defined(SWITCH) || defined(OUNCE)
 
 	Result processVariables(FILE* file) {
 		uint32_t main_offset = 0;
@@ -323,6 +345,7 @@ namespace LOCK {
 		return 0; //TO DO
 	}
 
+#endif
 	Result applyMasterWrite(FILE* file, size_t master_offset) {
 		uint32_t offset_impl = 0;
 
@@ -339,8 +362,10 @@ namespace LOCK {
 			SaltySDCore_printf("processes opcode: %d, offset: 0x%x\n", OPCODE, ftell(file));
 			switch(OPCODE) {
 				case 1: {rc = processBytes(file); break;}
+				#if defined(SWITCH) || defined(OUNCE)
 				case 2: {rc = processVariables(file); break;}
 				case 3: {rc = processCodeCave(file); break;}
+				#endif
 				case -1: {MasterWriteApplied = true; return 0;}
 				default: return 0x355;
 			}
@@ -561,9 +586,13 @@ namespace LOCK {
 			*/
 			int8_t OPCODE = read8(buffer);
 			if (OPCODE == 1) {
+				#if defined(SWITCH32) || defined(OUNCE32)
+				uintptr_t address = getAddress(buffer);
+				#else
 				int64_t address = getAddress(buffer);
 				if (address < 0) 
 					return 6;
+				#endif
 				/* value_type:
 					1		=	uint8
 					2		=	uin16
@@ -629,10 +658,13 @@ namespace LOCK {
 				}
 			}
 			else if (OPCODE == 2) {
+				#if defined(SWITCH32) || defined(OUNCE32)
+				uintptr_t address = getAddress(buffer);
+				#else
 				int64_t address = getAddress(buffer);
 				if (address < 0) 
 					return 6;
-
+				#endif
 				/* compare_type:
 					1	=	>
 					2	=	>=

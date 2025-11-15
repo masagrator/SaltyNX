@@ -1,3 +1,4 @@
+#ifdef __arch64__
 .macro SVC_BEGIN name
     .section .text.\name, "ax", %progbits
     .global \name
@@ -634,3 +635,4 @@ SVC_BEGIN svcCallSecureMonitor
     stp x6, x7, [x8, #0x30]
     ret
 SVC_END
+#endif

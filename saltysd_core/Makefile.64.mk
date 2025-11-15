@@ -7,7 +7,7 @@ $(error "Please set DEVKITPRO in your environment. export DEVKITPRO=<path to>/de
 endif
 
 TOPDIR ?= $(CURDIR)
-include $(DEVKITPRO)/devkitARM/base_rules
+include $(TOPDIR)/../libnx_min/nx/switch_rules
 
 #---------------------------------------------------------------------------------
 # TARGET is the name of the output
@@ -29,9 +29,11 @@ include $(DEVKITPRO)/devkitARM/base_rules
 #	 - icon.jpg
 #	 - <libnx folder>/default_icon.jpg
 #---------------------------------------------------------------------------------
-TARGET		:=	saltysd_bootstrap32
+include $(TOPDIR)/../version.mk
+
+TARGET		:=	saltysd_core
 BUILD		:=	build
-SOURCES		:=	source
+SOURCES		:=	source source/tinyexpr
 DATA		:=	data
 INCLUDES	:=	include
 EXEFS_SRC	:=	exefs_src
@@ -39,27 +41,27 @@ EXEFS_SRC	:=	exefs_src
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
-ARCH			:=	-march=armv6k -mtune=cortex-a57 -mtp=soft -fPIC
+ARCH	    :=	-march=armv8-a -mtune=cortex-a57 -mtp=soft -fPIE -fno-plt
 
-CFLAGS				:=	-Wall -Wno-pointer-to-int-cast -O3 \
-					-ffast-math \
-					$(ARCH) $(DEFINES)
+CFLAGS	:=	-Wall -O2 \
+			-ffast-math -ffunction-sections -fdata-sections \
+			$(ARCH) $(DEFINES)
 
-CFLAGS				+=	$(INCLUDE) -DSWITCH
+CFLAGS	+=	$(INCLUDE) -DSWITCH -DAPP_VERSION=\"$(VERSION)\"
 
-CXXFLAGS			:= $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++23
+CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++23
 
-ASFLAGS				:=	-g $(ARCH)
-LDFLAGS_3K			=	-specs=$(CURDIR)/switch_3k.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
-LDFLAGS_5K			=	-specs=$(CURDIR)/switch_5k.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
+ASFLAGS	     :=	-g $(ARCH)
 
-LIBS				:= -lnx_min
+LDFLAGS	=	-z max-page-size=0x1000 -specs=$(TOPDIR)/../libnx_min/nx/switch.specs -g $(ARCH) -Wl,--dynamic-list=$(CURDIR)/../dynamic_symbols.txt -Wl,-Map,$(notdir $*.map)
+
+LIBS	:= -lnx_min
 
 #---------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level containing
 # include and lib
 #---------------------------------------------------------------------------------
-LIBDIRS	:= $(PORTLIBS) $(LIBNX) $(CURDIR)/../libnx32_min/nx/
+LIBDIRS	:= $(PORTLIBS) $(CURDIR)/../libnx_min/nx/
 
 
 #---------------------------------------------------------------------------------
@@ -98,7 +100,7 @@ endif
 
 export OFILES	:=	$(addsuffix .o,$(BINFILES)) \
 			$(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(SFILES:.s=.o)
-			
+
 export OFILES2	:=	$(foreach file,$(OFILES),$(BUILD)/$(file))
 
 export INCLUDE	:=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
@@ -141,19 +143,16 @@ all: $(BUILD)
 
 $(BUILD):
 	@[ -d $@ ] || mkdir -p $@
-	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
-	@echo linking $(notdir $@)
-	@$(LD) $(LDFLAGS_3K) $(OFILES2) $(LIBPATHS) $(LIBS) -o $(TARGET)_3k.elf
-	@$(LD) $(LDFLAGS_5K) $(OFILES2) $(LIBPATHS) $(LIBS) -o $(TARGET)_5k.elf
-	@$(OBJCOPY) --only-keep-debug $(CURDIR)/$(TARGET)_3k.elf $(CURDIR)/$(TARGET)_3k.dbg
-	@$(OBJCOPY) --add-gnu-debuglink=$(CURDIR)/$(TARGET)_3k.dbg --strip-debug --strip-unneeded $(CURDIR)/$(TARGET)_3k.elf
-	@$(OBJCOPY) --only-keep-debug $(CURDIR)/$(TARGET)_5k.elf $(CURDIR)/$(TARGET)_5k.dbg
-	@$(OBJCOPY) --add-gnu-debuglink=$(CURDIR)/$(TARGET)_5k.dbg --strip-debug --strip-unneeded $(CURDIR)/$(TARGET)_5k.elf
-
+	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile.64.mk
+	@$(OBJCOPY) --only-keep-debug $(CURDIR)/$(TARGET).elf $(CURDIR)/$(TARGET).dbg
+	@$(OBJCOPY) --add-gnu-debuglink=$(CURDIR)/$(TARGET).dbg --strip-debug --strip-unneeded $(CURDIR)/$(TARGET).elf
+	@$(DEVKITPRO)/devkitA64/bin/aarch64-none-elf-size $(CURDIR)/$(TARGET).elf | awk 'NR==2 {print $$4}' > size.txt
+	@python3 patch_size.py
+	@rm -fr size.txt
 #---------------------------------------------------------------------------------
 clean:
 	@echo clean ...
-	@rm -fr $(BUILD) $(TARGET).pfs0 $(TARGET).nso $(TARGET).nro $(TARGET).nsp $(TARGET).nacp $(TARGET)_3k.elf $(TARGET)_5k.elf $(TARGET)_3k-debug.elf $(TARGET)_5k-debug.elf .lst .map
+	@rm -fr size.txt $(BUILD) $(TARGET).pfs0 $(TARGET).nso $(TARGET).nro $(TARGET).nsp $(TARGET).nacp $(TARGET).elf $(TARGET).dbg .map
 
 
 #---------------------------------------------------------------------------------

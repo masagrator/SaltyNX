@@ -96,8 +96,12 @@ static uint32_t* sharedOperationMode = 0;
 ReverseNX_state loadSave() {
 	char path[128];
     uint64_t titid = 0;
-    svcGetInfo(&titid, InfoType_TitleId, CUR_PROCESS_HANDLE, 0);	
+    svcGetInfo(&titid, InfoType_TitleId, CUR_PROCESS_HANDLE, 0);
+	#if defined(SWITCH32) || defined(OUNCE32)
+	snprintf(path, sizeof(path), "sdmc:/SaltySD/plugins/ReverseNX-RT/%016llX.dat", titid);
+	#else
 	snprintf(path, sizeof(path), "sdmc:/SaltySD/plugins/ReverseNX-RT/%016lX.dat", titid);
+	#endif
 	errno = 0;
 	FILE* save_file = SaltySDCore_fopen(path, "rb");
 	if (save_file) {

@@ -27,7 +27,11 @@ Handle orig_main_thread;
 void* orig_ctx;
 
 Handle sdcard;
+#if defined(SWITCH32) || defined(OUNCE32)
+const size_t elf_area_size = 0x200000; //We assume that Core itself won't take more than 0x200000 bytes;
+#else
 volatile size_t elf_area_size = 0xDEADBEEF; //MAGIC number to be replaced after code gets compiled
+#endif
 
 ThreadVars vars_orig;
 ThreadVars vars_mine;
@@ -65,15 +69,15 @@ void __attribute__((weak)) __libnx_exit(int rc)
 	// Restore TLS stuff
 	*getThreadVars() = vars_orig;
 	
-	u64 addr = SaltySDCore_getCodeStart();
+	uintptr_t addr = SaltySDCore_getCodeStart();
 
 	__nx_exit_clear(orig_ctx, orig_main_thread, (void*)addr);
 }
 
-u64  g_heapAddr;
+uintptr_t g_heapAddr;
 size_t g_heapSize;
 
-void SaltySDCore_LoadPatches (bool Aarch64) {
+void SaltySDCore_LoadPatches() {
 	char tmp4[256] = "";
 	char tmp2[256] = "";
 	char instr[256] = "";
@@ -90,7 +94,12 @@ void SaltySDCore_LoadPatches (bool Aarch64) {
 		while ((dir = readdir(d)) != NULL)
 		{
 			char *dot = strrchr(dir->d_name, '.');
-			if (dot && !strcmp(dot, ".asm64")) {
+			#if defined(SWITCH32) || defined(OUNCE32)
+			if (dot && !strcmp(dot, ".asm32"))
+			#else
+			if (dot && !strcmp(dot, ".asm64"))
+			#endif
+			{
 				snprintf(tmp2, 0x100, "%s%s", tmp4, dir->d_name);
 				SaltySDCore_printf("SaltySD Patcher: Found %s\n", dir->d_name);
 				FILE* patch = fopen(tmp2, "rb");
@@ -108,10 +117,11 @@ void SaltySDCore_LoadPatches (bool Aarch64) {
 				char* filename = dir->d_name;
 				uint8_t namelen = strlen(filename);
 				filename[namelen - 6] = 0;
-				uint64_t position = SaltySDCore_FindSymbol(filename);
+				uintptr_t position = SaltySDCore_FindSymbol(filename);
 				if (position) {
+					#
 					SaltySDCore_printf("SaltySD Patcher: Symbol Position: %016llx\n", position);
-					SaltySD_Memcpy(position, (uint64_t)instr, size);
+					SaltySD_Memcpy(position, (uintptr_t)instr, size);
 				}
 				else {
 					SaltySDCore_printf("SaltySD Patcher: Symbol Position: not found\n", position);
@@ -125,7 +135,11 @@ void SaltySDCore_LoadPatches (bool Aarch64) {
 	
 	SaltySDCore_printf("SaltySD Patcher: Searching patches in dir '/%016llx'...\n", tid);
 	
+	#if defined(SWITCH32) || defined(OUNCE32)
+	snprintf(tmp4, 0x100, "sdmc:/SaltySD/patches/%016llx/", tid);
+	#else
 	snprintf(tmp4, 0x100, "sdmc:/SaltySD/patches/%016lx/", tid);
+	#endif
 
 	d = opendir(tmp4);
 	if (d)
@@ -133,7 +147,12 @@ void SaltySDCore_LoadPatches (bool Aarch64) {
 		while ((dir = readdir(d)) != NULL)
 		{
 			char *dot = strrchr(dir->d_name, '.');
-			if (dot && !strcmp(dot, ".asm64")) {
+			#if defined(SWITCH32) || defined(OUNCE32)
+			if (dot && !strcmp(dot, ".asm32")) 
+			#else
+			if (dot && !strcmp(dot, ".asm64")) 
+			#endif
+			{
 				snprintf(tmp2, 0x100, "%s%s", tmp4, dir->d_name);
 				SaltySDCore_printf("SaltySD Patcher: Found %s\n", dir->d_name);
 				FILE* patch = fopen(tmp2, "rb");
@@ -151,10 +170,10 @@ void SaltySDCore_LoadPatches (bool Aarch64) {
 				char* filename = dir->d_name;
 				uint8_t namelen = strlen(filename);
 				filename[namelen - 6] = 0;
-				uint64_t position = SaltySDCore_FindSymbol(filename);
+				uintptr_t position = SaltySDCore_FindSymbol(filename);
 				if (position) {
 					SaltySDCore_printf("SaltySD Patcher: Symbol Position: %016llx\n", position);
-					SaltySD_Memcpy(position, (uint64_t)instr, size);
+					SaltySD_Memcpy(position, (uintptr_t)instr, size);
 				}
 				else {
 					SaltySDCore_printf("SaltySD Patcher: Symbol Position: not found\n", position);
@@ -166,6 +185,8 @@ void SaltySDCore_LoadPatches (bool Aarch64) {
 	
 	return;
 }
+
+#if defined(SWITCH) || defined(OUNCE)
 
 void setupELFHeap(void)
 {
@@ -179,13 +200,13 @@ void setupELFHeap(void)
 		debug_log("SaltySD Bootstrap: svcSetHeapSize failed with err %x\n", rc);
 	}
 
-	g_heapAddr = (u64)addr;
+	g_heapAddr = (uintptr_t)addr;
 	g_heapSize = ((elf_area_size+0x1FFFFF) & ~0x1FFFFF);
 }
 
-u64 find_next_elf_heap()
+uintptr_t find_next_elf_heap()
 {
-	u64 addr = g_heapAddr;
+	uintptr_t addr = g_heapAddr;
 	while (1)
 	{
 		MemoryInfo info;
@@ -203,11 +224,13 @@ u64 find_next_elf_heap()
 	return 0;
 }
 
+#endif
+
 extern void _start();
 
 void SaltySDCore_RegisterExistingModules()
 {
-	u64 addr = 0;
+	uintptr_t addr = 0;
 	while (1)
 	{
 		MemoryInfo info;
@@ -216,10 +239,10 @@ void SaltySDCore_RegisterExistingModules()
 		
 		if (info.perm == Perm_Rx)
 		{
-			SaltySDCore_RegisterModule((void*)info.addr);
-			u64 compaddr = (u64)info.addr;
-			if ((u64*)compaddr != (u64*)_start)
-				SaltySDCore_RegisterBuiltinModule((void*)info.addr);
+			SaltySDCore_RegisterModule((uintptr_t)info.addr);
+			uintptr_t compaddr = info.addr;
+			if (compaddr != (uintptr_t)_start)
+				SaltySDCore_RegisterBuiltinModule((uintptr_t)info.addr);
 		}
 
 		addr = info.addr + info.size;
@@ -263,6 +286,37 @@ Result svcGetInfoIntercept (u64 *out, size_t id0, Handle handle, u64 id1)
 
 	return ret;	
 }
+
+#if defined(SWITCH32) || defined(OUNCE32)
+void SaltySDCore_PatchSVCs()
+{
+	static u8 orig_1[] = {0x04, 0x00, 0x2D, 0xE5, 0x01, 0x00, 0x00, 0xEF, 0x00, 0x20, 0x9D, 0xE5}; //PUSH {r0}; SVC #0x1; LDR r2, [sp]
+	static u8 orig_2[] = {0x04, 0x00, 0x2D, 0xE5, 0x04, 0x00, 0x9D, 0xE5, 0x08, 0x30, 0x9D, 0xE5, 0x29, 0x00, 0x00, 0xEF, 0x00, 0x30, 0x9D, 0xE5}; //PUSH {R0}; LDR r0, [sp, #4]; LDR r3, [sp, #8]; SVC 0x29; LDR r3, [sp]
+	static u8 orig_1_alt[] = {0x04, 0x00, 0x2D, 0xE5, 0x01, 0x00, 0x00, 0xEF}; //PUSH {r0}; SVC #0x1
+	static u8 orig_2_alt[] = {0x04, 0x00, 0x2D, 0xE5, 0x04, 0x00, 0x9D, 0xE5, 0x08, 0x30, 0x9D, 0xE5, 0x29, 0x00, 0x00, 0xEF}; //PUSH {R0}; LDR r0, [sp, #4]; LDR r3, [sp, #8]; SVC 0x29
+	static u8 patch[0x8] = {0x04, 0xF0, 0x1F, 0xE5, 0xDE, 0xAD, 0xBE, 0xEF}; // LDR pc, [pc, #-4]; 0xDEADBEEF
+	uintptr_t dst_1 = SaltySDCore_findCodeEx(orig_1, sizeof(orig_1));
+	uintptr_t dst_2 = SaltySDCore_findCodeEx(orig_2, sizeof(orig_2));
+	if (!dst_1) {
+		dst_1 = SaltySDCore_findCodeEx(orig_1_alt, sizeof(orig_1_alt));
+	}
+	if (!dst_2) {
+		dst_2 = SaltySDCore_findCodeEx(orig_2_alt, sizeof(orig_2_alt));
+	}
+	
+	if (!dst_1 || !dst_2)
+	{
+		SaltySDCore_printf("SaltySD Core: Failed to find svcSetHeapSize! %llx\n", dst_1);
+		return;
+	}
+
+	*(uintptr_t*)&patch[4] = (uintptr_t)svcSetHeapSizeIntercept;
+	SaltySD_Memcpy((uintptr_t)dst_1, (uintptr_t)patch, sizeof(patch));
+	*(uintptr_t*)&patch[4] = (uintptr_t)svcGetInfoIntercept;
+	SaltySD_Memcpy((uintptr_t)dst_2, (uintptr_t)patch, sizeof(patch));		
+}
+
+#else
 
 void SaltySDCore_PatchSVCs()
 {
@@ -321,7 +375,7 @@ void** SaltySDCore_LoadPluginsInDir(char* path, void** entries, size_t* num_elfs
 				entries = realloc(entries, *num_elfs * sizeof(void*));
 				entries[*num_elfs-1] = (void*)elf_addr;
 
-				SaltySDCore_RegisterModule(entries[*num_elfs-1]);
+				SaltySDCore_RegisterModule((uintptr_t)entries[*num_elfs-1]);
 				elf_area_size += elf_size;
 			}
 		}
@@ -355,6 +409,8 @@ void SaltySDCore_LoadPlugins()
 	
 	return;
 }
+
+#endif
 
 typedef void (*nnosQueryMemoryInfo)(void* memoryinfo);
 uintptr_t Address_weak_QueryMemoryInfo = 0;
@@ -405,7 +461,7 @@ struct ModuleInfo {
 extern u64 code_start;
 
 size_t GetAllModuleInfo(struct ModuleInfo** modules, void* buffer, size_t buffer_size) {
-	u64 addr = code_start;
+	uintptr_t addr = code_start;
 	size_t module_count = 0;
 	uintptr_t addresses[13] = {0};
 	size_t sizes[13] = {0};
@@ -417,7 +473,7 @@ size_t GetAllModuleInfo(struct ModuleInfo** modules, void* buffer, size_t buffer
 
 		if (addr > info.addr) break;
 		
-		if (info.addr != (u64)_start && info.perm == Perm_Rx)
+		if (info.addr != (uintptr_t)_start && info.perm == Perm_Rx)
 		{
 			addresses[module_count] = info.addr;
 			sizes[module_count] = info.size; //this should be size of whole module, but games that use it seem to not care ¯\_(ツ)_/¯
@@ -503,23 +559,31 @@ int main(int argc, char *argv[])
 	ret = SaltySD_GetSDCard(&sdcard);
 	if (ret) goto fail;
 
+	#if defined(SWITCH32) || defined(OUNCE32)
+	SaltySDCore_printf("SaltySD Core32 " APP_VERSION ": restoring code...\n");
+	#else
 	SaltySDCore_printf("SaltySD Core " APP_VERSION ": restoring code...\n");
+	#endif
 	ret = SaltySD_Restore();
 	if (ret) goto fail;
 
 	SaltySDCore_PatchSVCs();
-	SaltySDCore_LoadPatches(true);
+	SaltySDCore_LoadPatches();
 
 	SaltySDCore_fillRoLoadModule();
 	SaltySDCore_ReplaceImport("_ZN2nn2ro10LoadModuleEPNS0_6ModuleEPKvPvmi", (void*)LoadModule);
 	
+	#if defined(SWITCH32) || defined(OUNCE32)
+	SaltySDCore_printf("SaltySD Core32: Plugins are not supported...\n");
+	#else
 	Result exc = SaltySD_Exception();
 	if (exc == 0x0) SaltySDCore_LoadPlugins();
 	else SaltySDCore_printf("SaltySD Core: Detected exception title, aborting loading plugins...\n");
+	#endif
 
 	ptrdiff_t SMO = -1;
 	ret = SaltySD_CheckIfSharedMemoryAvailable(&SMO, 1);
-	SaltySDCore_printf("SaltySD_CheckIfSharedMemoryAvailable ret: 0x%X\n", ret);
+	SaltySDCore_printf("SaltySD_CheckIfSharedMemoryAvailable ret: 0x%lX\n", ret);
 	if (R_SUCCEEDED(ret)) {
 		SharedMemory _sharedmemory = {};
 		Handle remoteSharedMemory = 0;
@@ -541,7 +605,7 @@ int main(int argc, char *argv[])
 			}
 		}
 		else {
-			SaltySDCore_printf("SaltySD Core: shmemMap failed: 0x%X\n", shmemMapRc);
+			SaltySDCore_printf("SaltySD Core: shmemMap failed: 0x%lX\n", shmemMapRc);
 		}
 	}
 
@@ -551,7 +615,11 @@ int main(int argc, char *argv[])
 	__libnx_exit(0);
 
 fail:
+	#if defined(SWITCH32) || defined(OUNCE32)
+	debug_log("SaltySD Core: failed with retcode %lx\n", ret);
+	#else
 	debug_log("SaltySD Core: failed with retcode %x\n", ret);
-	SaltySDCore_printf("SaltySD Core: failed with retcode %x\n", ret);
+	#endif
+	SaltySDCore_printf("SaltySD Core: failed with retcode %lx\n", ret);
 	__libnx_exit(0);
 }

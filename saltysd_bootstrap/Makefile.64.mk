@@ -7,7 +7,7 @@ $(error "Please set DEVKITPRO in your environment. export DEVKITPRO=<path to>/de
 endif
 
 TOPDIR ?= $(CURDIR)
-include $(TOPDIR)/../libnx_min/nx/switch_rules
+include $(TOPDIR)/rel_rules
 
 #---------------------------------------------------------------------------------
 # TARGET is the name of the output
@@ -29,11 +29,9 @@ include $(TOPDIR)/../libnx_min/nx/switch_rules
 #	 - icon.jpg
 #	 - <libnx folder>/default_icon.jpg
 #---------------------------------------------------------------------------------
-include $(TOPDIR)/../version.mk
-
-TARGET		:=	saltysd_core
+TARGET		:=	saltysd_bootstrap
 BUILD		:=	build
-SOURCES		:=	source source/tinyexpr
+SOURCES		:=	source
 DATA		:=	data
 INCLUDES	:=	include
 EXEFS_SRC	:=	exefs_src
@@ -41,19 +39,20 @@ EXEFS_SRC	:=	exefs_src
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
-ARCH	    :=	-march=armv8-a -mtune=cortex-a57 -mtp=soft -fPIE -fno-plt
+ARCH	:=	-march=armv8-a -mtune=cortex-a57 -mtp=soft
 
-CFLAGS	:=	-Wall -O2 \
+ASFLAGS :=  $(ARCH)
+
+CFLAGS	:=	-g -Wall -O3 \
 			-ffast-math -ffunction-sections -fdata-sections \
 			$(ARCH) $(DEFINES)
 
-CFLAGS	+=	$(INCLUDE) -DSWITCH -DAPP_VERSION=\"$(VERSION)\"
+CFLAGS	+=	$(INCLUDE) -DSWITCH
 
 CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++23
 
-ASFLAGS	     :=	-g $(ARCH)
-
-LDFLAGS	=	-z max-page-size=0x1000 -specs=$(TOPDIR)/../libnx_min/nx/switch.specs -g $(ARCH) -Wl,--dynamic-list=$(CURDIR)/../dynamic_symbols.txt -Wl,-Map,$(notdir $*.map)
+ASFLAGS	:=	-g $(ARCH)
+LDFLAGS	=	-z max-page-size=0x1000 -T $(TOPDIR)/rel.ld -z text -z nodynamic-undefined-weak --build-id=sha1 -g --emit-relocs
 
 LIBS	:= -lnx_min
 
@@ -61,7 +60,7 @@ LIBS	:= -lnx_min
 # list of directories containing libraries, this must be the top level containing
 # include and lib
 #---------------------------------------------------------------------------------
-LIBDIRS	:= $(PORTLIBS) $(CURDIR)/../libnx_min/nx/
+LIBDIRS	:= $(PORTLIBS) $(LIBNX) $(CURDIR)/../libnx_min/nx/
 
 
 #---------------------------------------------------------------------------------
@@ -100,8 +99,6 @@ endif
 
 export OFILES	:=	$(addsuffix .o,$(BINFILES)) \
 			$(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(SFILES:.s=.o)
-
-export OFILES2	:=	$(foreach file,$(OFILES),$(BUILD)/$(file))
 
 export INCLUDE	:=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
 			$(foreach dir,$(LIBDIRS),-I$(dir)/include) \
@@ -143,16 +140,14 @@ all: $(BUILD)
 
 $(BUILD):
 	@[ -d $@ ] || mkdir -p $@
-	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
+	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile.64.mk
 	@$(OBJCOPY) --only-keep-debug $(CURDIR)/$(TARGET).elf $(CURDIR)/$(TARGET).dbg
 	@$(OBJCOPY) --add-gnu-debuglink=$(CURDIR)/$(TARGET).dbg --strip-debug --strip-unneeded $(CURDIR)/$(TARGET).elf
-	@$(DEVKITPRO)/devkitA64/bin/aarch64-none-elf-size $(CURDIR)/$(TARGET).elf | awk 'NR==2 {print $$4}' > size.txt
-	@python3 patch_size.py
-	@rm -fr size.txt
+
 #---------------------------------------------------------------------------------
 clean:
 	@echo clean ...
-	@rm -fr size.txt $(BUILD) $(TARGET).pfs0 $(TARGET).nso $(TARGET).nro $(TARGET).nsp $(TARGET).nacp $(TARGET).elf $(TARGET).dbg .map
+	@rm -fr $(BUILD) $(TARGET).pfs0 $(TARGET).nso $(TARGET).nro $(TARGET).nsp $(TARGET).nacp $(TARGET).elf $(TARGET).dbg
 
 
 #---------------------------------------------------------------------------------
@@ -172,7 +167,6 @@ $(OUTPUT).elf	:	$(OFILES)
 # you need a rule like this for each extension you use as binary data
 #---------------------------------------------------------------------------------
 %.bin.o	:	%.bin
-%.elf.o :   %.elf
 #---------------------------------------------------------------------------------
 	@echo $(notdir $<)
 	@$(bin2o)

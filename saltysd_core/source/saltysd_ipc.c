@@ -64,10 +64,10 @@ Result SaltySD_Term()
 		IpcParsedCommand r;
 		ipcParse(&r);
 
-		struct {
+		struct respond {
 			u64 magic;
 			u64 result;
-		} *resp = r.Raw;
+		} *resp = (struct respond*)r.Raw;
 
 		ret = resp->result;
 	}
@@ -107,16 +107,18 @@ Result SaltySD_Restore()
 		IpcParsedCommand r;
 		ipcParse(&r);
 
-		struct {
+		struct respond {
 			u64 magic;
 			u64 result;
-		} *resp = r.Raw;
+		} *resp = (struct respond*)r.Raw;
 
 		ret = resp->result;
 	}
 
 	return ret;
 }
+
+#if defined(SWITCH) || defined(OUNCE)
 
 Result SaltySD_LoadELF(u64 heap, u64* elf_addr, u64* elf_size, char* name)
 {
@@ -165,7 +167,9 @@ Result SaltySD_LoadELF(u64 heap, u64* elf_addr, u64* elf_size, char* name)
 	return ret;
 }
 
-Result SaltySD_Memcpy(u64 to, u64 from, u64 size)
+#endif
+
+Result SaltySD_Memcpy(uintptr_t to, uintptr_t from, size_t size)
 {
 	Result ret;
 	IpcCommand c;
@@ -197,10 +201,10 @@ Result SaltySD_Memcpy(u64 to, u64 from, u64 size)
 		IpcParsedCommand r;
 		ipcParse(&r);
 
-		struct {
+		struct respond {
 			u64 magic;
 			u64 result;
-		} *resp = r.Raw;
+		} *resp = (struct respond*)r.Raw;
 
 		ret = resp->result;
 	}
@@ -235,11 +239,11 @@ Result SaltySD_Exception()
 		IpcParsedCommand r;
 		ipcParse(&r);
 
-		struct {
+		struct respond {
 			u64 magic;
 			u64 result;
 			u64 reserved[2];
-		} *resp = r.Raw;
+		} *resp = (struct respond*)r.Raw;
 
 		ret = resp->result;
 	}
@@ -273,17 +277,16 @@ Result SaltySD_GetSDCard(Handle *retrieve)
 		IpcParsedCommand r;
 		ipcParse(&r);
 
-		struct {
+		struct respond {
 			u64 magic;
 			u64 result;
 			u64 reserved[2];
-		} *resp = r.Raw;
+		} *resp = (struct respond*)r.Raw;
 
 		ret = resp->result;
 		
 		if (!ret)
 		{
-			SaltySDCore_printf("SaltySD Core: got SD card handle %x\n", r.Handles[0]);
 			*retrieve = r.Handles[0];
 			
 			// Init fs stuff
@@ -291,6 +294,8 @@ Result SaltySD_GetSDCard(Handle *retrieve)
 			sdcardfs.s.handle = *retrieve;
 			int dev = fsdevMountDevice("sdmc", sdcardfs);
 			setDefaultDevice(dev);
+
+			SaltySDCore_printf("SaltySD Core: got SD card handle %x\n", r.Handles[0]);
 		}
 	}
 	
@@ -325,10 +330,10 @@ Result SaltySD_print(char* out)
 		IpcParsedCommand r;
 		ipcParse(&r);
 
-		struct {
+		struct respond {
 			u64 magic;
 			u64 result;
-		} *resp = r.Raw;
+		} *resp = (struct respond*)r.Raw;
 
 		ret = resp->result;
 	}
@@ -336,7 +341,7 @@ Result SaltySD_print(char* out)
 	return ret;
 }
 
-Result SaltySD_CheckIfSharedMemoryAvailable(ptrdiff_t *new_offset, u64 new_size)
+Result SaltySD_CheckIfSharedMemoryAvailable(ptrdiff_t *new_offset, size_t new_size)
 {
 	Result ret = 0;
 
@@ -364,12 +369,12 @@ Result SaltySD_CheckIfSharedMemoryAvailable(ptrdiff_t *new_offset, u64 new_size)
 		IpcParsedCommand r;
 		ipcParse(&r);
 
-		struct {
+		struct respond {
 			u64 magic;
 			u64 result;
 			u64 offset;
 			u64 reserved;
-		} *resp = r.Raw;
+		} *resp = (struct respond*)r.Raw;
 
 		ret = resp->result;
 		
@@ -409,11 +414,11 @@ Result SaltySD_GetSharedMemoryHandle(Handle *retrieve)
 		IpcParsedCommand r;
 		ipcParse(&r);
 
-		struct {
+		struct respond {
 			u64 magic;
 			u64 result;
 			u64 reserved[2];
-		} *resp = r.Raw;
+		} *resp = (struct respond*)r.Raw;
 
 		ret = resp->result;
 		
@@ -449,8 +454,12 @@ Result SaltySD_printf(const char* format, ...)
 	}
 
 	if (ret)
-	{
+	{	
+		#if defined(SWITCH32) || defined(OUNCE32)
+		debug_log("SaltySD Core: failed w/ error %lx, msg: %s", ret, tmp);
+		#else
 		debug_log("SaltySD Core: failed w/ error %x, msg: %s", ret, tmp);
+		#endif
 	}
 
 	return ret;
@@ -483,14 +492,18 @@ u64 SaltySD_GetBID()
 		IpcParsedCommand r;
 		ipcParse(&r);
 
-		struct {
+		struct respond {
 			u64 magic;
 			u64 result;
-		} *resp = r.Raw;
+		} *resp = (struct respond*)r.Raw;
 
 		uint64_t rett = resp->result;
 		if (rett) {
+			#if defined(SWITCH32) || defined(OUNCE32)
+			SaltySDCore_printf("SaltySD Core: BID: %016llX\n", rett);
+			#else
 			SaltySDCore_printf("SaltySD Core: BID: %016lX\n", rett);
+			#endif
 			return rett;
 		}
 		else {

@@ -1,1 +1,0 @@
-void ReverseNX(SharedMemory* _sharedmemory, uint32_t* _sharedOperationMode);

@@ -29,11 +29,9 @@ include $(DEVKITPRO)/devkitARM/base_rules
 #	 - icon.jpg
 #	 - <libnx folder>/default_icon.jpg
 #---------------------------------------------------------------------------------
-include $(TOPDIR)/../version.mk
-
-TARGET		:=	saltysd_core32
-BUILD		:=	build
-SOURCES		:=	source source/tinyexpr
+TARGET		:=	saltysd_bootstrap32
+BUILD		:=	build32
+SOURCES		:=	source
 DATA		:=	data
 INCLUDES	:=	include
 EXEFS_SRC	:=	exefs_src
@@ -41,22 +39,23 @@ EXEFS_SRC	:=	exefs_src
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
-ARCH			:=	-march=armv6k -mtune=cortex-a57 -mtp=soft -fPIE -mfloat-abi=hard -fno-plt
+ARCH			:=	-march=armv6k -mtune=cortex-a57 -mtp=soft -fPIC
 
-CFLAGS			:=	-Wall -Wno-pointer-to-int-cast -O2 \
-					-ffast-math -ffunction-sections \
+CFLAGS				:=	-Wall -Wno-pointer-to-int-cast -O3 \
+					-ffast-math -ffunction-sections -fdata-sections \
 					$(ARCH) $(DEFINES)
 
-CFLAGS			+=	$(INCLUDE) -DSWITCH32 -DAPP_VERSION=\"$(VERSION)\"
+CFLAGS				+=	$(INCLUDE) -DSWITCH32
 
-CXXFLAGS		:=	$(CFLAGS) -fno-exceptions -fno-rtti -std=gnu++23
+CXXFLAGS			:= $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++23
 
-ASFLAGS			:=	-g $(ARCH)
-LDFLAGS			=	-specs=$(CURDIR)/../libnx32_min/nx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
+ASFLAGS				:=	-g $(ARCH)
+LDFLAGS_3K			=	-specs=$(CURDIR)/switch_3k.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
+LDFLAGS_5K			=	-specs=$(CURDIR)/switch_5k.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
 
-LIBS			:=	-lnx_min
+LIBS				:= -lnx_min
 
-#---------------------------------Wpointer-to-int-cast-------------------------------------------------
+#---------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level containing
 # include and lib
 #---------------------------------------------------------------------------------
@@ -99,7 +98,7 @@ endif
 
 export OFILES	:=	$(addsuffix .o,$(BINFILES)) \
 			$(CPPFILES:.cpp=.o) $(CFILES:.c=.o) $(SFILES:.s=.o)
-
+			
 export OFILES2	:=	$(foreach file,$(OFILES),$(BUILD)/$(file))
 
 export INCLUDE	:=	$(foreach dir,$(INCLUDES),-I$(CURDIR)/$(dir)) \
@@ -142,16 +141,19 @@ all: $(BUILD)
 
 $(BUILD):
 	@[ -d $@ ] || mkdir -p $@
-	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile
+	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile.32.mk
 	@echo linking $(notdir $@)
-	@$(LD) $(LDFLAGS) $(OFILES2) $(LIBPATHS) $(LIBS) -o $(TARGET).elf
-	@$(OBJCOPY) --only-keep-debug $(CURDIR)/$(TARGET).elf $(CURDIR)/$(TARGET).dbg
-	@$(OBJCOPY) --add-gnu-debuglink=$(CURDIR)/$(TARGET).dbg --strip-debug --strip-unneeded $(CURDIR)/$(TARGET).elf
+	@$(LD) $(LDFLAGS_3K) $(OFILES2) $(LIBPATHS) $(LIBS) -o $(TARGET)_3k.elf
+	@$(LD) $(LDFLAGS_5K) $(OFILES2) $(LIBPATHS) $(LIBS) -o $(TARGET)_5k.elf
+	@$(OBJCOPY) --only-keep-debug $(CURDIR)/$(TARGET)_3k.elf $(CURDIR)/$(TARGET)_3k.dbg
+	@$(OBJCOPY) --add-gnu-debuglink=$(CURDIR)/$(TARGET)_3k.dbg --strip-debug --strip-unneeded $(CURDIR)/$(TARGET)_3k.elf
+	@$(OBJCOPY) --only-keep-debug $(CURDIR)/$(TARGET)_5k.elf $(CURDIR)/$(TARGET)_5k.dbg
+	@$(OBJCOPY) --add-gnu-debuglink=$(CURDIR)/$(TARGET)_5k.dbg --strip-debug --strip-unneeded $(CURDIR)/$(TARGET)_5k.elf
 
 #---------------------------------------------------------------------------------
 clean:
 	@echo clean ...
-	@rm -fr $(BUILD) $(TARGET).pfs0 $(TARGET).nso $(TARGET).nro $(TARGET).nsp $(TARGET).nacp $(TARGET).elf $(TARGET).dbg .lst .map
+	@rm -fr $(BUILD) $(TARGET).pfs0 $(TARGET).nso $(TARGET).nro $(TARGET).nsp $(TARGET).nacp $(TARGET)_3k.elf $(TARGET)_5k.elf $(TARGET)_3k.dbg $(TARGET)_5k.dbg .lst .map
 
 
 #---------------------------------------------------------------------------------
