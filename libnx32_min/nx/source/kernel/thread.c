@@ -11,7 +11,7 @@
 #include "services/fatal.h"
 #include "runtime/threadvars.h"
 
-#define USER_TLS_BEGIN 0x108
+#define USER_TLS_BEGIN 0x180
 #define USER_TLS_END   (0x200 - sizeof(ThreadVars))
 #define NUM_TLS_SLOTS ((USER_TLS_END - USER_TLS_BEGIN) / sizeof(void*))
 
