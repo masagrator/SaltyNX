@@ -1141,6 +1141,11 @@ int main(int argc, char *argv[])
     memcpy(ldrDmntSrv, &ldrDmntClone, sizeof(Service));
 
     ABORT_IF_FAILED(pdmqryInitialize(), 8);
+    Service* pdmqrySrv = pdmqryGetServiceSession();
+    Service pdmqryClone;
+    serviceClone(pdmqrySrv, &pdmqryClone);
+    serviceClose(pdmqrySrv);
+    memcpy(pdmqrySrv, &pdmqryClone, sizeof(Service));
 
     if (file_or_directory_exists("sdmc:/SaltySD/flags/displaysync.flag")) {
         displaySync = true;
