@@ -19,12 +19,7 @@ startup:
     mov  x5, x0
     mov  x4, x1
 
-    // Handle the exception if needed.
-    // if (ctx != NULL && main_thread != -1)__libnx_exception_entry(<inargs>);
-    cmp x5, #0
-    ccmn x4, #1, #4, ne // 4 = Z
-    beq bssclr_start
-    b __libnx_exception_entry
+    b bssclr_start
 
 bssclr_start:
     mov x27, x7
