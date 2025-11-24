@@ -60,6 +60,13 @@ struct VkViewport {
 	float    maxDepth;
 };
 
+struct VkRect2D {
+	int32_t    x;
+	int32_t    y;
+	uint32_t    width;
+	uint32_t    height;
+};
+
 struct glViewportArray {
 	float x;
 	float y;
@@ -109,6 +116,8 @@ typedef void* (*_vkGetInstanceProcAddr_0)(void* instance, const char* vkFunction
 typedef void* (*vkGetDeviceProcAddr_0)(void* device, const char* vkFunction);
 typedef void (*vkCmdSetViewport_0)(void* commandBuffer, uint32_t firstViewport, uint32_t viewportCount, const VkViewport* pViewports);
 typedef void (*vkCmdSetViewportWithCount_0)(void* commandBuffer, uint32_t viewportCount, const VkViewport* pViewports);
+typedef void (*vkCmdSetScissor_0)(void* commandBuffer, uint32_t firstScissor, uint32_t scissorCount, const VkRect2D* pScissors);
+typedef void (*vkCmdSetScissorWithCount_0)(void* commandBuffer, uint32_t scissorCount, const VkRect2D* pScissors);
 typedef s32 (*vkCreateSwapchainKHR_0)(void* Device, const VkSwapchainCreateInfoKHR* pCreateInfo, const void* pAllocator, const void** pSwapchain);
 typedef s32 (*vkGetSwapchainImagesKHR_0)(void* Device, void* VkSwapchainKHR, uint32_t* pSwapchainImageCount, int** pSwapchainImages);
 typedef s32 (*vkQueuePresentKHR_0)(const void* vkQueue, const void* VkPresentInfoKHR);
@@ -168,6 +177,8 @@ struct {
 	uintptr_t vkGetSwapchainImagesKHR;
 	uintptr_t vkCmdSetViewport;
 	uintptr_t vkCmdSetViewportWithCount;
+	uintptr_t vkCmdSetScissor;
+	uintptr_t vkCmdSetScissorWithCount;
 	uintptr_t vkCreateSwapchainKHR;
 	uintptr_t nvSwapchainCreateSwapchainKHR;
 	uintptr_t nvSwapchainGetInstanceProcAddr;
@@ -304,6 +315,8 @@ enum {
 	ZeroSyncType_Semi
 };
 
+std::pair<int, int> last_viewport = {0, 0};
+
 inline uintptr_t getMainAddress() {
 	MemoryInfo memoryinfo = {0};
 	u32 pageinfo = 0;
@@ -419,6 +432,8 @@ namespace NX_FPS_Math {
 	}
 
 	void PostFrame() {
+		last_viewport.first = 0;
+		last_viewport.second = 0;
 		Shared->frameNumber++;
 		uint64_t endtick = Utils::_getSystemTick();
 		uint64_t framedelta = endtick - frameend;
@@ -570,6 +585,8 @@ namespace vk {
 		if (resolutionLookup) for (uint i = firstViewport; i < firstViewport+viewportCount; i++) {
 			if (pViewports[i].height > 1.f && pViewports[i].width > 1.f && pViewports[i].x == 0.f && pViewports[i].y == 0.f) {
 				NX_FPS_Math::addResToViewports(pViewports[i].width, pViewports[i].height);
+				last_viewport.first = (int)pViewports[i].width;
+				last_viewport.second = (int)pViewports[i].height;
 			}
 		}
 		return ((vkCmdSetViewport_0)(Address_weaks.vkCmdSetViewport))(commandBuffer, firstViewport, viewportCount, pViewports);
@@ -579,9 +596,29 @@ namespace vk {
 		if (resolutionLookup) for (uint i = 0; i < viewportCount; i++) {
 			if (pViewports[i].height > 1.f && pViewports[i].width > 1.f && pViewports[i].x == 0.f && pViewports[i].y == 0.f) {
 				NX_FPS_Math::addResToViewports(pViewports[i].width, pViewports[i].height);
+				last_viewport.first = (int)pViewports[i].width;
+				last_viewport.second = (int)pViewports[i].height;
 			}
 		}
 		return ((vkCmdSetViewportWithCount_0)(Address_weaks.vkCmdSetViewportWithCount))(commandBuffer, viewportCount, pViewports);
+	}
+
+	void CmdSetScissor(void* commandBuffer, uint32_t firstScissor, uint32_t ScissorCount, const VkRect2D* pScissors) {
+		if (resolutionLookup) for (uint i = firstScissor; i < firstScissor+ScissorCount; i++) {
+			if (pScissors[i].height > 1 && pScissors[i].width > 1 && pScissors[i].x == 0 && pScissors[i].y == 0 && pScissors[i].width != (uint32_t)last_viewport.first && pScissors[i].height != (uint32_t)last_viewport.second) {
+				NX_FPS_Math::addResToViewports(pScissors[i].width, pScissors[i].height);
+			}
+		}
+		return ((vkCmdSetScissor_0)(Address_weaks.vkCmdSetScissor))(commandBuffer, firstScissor, ScissorCount, pScissors);
+	}
+
+	void CmdSetScissorWithCount(void* commandBuffer, uint32_t ScissorCount, const VkRect2D* pScissors) {
+		if (resolutionLookup) for (uint i = 0; i < ScissorCount; i++) {
+			if (pScissors[i].height > 1 && pScissors[i].width > 1 && pScissors[i].x == 0 && pScissors[i].y == 0 && pScissors[i].width != (uint32_t)last_viewport.first && pScissors[i].height != (uint32_t)last_viewport.second) {
+				NX_FPS_Math::addResToViewports(pScissors[i].width, pScissors[i].height);
+			}
+		}
+		return ((vkCmdSetScissorWithCount_0)(Address_weaks.vkCmdSetScissorWithCount))(commandBuffer, ScissorCount, pScissors);
 	}
 
 	namespace Common {
@@ -650,6 +687,14 @@ namespace vk {
 			if (!strcmp("vkCmdSetViewportWithCount", vkFunction)) {
 				if (!Address_weaks.vkCmdSetViewportWithCount) Address_weaks.vkCmdSetViewportWithCount = address;
 				return (void*)&CmdSetViewportWithCount;
+			}
+			if (!strcmp("vkCmdSetScissor", vkFunction)) {
+				if (!Address_weaks.vkCmdSetScissor) Address_weaks.vkCmdSetScissor = address;
+				return (void*)&CmdSetScissor;
+			}
+			if (!strcmp("vkCmdSetScissorWithCount", vkFunction)) {
+				if (!Address_weaks.vkCmdSetScissorWithCount) Address_weaks.vkCmdSetScissorWithCount = address;
+				return (void*)&CmdSetScissorWithCount;
 			}
 			if (!strcmp("vkCreateSwapchainKHR", vkFunction)) {
 				if (!Address_weaks.vkCreateSwapchainKHR) Address_weaks.vkCreateSwapchainKHR = address;
@@ -1133,8 +1178,6 @@ namespace NVN {
 	struct nvnCommandBuffer {
 		char reserved[0x80];
 	};
-
-	std::pair<int, int> last_viewport = {0, 0};
 
 	void* CommandBufferSetViewports(nvnCommandBuffer* cmdBuf, int start, int count, const NVNViewport* viewports) {
 		if (resolutionLookup) for (int i = start; i < start+count; i++) {
