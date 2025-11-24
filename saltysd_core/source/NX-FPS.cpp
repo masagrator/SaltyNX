@@ -115,6 +115,7 @@ typedef s32 (*vkQueuePresentKHR_0)(const void* vkQueue, const void* VkPresentInf
 
 typedef void (*SetFocusHandlingMode_0)(AppletFocusHandlingMode mode);
 typedef u32 (*FileAccessorRead_0)(void* fileHandle, size_t* bytesRead, int64_t position, void* buffer, size_t readBytes, unsigned int* ReadOption);
+typedef u32 (*FileAccessorReadCache_0)(void* fileHandle, size_t* bytesRead, int64_t position, void* buffer, size_t readBytes, unsigned int* ReadOption, void* FileDataCacheAccessResult);
 typedef u64 (*_ZN2nn2os17ConvertToTimeSpanENS0_4TickE_0)(u64 tick);
 typedef u64 (*_ZN2nn2os13GetSystemTickEv_0)();
 typedef u32 (*nnroLookupSymbol_0)(uintptr_t* pOutAddress, const char* name);
@@ -180,6 +181,7 @@ struct {
 	uintptr_t GetSystemTickFrequency;
 	uintptr_t SetFocusHandlingMode;
 	uintptr_t FileAccessorRead;
+	uintptr_t FileAccessorReadCache;
 	uintptr_t ConvertToTimeSpan;
 	uintptr_t SetUserInactivityDetectionTimeExtended;
 } Address_weaks;
@@ -324,6 +326,15 @@ namespace nn {
 		if (!bytesRead)
 			bytesRead = &bytesRead_impl;
 		Result ret = ((FileAccessorRead_0)(Address_weaks.FileAccessorRead))(fileHandle, bytesRead, position, buffer, readBytes, ReadOption);
+		fileBytesRead += *bytesRead;
+		return ret;
+	}
+
+	Result FileAccessorReadCache(void* fileHandle, size_t* bytesRead, int64_t position, void* buffer, size_t readBytes, unsigned int* ReadOption, void* FileDataCacheAccessResult) {
+		size_t bytesRead_impl = 0;
+		if (!bytesRead)
+			bytesRead = &bytesRead_impl;
+		Result ret = ((FileAccessorReadCache_0)(Address_weaks.FileAccessorReadCache))(fileHandle, bytesRead, position, buffer, readBytes, ReadOption, FileDataCacheAccessResult);
 		fileBytesRead += *bytesRead;
 		return ret;
 	}
@@ -1354,9 +1365,13 @@ extern "C" {
 				#if defined(SWITCH32) || defined(OUNCE32)
 				Address_weaks.FileAccessorRead = SaltySDCore_FindSymbolBuiltin("_ZN2nn2fs6detail12FileAccessor4ReadEPjxPvjRKNS0_10ReadOptionE");		
 				SaltySDCore_ReplaceImport("_ZN2nn2fs6detail12FileAccessor4ReadEPjxPvjRKNS0_10ReadOptionE", (void*)nn::FileAccessorRead);
+				Address_weaks.FileAccessorReadCache = SaltySDCore_FindSymbolBuiltin("_ZN2nn2fs6detail12FileAccessor4ReadEPjxPvjRKNS0_10ReadOptionEPNS1_25FileDataCacheAccessResultE");		
+				SaltySDCore_ReplaceImport("_ZN2nn2fs6detail12FileAccessor4ReadEPjxPvjRKNS0_10ReadOptionEPNS1_25FileDataCacheAccessResultE", (void*)nn::FileAccessorReadCache);
 				#else
 				Address_weaks.FileAccessorRead = SaltySDCore_FindSymbolBuiltin("_ZN2nn2fs6detail12FileAccessor4ReadEPmlPvmRKNS0_10ReadOptionE");		
 				SaltySDCore_ReplaceImport("_ZN2nn2fs6detail12FileAccessor4ReadEPmlPvmRKNS0_10ReadOptionE", (void*)nn::FileAccessorRead);
+				Address_weaks.FileAccessorReadCache = SaltySDCore_FindSymbolBuiltin("_ZN2nn2fs6detail12FileAccessor4ReadEPmlPvmRKNS0_10ReadOptionEPNS1_25FileDataCacheAccessResultE");		
+				SaltySDCore_ReplaceImport("_ZN2nn2fs6detail12FileAccessor4ReadEPmlPvmRKNS0_10ReadOptionEPNS1_25FileDataCacheAccessResultE", (void*)nn::FileAccessorReadCache);
 				#endif
 			}
 			else SaltySDCore_fclose(readFlag);
