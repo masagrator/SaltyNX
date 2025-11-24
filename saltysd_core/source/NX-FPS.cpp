@@ -326,7 +326,7 @@ namespace nn {
 		if (!bytesRead)
 			bytesRead = &bytesRead_impl;
 		Result ret = ((FileAccessorRead_0)(Address_weaks.FileAccessorRead))(fileHandle, bytesRead, position, buffer, readBytes, ReadOption);
-		fileBytesRead += *bytesRead;
+		if (R_SUCCEEDED(ret)) fileBytesRead += *bytesRead;
 		return ret;
 	}
 
@@ -335,7 +335,7 @@ namespace nn {
 		if (!bytesRead)
 			bytesRead = &bytesRead_impl;
 		Result ret = ((FileAccessorReadCache_0)(Address_weaks.FileAccessorReadCache))(fileHandle, bytesRead, position, buffer, readBytes, ReadOption, FileDataCacheAccessResult);
-		fileBytesRead += *bytesRead;
+		if (R_SUCCEEDED(ret)) fileBytesRead += *bytesRead;
 		return ret;
 	}
 
