@@ -692,7 +692,7 @@ namespace vk {
 				if (!Address_weaks.vkCmdSetScissor) Address_weaks.vkCmdSetScissor = address;
 				return (void*)&CmdSetScissor;
 			}
-			if (!strcmp("vkCmdSetViewportWithCount", vkFunction)) {
+			if (!strcmp("vkCmdSetScissorWithCount", vkFunction)) {
 				if (!Address_weaks.vkCmdSetScissorWithCount) Address_weaks.vkCmdSetScissorWithCount = address;
 				return (void*)&CmdSetScissorWithCount;
 			}
