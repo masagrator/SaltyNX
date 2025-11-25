@@ -217,7 +217,9 @@ __attribute__((noinline)) Result isApplicationOutOfFocus(bool* outOfFocus) {
         TID.parts.part[0] = events[i].event_data.applet.program_id[1];
         TID.parts.part[1] = events[i].event_data.applet.program_id[0];
 
-        if (TID.full != TIDnow)
+
+
+        if (TID.full != (TIDnow & ~0xFFF))
             continue;
         else {
             itr = i;
