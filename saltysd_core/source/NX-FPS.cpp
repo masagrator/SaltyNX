@@ -299,7 +299,7 @@ struct {
 #elif defined(OUNCE) || defined(OUNCE32)
 	#define systemtickfrequency 31250000
 #else
-	uint64_t systemtickfrequency = 0;
+	constexpr uint64_t systemtickfrequency = 0;
 #endif
 static_assert(systemtickfrequency != 0);
 
