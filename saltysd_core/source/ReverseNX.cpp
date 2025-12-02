@@ -197,7 +197,7 @@ bool TryPopNotificationMessage(int* msg) {
 
 int PopNotificationMessage() {
 	while (true) {
-		int msg = 0;
+		int msg;
 		if (TryPopNotificationMessage(&msg)) {
 			return msg;
 		}
