@@ -17,7 +17,7 @@
 
 u32 __nx_applet_type = AppletType_None;
 
-static char g_heap[0x20000];
+static char g_heap[0x8000];
 
 extern void __nx_exit_clear(void* ctx, Handle thread, void* addr);
 extern void elf_trampoline(void* context, Handle thread, void* func);
@@ -56,7 +56,7 @@ void __libnx_init(void* ctx, Handle main_thread, void* saved_lr)
 	vars_mine.handle = main_thread;
 	vars_mine.thread_ptr = NULL;
 	vars_mine.reent = _impure_ptr;
-	vars_mine.tls_tp = (void*)malloc(0x1000);
+	vars_mine.tls_tp = (void*)malloc(0x100);
 	vars_orig = *getThreadVars();
 	*getThreadVars() = vars_mine;
 	virtmemSetup();
@@ -68,6 +68,8 @@ void __attribute__((weak)) __libnx_exit(int rc)
 	
 	// Restore TLS stuff
 	*getThreadVars() = vars_orig;
+
+	free(vars_mine.tls_tp);
 	
 	uintptr_t addr = SaltySDCore_getCodeStart();
 
