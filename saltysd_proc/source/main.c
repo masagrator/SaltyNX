@@ -13,6 +13,7 @@
 #include "loadelf.h"
 #include "useful.h"
 #include "dmntcht.h"
+ #include <malloc.h>
 
 #define MODULE_SALTYSD 420
 #define NVDISP_PANEL_GET_VENDOR_ID 0xC003021A
@@ -303,12 +304,16 @@ void hijack_pid(u64 pid)
 
     if (already_hijacking)
     {
-        SaltySD_printf("SaltySD: PID %llx spawned before last hijack finished bootstrapping! Ignoring...\n", pid);
+        SaltySD_printf("SaltySD: PID %d spawned before last hijack finished bootstrapping! Ignoring...\n", pid);
         return;
     }
     
     already_hijacking = true;
-    svcDebugActiveProcess(&debug, pid);
+    Result rc = svcDebugActiveProcess(&debug, pid);
+    if (R_FAILED(rc)) {
+        SaltySD_printf("SaltySD: PID %d is not allowing debugging, error 0x%x, aborting...\n", pid, rc);
+        goto abort_bootstrap;
+    }
 
     bool isA64 = true;
 
@@ -510,7 +515,7 @@ Result handleServiceCmd(int cmd)
             elf_data = NULL;
             elf_size = 0;
         }
-        else if (f)
+        else
         {
             fseek(f, 0, SEEK_END);
             elf_size = ftell(f);
@@ -523,6 +528,7 @@ Result handleServiceCmd(int cmd)
                 fread(elf_data, elf_size, 1, f);
             }
             else SaltySD_printf("SaltySD: Not enough memory to load elf file! Aborting...\n");
+            fclose(f);
         }
         free(path);
         
@@ -538,12 +544,8 @@ Result handleServiceCmd(int cmd)
 
         svcCloseHandle(proc);
         
-        if (f)
-        {
-            if (elf_data)
-                free(elf_data);
-            fclose(f);
-        }
+        if (elf_data)
+            free(elf_data);
         
         // Ship off results
         struct {
