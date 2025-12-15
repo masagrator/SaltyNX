@@ -32,7 +32,7 @@ struct MinMax {
 };
 
 Handle saltyport, sdcard, injectserv;
-static char g_heap[0x70000];
+static char g_heap[0x60000];
 bool should_terminate = false;
 bool already_hijacking = false;
 DebugEventInfo eventinfo;
