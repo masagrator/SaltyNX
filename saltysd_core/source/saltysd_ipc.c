@@ -5,6 +5,7 @@
 
 #include "saltysd_core.h"
 #include "useful.h"
+#include "nanoprintf.h"
 
 Handle saltysd;
 
@@ -439,7 +440,7 @@ Result SaltySD_printf(const char* format, ...)
 
 	va_list args;
 	va_start(args, format);
-	vsnprintf(tmp, 256, format, args);
+	npf_vsnprintf(tmp, 256, format, args);
 	va_end(args);
 	
 	int i = 0;

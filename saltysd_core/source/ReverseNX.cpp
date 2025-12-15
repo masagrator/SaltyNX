@@ -5,6 +5,7 @@
 #include "saltysd_dynamic.h"
 #include <cerrno>
 #include <utility>
+#include "nanoprintf.h"
 
 enum ReverseNX_state {
 	ReverseNX_Switch_Invalid = -1,
@@ -98,9 +99,9 @@ ReverseNX_state loadSave() {
     uint64_t titid = 0;
     svcGetInfo(&titid, InfoType_TitleId, CUR_PROCESS_HANDLE, 0);
 	#if defined(SWITCH32) || defined(OUNCE32)
-	snprintf(path, sizeof(path), "sdmc:/SaltySD/plugins/ReverseNX-RT/%016llX.dat", titid);
+	npf_snprintf(path, sizeof(path), "sdmc:/SaltySD/plugins/ReverseNX-RT/%016llX.dat", titid);
 	#else
-	snprintf(path, sizeof(path), "sdmc:/SaltySD/plugins/ReverseNX-RT/%016lX.dat", titid);
+	npf_snprintf(path, sizeof(path), "sdmc:/SaltySD/plugins/ReverseNX-RT/%016lX.dat", titid);
 	#endif
 	errno = 0;
 	FILE* save_file = SaltySDCore_fopen(path, "rb");
@@ -197,7 +198,7 @@ bool TryPopNotificationMessage(int* msg) {
 
 int PopNotificationMessage() {
 	while (true) {
-		int msg;
+		int msg = 0;
 		if (TryPopNotificationMessage(&msg)) {
 			return msg;
 		}
@@ -214,7 +215,7 @@ uint32_t GetPerformanceMode() {
 
 uint8_t GetOperationMode() {
 	//Fix for Unravel Two that calls this function constantly without checking notifications
-	if (!ReverseNX_RT->pluginActive) ReverseNX_RT->pluginActive = true;
+	ReverseNX_RT->pluginActive = true;
 	*sharedOperationMode = ((_ZN2nn2oe16GetOperationModeEv)(Address_weaks.GetOperationMode))();
 	if (ReverseNX_RT->def) ReverseNX_RT->isDocked = *sharedOperationMode;
 	

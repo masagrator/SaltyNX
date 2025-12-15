@@ -6,6 +6,7 @@
 #include <cmath>
 #include "lock.hpp"
 #include <algorithm>
+#include "nanoprintf.h"
 
 struct NVNTexture {
 	char reserved[0x80];
@@ -299,7 +300,7 @@ struct {
 #elif defined(OUNCE) || defined(OUNCE32)
 	#define systemtickfrequency 31250000
 #else
-	constexpr uint64_t systemtickfrequency = 0;
+	uint64_t systemtickfrequency = 0;
 #endif
 static_assert(systemtickfrequency != 0);
 
@@ -1423,9 +1424,9 @@ extern "C" {
 			svcGetInfo(&titleid, InfoType_TitleId, CUR_PROCESS_HANDLE, 0);
 			char path[128];
 			#if defined(SWITCH32) || defined(OUNCE32)
-			snprintf(path, sizeof(path), "sdmc:/SaltySD/plugins/FPSLocker/%016llX.dat", titleid);
+			npf_snprintf(path, sizeof(path), "sdmc:/SaltySD/plugins/FPSLocker/%016llX.dat", titleid);
 			#else
-			snprintf(path, sizeof(path), "sdmc:/SaltySD/plugins/FPSLocker/%016lX.dat", titleid);
+			npf_snprintf(path, sizeof(path), "sdmc:/SaltySD/plugins/FPSLocker/%016lX.dat", titleid);
 			#endif
 			FILE* file_dat = SaltySDCore_fopen(path, "rb");
 			if (file_dat) {
@@ -1467,10 +1468,10 @@ extern "C" {
 			else {
 				#if defined(SWITCH32) || defined(OUNCE32)
 				SaltySDCore_printf("NX-FPS: BID: %016llX\n", buildid);
-				snprintf(path, sizeof(path), "sdmc:/SaltySD/plugins/FPSLocker/patches/%016llX/%016llX.bin", titleid, buildid);
+				npf_snprintf(path, sizeof(path), "sdmc:/SaltySD/plugins/FPSLocker/patches/%016llX/%016llX.bin", titleid, buildid);
 				#else
 				SaltySDCore_printf("NX-FPS: BID: %016lX\n", buildid);
-				snprintf(path, sizeof(path), "sdmc:/SaltySD/plugins/FPSLocker/patches/%016lX/%016lX.bin", titleid, buildid);
+				npf_snprintf(path, sizeof(path), "sdmc:/SaltySD/plugins/FPSLocker/patches/%016lX/%016lX.bin", titleid, buildid);
 				#endif
 				FILE* patch_file = SaltySDCore_fopen(path, "rb");
 				if (patch_file) {

@@ -12,6 +12,8 @@
 #include "saltysd_ipc.h"
 #include "saltysd_core.h"
 #include "saltysd_dynamic.h"
+#define NANOPRINTF_IMPLEMENTATION
+#include "nanoprintf.h"
 
 #include "bm.h"
 
@@ -88,7 +90,7 @@ void SaltySDCore_LoadPatches() {
 	
 	SaltySDCore_printf("SaltySD Patcher: Searching patches in dir '/'...\n");
 	
-	snprintf(tmp4, 0x100, "sdmc:/SaltySD/patches/");
+	npf_snprintf(tmp4, 0x100, "sdmc:/SaltySD/patches/");
 
 	d = opendir(tmp4);
 	if (d)
@@ -102,7 +104,7 @@ void SaltySDCore_LoadPatches() {
 			if (dot && !strcmp(dot, ".asm64"))
 			#endif
 			{
-				snprintf(tmp2, 0x100, "%s%s", tmp4, dir->d_name);
+				npf_snprintf(tmp2, 0x100, "%s%s", tmp4, dir->d_name);
 				SaltySDCore_printf("SaltySD Patcher: Found %s\n", dir->d_name);
 				FILE* patch = fopen(tmp2, "rb");
 				fseek(patch, 0, SEEK_END);
@@ -138,9 +140,9 @@ void SaltySDCore_LoadPatches() {
 	SaltySDCore_printf("SaltySD Patcher: Searching patches in dir '/%016llx'...\n", tid);
 	
 	#if defined(SWITCH32) || defined(OUNCE32)
-	snprintf(tmp4, 0x100, "sdmc:/SaltySD/patches/%016llx/", tid);
+	npf_snprintf(tmp4, 0x100, "sdmc:/SaltySD/patches/%016llx/", tid);
 	#else
-	snprintf(tmp4, 0x100, "sdmc:/SaltySD/patches/%016lx/", tid);
+	npf_snprintf(tmp4, 0x100, "sdmc:/SaltySD/patches/%016lx/", tid);
 	#endif
 
 	d = opendir(tmp4);
@@ -155,7 +157,7 @@ void SaltySDCore_LoadPatches() {
 			if (dot && !strcmp(dot, ".asm64")) 
 			#endif
 			{
-				snprintf(tmp2, 0x100, "%s%s", tmp4, dir->d_name);
+				npf_snprintf(tmp2, 0x100, "%s%s", tmp4, dir->d_name);
 				SaltySDCore_printf("SaltySD Patcher: Found %s\n", dir->d_name);
 				FILE* patch = fopen(tmp2, "rb");
 				fseek(patch, 0, SEEK_END);
@@ -359,7 +361,7 @@ void** SaltySDCore_LoadPluginsInDir(char* path, void** entries, size_t* num_elfs
 
 	SaltySDCore_printf("SaltySD Core: Searching plugin dir `%s'...\n", path);
 	
-	snprintf(tmp, 0x100, "sdmc:/SaltySD/plugins/%s", path);
+	npf_snprintf(tmp, 0x100, "sdmc:/SaltySD/plugins/%s", path);
 
 	d = opendir(tmp);
 	if (d)
@@ -371,7 +373,7 @@ void** SaltySDCore_LoadPluginsInDir(char* path, void** entries, size_t* num_elfs
 			{
 				u64 elf_addr, elf_size;
 				setupELFHeap();
-				snprintf(tmp, 0x100, "%s%s", path, dir->d_name);
+				npf_snprintf(tmp, 0x100, "%s%s", path, dir->d_name);
 				SaltySD_LoadELF(find_next_elf_heap(), &elf_addr, &elf_size, tmp);
 				*num_elfs = *num_elfs + 1;
 				entries = realloc(entries, *num_elfs * sizeof(void*));
@@ -397,7 +399,7 @@ void SaltySDCore_LoadPlugins()
 	size_t num_elfs = 0;
 	
 	entries = SaltySDCore_LoadPluginsInDir("", entries, &num_elfs);
-	snprintf(tmp3, 0x20, "%016lx/", tid);
+	npf_snprintf(tmp3, 0x20, "%016lx/", tid);
 	entries = SaltySDCore_LoadPluginsInDir(tmp3, entries, &num_elfs);
 	
 	for (int i = 0; i < num_elfs; i++)
