@@ -11,6 +11,7 @@
 #include "spawner_ipc.h"
 
 #include "loadelf.h"
+#define NANOPRINTF_IMPLEMENTATION
 #include "useful.h"
 #include "dmntcht.h"
  #include <malloc.h>
@@ -124,7 +125,7 @@ bool isCheatsFolderInstalled() {
     char romfspath[0x40] = "";
     bool flag = false;
 
-    snprintf(romfspath, 0x40, "sdmc:/atmosphere/contents/%016lx/cheats", TIDnow);
+    npf_snprintf(romfspath, 0x40, "sdmc:/atmosphere/contents/%016lx/cheats", TIDnow);
 
     DIR* dir = opendir(romfspath);
     if (dir) {
@@ -140,8 +141,8 @@ void renameCheatsFolder() {
     char cheatspath[0x3C] = "";
     char cheatspathtemp[0x40] = "";
 
-    snprintf(cheatspath, 0x3C, "sdmc:/atmosphere/contents/%016lx/cheats", TIDnow);
-    snprintf(cheatspathtemp, 0x40, "%stemp", cheatspath);
+    npf_snprintf(cheatspath, 0x3C, "sdmc:/atmosphere/contents/%016lx/cheats", TIDnow);
+    npf_snprintf(cheatspathtemp, 0x40, "%stemp", cheatspath);
     if (!check) {
         rename(cheatspath, cheatspathtemp);
         check = true;
@@ -157,7 +158,7 @@ bool isModInstalled() {
     char romfspath[0x40] = "";
     bool flag = false;
 
-    snprintf(romfspath, 0x40, "sdmc:/atmosphere/contents/%016lx/romfs", TIDnow);
+    npf_snprintf(romfspath, 0x40, "sdmc:/atmosphere/contents/%016lx/romfs", TIDnow);
 
     DIR* dir = opendir(romfspath);
     if (dir) {
@@ -259,7 +260,7 @@ bool hijack_bootstrap(Handle* debug, u64 pid, u64 tid, bool isA64)
         FILE* file = 0;
         file = fopen("sdmc:/SaltySD/saltysd_bootstrap.elf", "rb");
         if (!file) {
-            SaltySD_printf("SaltySD: SaltySD/saltysd_bootstrap.elf not found, aborting...\n", ret);
+            SaltySD_printf("SaltySD: SaltySD/saltysd_bootstrap.elf not found, aborting...\n");
             svcCloseHandle(*debug);
             return false;
         }
@@ -372,7 +373,7 @@ void hijack_pid(u64 pid)
                 char exceptions[20];
                 char titleidnumX[20];
 
-                snprintf(titleidnumX, sizeof titleidnumX, "X%016lx", eventinfo.tid);
+                npf_snprintf(titleidnumX, sizeof titleidnumX, "X%016lx", eventinfo.tid);
                 while (fgets(exceptions, sizeof(exceptions), except)) {
                     titleidnumX[0] = 'X';
                     if (!strncasecmp(exceptions, titleidnumX, 17)) {
@@ -493,7 +494,7 @@ Result handleServiceCmd(int cmd)
         
         memcpy(name, resp->name, 64);
         
-        SaltySD_printf("SaltySD: cmd 1 handler, proc handle %x, heap %llx, path %s\n", proc, heap, name);
+        SaltySD_printf("SaltySD: cmd 1 handler, proc handle %x, heap %lx, path %s\n", proc, heap, name);
         
         char* path = malloc(96);
         uint8_t* elf_data = NULL;
@@ -501,11 +502,11 @@ Result handleServiceCmd(int cmd)
         bool arm32 = false;
         if (!strncmp(name, "saltysd_core32.elf", 18)) arm32 = true;
 
-        snprintf(path, 96, "sdmc:/SaltySD/plugins/%s", name);
+        npf_snprintf(path, 96, "sdmc:/SaltySD/plugins/%s", name);
         FILE* f = fopen(path, "rb");
         if (!f)
         {
-            snprintf(path, 96, "sdmc:/SaltySD/%s", name);
+            npf_snprintf(path, 96, "sdmc:/SaltySD/%s", name);
             f = fopen(path, "rb");
         }
 
@@ -629,7 +630,7 @@ Result handleServiceCmd(int cmd)
         raw->magic = SFCO_MAGIC;
         raw->result = ret;
 
-        SaltySD_printf("SaltySD: cmd 3 handler, memcpy(%llx, %llx, %llx)\n", to, from, size);
+        SaltySD_printf("SaltySD: cmd 3 handler, memcpy(%lx, %lx, %lx)\n", to, from, size);
 
         return 0;
     }

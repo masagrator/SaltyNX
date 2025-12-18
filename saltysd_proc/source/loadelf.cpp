@@ -49,7 +49,7 @@ Result load_elf_debug(Handle debug, uint64_t* start, uint8_t* elf_data, u32 elf_
 	data_fsize = data_seg.phdr->p_filesz;
 	text_msize = text_seg.phdr->p_memsz;
 	data_msize = data_seg.phdr->p_memsz;
-	SaltySD_printf(".text to %llx, .data to %llx\n", text_addr, data_addr);
+	SaltySD_printf(".text to %lx, .data to %lx\n", text_addr, data_addr);
 	
 	elf.relocate_segment(0, text_addr);
 	elf.relocate_segment(1, data_addr);
@@ -126,7 +126,7 @@ Result load_elf32_debug(Handle debug, uint64_t* start)
 	data_fsize = data_seg.phdr->p_filesz;
 	text_msize = text_seg.phdr->p_memsz;
 	data_msize = data_seg.phdr->p_memsz;
-	SaltySD_printf("32bit .text to %llx, .data to %llx\n", text_addr, data_addr);
+	SaltySD_printf("32bit .text to %llx, .data to %lx\n", text_addr, data_addr);
 	
 	elf.relocate(text_addr, data_addr, 0);
 	
@@ -210,7 +210,7 @@ Result load_elf_proc(Handle proc, uint64_t pid, uint64_t heap, uint64_t* start, 
 	u64 load_addr = game_start_address - 0x200000;
 	ret = svcMapProcessCodeMemory(proc, load_addr, heap, (max_vaddr - min_vaddr));
 	if (R_FAILED(ret)) {
-		SaltySD_printf("SaltySD: Search for size %llx\n", (max_vaddr - min_vaddr));
+		SaltySD_printf("SaltySD: Search for size %lx\n", (max_vaddr - min_vaddr));
 		do
 		{
 			load_addr = randomGet64() & 0xFFFFFF000ull;
@@ -220,7 +220,7 @@ Result load_elf_proc(Handle proc, uint64_t pid, uint64_t heap, uint64_t* start, 
 		if (ret) return ret;
 	}
 	
-	SaltySD_printf("SaltySD: Found free address space at %llx, size %llx\n", load_addr, (max_vaddr - min_vaddr));
+	SaltySD_printf("SaltySD: Found free address space at %lx, size %lx\n", load_addr, (max_vaddr - min_vaddr));
 	
 	// Adjust permissions and then return
 	for (auto seg : elf.get_segments())
@@ -291,7 +291,7 @@ Result load_elf32_proc(Handle proc, uint64_t pid, uint32_t heap, uint32_t* start
 	// Unmap heap, map new code
 	
 	u32 load_addr;
-	SaltySD_printf("SaltySD: Search for size %llx\n", (max_vaddr - min_vaddr));
+	SaltySD_printf("SaltySD: Search for size %lx\n", (max_vaddr - min_vaddr));
 	do
 	{	
 		randomGet(&load_addr, 4);
@@ -301,7 +301,7 @@ Result load_elf32_proc(Handle proc, uint64_t pid, uint32_t heap, uint32_t* start
 	while (ret == 0xDC01 || ret == 0xD401);
 	if (ret) return ret;
 	
-	SaltySD_printf("SaltySD: Found free address space at %llx, size %llx\n", load_addr, (max_vaddr - min_vaddr));
+	SaltySD_printf("SaltySD: Found free address space at %lx, size %lx\n", load_addr, (max_vaddr - min_vaddr));
 	
 	uint32_t data_addr = 0;
 	uint32_t read_addr = 0;
