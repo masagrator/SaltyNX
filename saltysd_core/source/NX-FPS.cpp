@@ -1466,11 +1466,10 @@ extern "C" {
 				SaltySDCore_printf("NX-FPS: getBID failed! Err: 0x%x\n", ret);
 			}
 			else {
+				SaltySDCore_printf("NX-FPS: BID: %016lX\n", buildid);
 				#if defined(SWITCH32) || defined(OUNCE32)
-				SaltySDCore_printf("NX-FPS: BID: %016llX\n", buildid);
 				npf_snprintf(path, sizeof(path), "sdmc:/SaltySD/plugins/FPSLocker/patches/%016llX/%016llX.bin", titleid, buildid);
 				#else
-				SaltySDCore_printf("NX-FPS: BID: %016lX\n", buildid);
 				npf_snprintf(path, sizeof(path), "sdmc:/SaltySD/plugins/FPSLocker/patches/%016lX/%016lX.bin", titleid, buildid);
 				#endif
 				FILE* patch_file = SaltySDCore_fopen(path, "rb");

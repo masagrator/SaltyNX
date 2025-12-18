@@ -124,7 +124,7 @@ void SaltySDCore_LoadPatches() {
 				uintptr_t position = SaltySDCore_FindSymbol(filename);
 				if (position) {
 					#
-					SaltySDCore_printf("SaltySD Patcher: Symbol Position: %016llx\n", position);
+					SaltySDCore_printf("SaltySD Patcher: Symbol Position: 0x%lX\n", position);
 					SaltySD_Memcpy(position, (uintptr_t)instr, size);
 				}
 				else {
@@ -137,7 +137,7 @@ void SaltySDCore_LoadPatches() {
 
 	svcGetInfo(&tid, 18, CUR_PROCESS_HANDLE, 0);
 	
-	SaltySDCore_printf("SaltySD Patcher: Searching patches in dir '/%016llx'...\n", tid);
+	SaltySDCore_printf("SaltySD Patcher: Searching patches in dir '/%016lX'...\n", tid);
 	
 	#if defined(SWITCH32) || defined(OUNCE32)
 	npf_snprintf(tmp4, 0x100, "sdmc:/SaltySD/patches/%016llx/", tid);
@@ -176,7 +176,7 @@ void SaltySDCore_LoadPatches() {
 				filename[namelen - 6] = 0;
 				uintptr_t position = SaltySDCore_FindSymbol(filename);
 				if (position) {
-					SaltySDCore_printf("SaltySD Patcher: Symbol Position: %016llx\n", position);
+					SaltySDCore_printf("SaltySD Patcher: Symbol Position: 0x%lX\n", position);
 					SaltySD_Memcpy(position, (uintptr_t)instr, size);
 				}
 				else {
@@ -310,7 +310,7 @@ void SaltySDCore_PatchSVCs()
 	
 	if (!dst_1 || !dst_2)
 	{
-		SaltySDCore_printf("SaltySD Core: Failed to find svcSetHeapSize! %llx\n", dst_1);
+		SaltySDCore_printf("SaltySD Core: Failed to find svcSetHeapSize or svcGetInfo!\n");
 		return;
 	}
 
@@ -399,7 +399,7 @@ void SaltySDCore_LoadPlugins()
 	size_t num_elfs = 0;
 	
 	entries = SaltySDCore_LoadPluginsInDir("", entries, &num_elfs);
-	npf_snprintf(tmp3, 0x20, "%016lx/", tid);
+	npf_snprintf(tmp3, 0x20, "%016lX/", tid);
 	entries = SaltySDCore_LoadPluginsInDir(tmp3, entries, &num_elfs);
 	
 	for (int i = 0; i < num_elfs; i++)

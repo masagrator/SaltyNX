@@ -500,11 +500,7 @@ u64 SaltySD_GetBID()
 
 		uint64_t rett = resp->result;
 		if (rett) {
-			#if defined(SWITCH32) || defined(OUNCE32)
-			SaltySDCore_printf("SaltySD Core: BID: %016llX\n", rett);
-			#else
 			SaltySDCore_printf("SaltySD Core: BID: %016lX\n", rett);
-			#endif
 			return rett;
 		}
 		else {
