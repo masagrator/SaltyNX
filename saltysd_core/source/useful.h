@@ -1,6 +1,5 @@
 #ifndef USEFUL_H
 #define USEFUL_H
-#define NANOPRINTF_IMPLEMENTATION
 
 #include <switch_min.h>
 #include <string.h>
