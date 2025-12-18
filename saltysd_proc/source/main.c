@@ -66,6 +66,22 @@ uintptr_t game_start_address = 0;
 #endif
 static_assert(systemtickfrequency != 0);
 
+void* __real___cxa_throw(void *thrown_exception, void *pvar, void (*dest)(void *));
+void* __real__Unwind_Resume();
+void* __real___gxx_personality_v0();
+
+void __wrap___cxa_throw(void *thrown_exception, void *pvar, void (*dest)(void *)) {
+    abort();
+}
+
+void __wrap__Unwind_Resume() {
+    return;
+}
+
+void __wrap___gxx_personality_v0() {
+    return;
+}
+
 void __libnx_initheap(void)
 {
     extern char* fake_heap_start;
