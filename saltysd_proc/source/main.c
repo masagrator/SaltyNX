@@ -66,6 +66,7 @@ uintptr_t game_start_address = 0;
 #endif
 static_assert(systemtickfrequency != 0);
 
+//This is done to save some space as they have no practical use in our case
 void* __real___cxa_throw(void *thrown_exception, void *pvar, void (*dest)(void *));
 void* __real__Unwind_Resume();
 void* __real___gxx_personality_v0();
