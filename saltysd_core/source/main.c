@@ -32,7 +32,7 @@ Handle sdcard;
 #if defined(SWITCH32) || defined(OUNCE32)
 const size_t elf_area_size = 0x200000; //We assume that Core itself won't take more than 0x200000 bytes;
 #else
-volatile size_t elf_area_size = 0xDEADBEEF; //MAGIC number to be replaced after code gets compiled
+volatile size_t elf_area_size = 0xDEEDBEEF; //MAGIC number to be replaced after code gets compiled
 #endif
 
 ThreadVars vars_orig;
