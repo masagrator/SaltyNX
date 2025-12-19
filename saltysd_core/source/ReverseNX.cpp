@@ -155,7 +155,7 @@ bool TryPopNotificationMessage(int* msg) {
 	static bool compare = false;
 	static bool compare2 = false;
 
-	ReverseNX_RT->pluginActive = true;
+	if (!ReverseNX_RT->pluginActive) ReverseNX_RT->pluginActive = true;
 
 	if (ReverseNX_RT->def) {
 		if (!check1) {
@@ -197,8 +197,8 @@ bool TryPopNotificationMessage(int* msg) {
 }
 
 int PopNotificationMessage() {
+	int msg = 0;
 	while (true) {
-		int msg = 0;
 		if (TryPopNotificationMessage(&msg)) {
 			return msg;
 		}
@@ -215,7 +215,7 @@ uint32_t GetPerformanceMode() {
 
 uint8_t GetOperationMode() {
 	//Fix for Unravel Two that calls this function constantly without checking notifications
-	ReverseNX_RT->pluginActive = true;
+	if (!ReverseNX_RT->pluginActive) ReverseNX_RT->pluginActive = true;
 	*sharedOperationMode = ((_ZN2nn2oe16GetOperationModeEv)(Address_weaks.GetOperationMode))();
 	if (ReverseNX_RT->def) ReverseNX_RT->isDocked = *sharedOperationMode;
 	
@@ -358,7 +358,7 @@ void LinkMultiWaitHolder(void* MultiWaitType, void* MultiWaitHolderType) {
 void* WaitAny(void* MultiWaitType) {
 	if (multiWaitCopy != MultiWaitType)
 		return ((nnosWaitAny)(Address_weaks.WaitAny))(MultiWaitType);
-	ReverseNX_RT->pluginActive = true;
+	if (!ReverseNX_RT->pluginActive) ReverseNX_RT->pluginActive = true;
 	void* ret_value = ((nnosTimedWaitAny)(Address_weaks.TimedWaitAny))(MultiWaitType, 1000000);
 	if (ret_value != NULL) return ret_value;
 	multiWaitHack = true;
