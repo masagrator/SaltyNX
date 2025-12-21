@@ -190,23 +190,17 @@ void SaltySDCore_LoadPatches() {
 	return;
 }
 
-#if defined(SWITCH) || defined(OUNCE)
-
 void setupELFHeap(void)
 {
 	void* addr = NULL;
-	Result rc = 0;
 
-	rc = svcSetHeapSize(&addr, ((elf_area_size+0x1FFFFF) & ~0x1FFFFF));
-
-	if (rc || addr == NULL)
-	{
-		debug_log("SaltySD Bootstrap: svcSetHeapSize failed with err %x\n", rc);
-	}
+	svcSetHeapSize(&addr, ((elf_area_size+0x1FFFFF) & ~0x1FFFFF));
 
 	g_heapAddr = (uintptr_t)addr;
 	g_heapSize = ((elf_area_size+0x1FFFFF) & ~0x1FFFFF);
 }
+
+#if defined(SWITCH) || defined(OUNCE)
 
 uintptr_t find_next_elf_heap()
 {
@@ -616,8 +610,7 @@ int main(int argc, char *argv[])
 	ret = SaltySD_Deinit();
 	if (ret) goto fail;
 	
-	void* addr;
-	svcSetHeapSize(&addr, 0x200000);
+	setupELFHeap();
 	__libnx_exit(0);
 
 fail:
