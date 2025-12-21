@@ -189,7 +189,7 @@ Result load_elf_proc(Handle proc, uint64_t pid, uint64_t heap, uint64_t* start, 
 		do
 		{
 			map_addr = randomGet64() & 0xFFFFFF000ull;
-			ret = svcMapProcessCodeMemory(proc, map_addr, heap+0x200000, 0x200000);
+			ret = svcMapProcessCodeMemory(proc, map_addr, ((heap+0x200000) & ~0x1FFFFF), 0x200000);
 		}
 		while (ret == 0xDC01 || ret == 0xD401);
 		svcSetProcessMemoryPermission(proc, map_addr, 0x200000, Perm_Rw);
@@ -317,7 +317,7 @@ Result load_elf32_proc(Handle proc, uint64_t pid, uint32_t heap, uint32_t* start
 		do
 		{
 			map_addr = randomGet64() & 0xFFFFFF000ull;
-			ret = svcMapProcessCodeMemory(proc, map_addr, heap+0x200000, 0x200000);
+			ret = svcMapProcessCodeMemory(proc, map_addr, ((heap+0x200000) & ~0x1FFFFF), 0x200000);
 		}
 		while (ret == 0xDC01 || ret == 0xD401);
 		svcSetProcessMemoryPermission(proc, map_addr, 0x200000, Perm_Rw);
