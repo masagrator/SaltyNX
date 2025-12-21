@@ -33,7 +33,7 @@ struct MinMax {
 };
 
 Handle saltyport, sdcard, injectserv;
-static char g_heap[0x60000];
+static char g_heap[0x30000];
 bool should_terminate = false;
 bool already_hijacking = false;
 DebugEventInfo eventinfo;
@@ -514,7 +514,6 @@ Result handleServiceCmd(int cmd)
         SaltySD_printf("SaltySD: cmd 1 handler, proc handle %x, heap %lx, path %s\n", proc, heap, name);
         
         char* path = malloc(96);
-        uint8_t* elf_data = NULL;
         u32 elf_size = 0;
         bool arm32 = false;
         if (!strncmp(name, "saltysd_core32.elf", 18)) arm32 = true;
@@ -530,7 +529,6 @@ Result handleServiceCmd(int cmd)
         if (!f)
         {
             SaltySD_printf("SaltySD: failed to load plugin `%s'!\n", name);
-            elf_data = NULL;
             elf_size = 0;
         }
         else
@@ -540,21 +538,14 @@ Result handleServiceCmd(int cmd)
             fseek(f, 0, SEEK_SET);
             
             SaltySD_printf("SaltySD: loading %s, size 0x%x\n", path, elf_size);
-            
-            elf_data = malloc(elf_size);
-            if (elf_data) {
-                fread(elf_data, elf_size, 1, f);
-            }
-            else SaltySD_printf("SaltySD: Not enough memory to load elf file! Aborting...\n");
-            fclose(f);
         }
         free(path);
         
         u64 new_start = 0, new_size = 0;
-        if (elf_data && elf_size) {
+        if (f && elf_size) {
             if (!arm32)
-                ret = load_elf_proc(proc, r.Pid, heap, &new_start, &new_size, elf_data, elf_size);
-            else ret = load_elf32_proc(proc, r.Pid, (u32)heap, (u32*)&new_start, (u32*)&new_size, elf_data, elf_size);
+                ret = load_elf_proc(proc, r.Pid, heap, &new_start, &new_size, f, elf_size);
+            else ret = load_elf32_proc(proc, r.Pid, (u32)heap, (u32*)&new_start, (u32*)&new_size, f, elf_size);
             if (ret) SaltySD_printf("Load_elf arm32: %d, ret: 0x%x\n", arm32, ret);
         }
         else
@@ -562,8 +553,8 @@ Result handleServiceCmd(int cmd)
 
         svcCloseHandle(proc);
         
-        if (elf_data)
-            free(elf_data);
+        if (f)
+            fclose(f);
         
         // Ship off results
         struct {
@@ -659,7 +650,6 @@ Result handleServiceCmd(int cmd)
     }
     else if (cmd == 5) // Log
     {
-        SaltySD_printf("SaltySD: cmd 5 handler\n");
 
         IpcParsedCommand r = {0};
         ipcParse(&r);
@@ -672,6 +662,8 @@ Result handleServiceCmd(int cmd)
         } *resp = r.Raw;
 
         SaltySD_printf(resp->log);
+
+        SaltySD_printf("SaltySD: cmd 5 handler\n");
 
         ret = 0;
     }

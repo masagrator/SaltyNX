@@ -1,7 +1,6 @@
 #include "loadelf.h"
 
-#include <istream>
-#include <streambuf>
+#include <cstdio>
 
 #include "useful.h"
 #include "elf_parser.hpp"
@@ -168,13 +167,44 @@ Result restore_elf_debug(Handle debug)
 	return ret;
 }
 
-Result load_elf_proc(Handle proc, uint64_t pid, uint64_t heap, uint64_t* start, uint64_t* total_size, uint8_t* elf_data, u32 elf_size)
+Result load_elf_proc(Handle proc, uint64_t pid, uint64_t heap, uint64_t* start, uint64_t* total_size, FILE* f, u32 elf_size)
 {
 	Result ret;
 	Handle debug;
 	
 	*start = 0;
 	*total_size = 0;
+	uint8_t* elf_data = 0;
+	u64 map_addr = 0;
+
+	MemoryInfo meminfo;
+	u32 pageinfo;
+
+	Result rc = svcQueryProcessMemory(&meminfo, &pageinfo, proc, heap);
+	if (R_FAILED(rc)) {
+		SaltySD_printf("SaltySD: load_elf_proc failed query mapping 0x%lx with 0x%x\n", heap, rc);
+	}
+	else {
+		SaltySD_printf("SaltySD: load_elf_proc query mapping 0x%lx, addr: 0x%lx, Perm: %d, size: 0x%lx\n", heap, meminfo.addr, meminfo.perm, meminfo.size);
+		do
+		{
+			map_addr = randomGet64() & 0xFFFFFF000ull;
+			ret = svcMapProcessCodeMemory(proc, map_addr, heap+0x200000, 0x200000);
+		}
+		while (ret == 0xDC01 || ret == 0xD401);
+		svcSetProcessMemoryPermission(proc, map_addr, 0x200000, Perm_Rw);
+		virtmemLock();
+		elf_data = (uint8_t*)virtmemFindAslr(0x200000, 0);
+		rc = svcMapProcessMemory(elf_data, proc, map_addr, 0x200000);
+		virtmemUnlock();
+	}
+
+	if (R_FAILED(rc)) {
+		SaltySD_printf("SaltySD: load_elf_proc failed mapping 0x%lx to 0x%lx with 0x%x\n", heap, elf_data, rc);
+		return 1;
+	}
+
+	fread(elf_data, elf_size, 1, f);
 	
 	Elf_parser elf(elf_data);
 
@@ -194,7 +224,11 @@ Result load_elf_proc(Handle proc, uint64_t pid, uint64_t heap, uint64_t* start, 
 	// Debug the process to write into the heap addr provided
 	// Note: Could probably just use buffer descs for this but whatever.
 	ret = svcDebugActiveProcess(&debug, pid);
-	if (ret) return ret;
+	if (ret) {
+		svcUnmapProcessMemory(elf_data, proc, map_addr, 0x200000);
+		svcUnmapProcessCodeMemory(proc, map_addr, heap+0x200000, 0x200000);
+		return ret;
+	}
 
 	for (auto seg : elf.get_segments())
 	{
@@ -203,7 +237,11 @@ Result load_elf_proc(Handle proc, uint64_t pid, uint64_t heap, uint64_t* start, 
 	}
 
 	svcCloseHandle(debug);
-	if (ret) return ret;
+	if (ret) {
+		svcUnmapProcessMemory(elf_data, proc, map_addr, 0x200000);
+		svcUnmapProcessCodeMemory(proc, map_addr, heap+0x200000, 0x200000);
+		return ret;
+	}
 	
 	// Unmap heap, map new code
 	
@@ -217,7 +255,11 @@ Result load_elf_proc(Handle proc, uint64_t pid, uint64_t heap, uint64_t* start, 
 			ret = svcMapProcessCodeMemory(proc, load_addr, heap, (max_vaddr - min_vaddr));
 		}
 		while (ret == 0xDC01 || ret == 0xD401);
-		if (ret) return ret;
+		if (ret) {
+			svcUnmapProcessMemory(elf_data, proc, map_addr, 0x200000);
+			svcUnmapProcessCodeMemory(proc, map_addr, heap+0x200000, 0x200000);
+			return ret;
+		}
 	}
 	
 	SaltySD_printf("SaltySD: Found free address space at %lx, size %lx\n", load_addr, (max_vaddr - min_vaddr));
@@ -247,17 +289,50 @@ Result load_elf_proc(Handle proc, uint64_t pid, uint64_t heap, uint64_t* start, 
 	
 	*start = load_addr;
 	*total_size = (max_vaddr - min_vaddr);
-	
+	svcUnmapProcessMemory(elf_data, proc, map_addr, 0x200000);
+	svcUnmapProcessCodeMemory(proc, map_addr, heap+0x200000, 0x200000);
 	return ret;
 }
 
-Result load_elf32_proc(Handle proc, uint64_t pid, uint32_t heap, uint32_t* start, uint32_t* total_size, uint8_t* elf_data, u32 elf_size)
+Result load_elf32_proc(Handle proc, uint64_t pid, uint32_t heap, uint32_t* start, uint32_t* total_size, FILE* f, u32 elf_size)
 {
 	Result ret;
 	Handle debug;
 	
 	*start = 0;
 	*total_size = 0;
+	u64 map_addr = 0;
+
+	uint8_t* elf_data = 0;
+
+	MemoryInfo meminfo;
+	u32 pageinfo;
+
+	Result rc = svcQueryProcessMemory(&meminfo, &pageinfo, proc, heap);
+	if (R_FAILED(rc)) {
+		SaltySD_printf("SaltySD: load_elf_proc failed query mapping 0x%lx with 0x%x\n", heap, rc);
+	}
+	else {
+		SaltySD_printf("SaltySD: load_elf_proc query mapping 0x%lx, addr: 0x%lx, Perm: %d, size: 0x%lx\n", heap, meminfo.addr, meminfo.perm, meminfo.size);
+		do
+		{
+			map_addr = randomGet64() & 0xFFFFFF000ull;
+			ret = svcMapProcessCodeMemory(proc, map_addr, heap+0x200000, 0x200000);
+		}
+		while (ret == 0xDC01 || ret == 0xD401);
+		svcSetProcessMemoryPermission(proc, map_addr, 0x200000, Perm_Rw);
+		virtmemLock();
+		elf_data = (uint8_t*)virtmemFindAslr(0x200000, 0);
+		rc = svcMapProcessMemory(elf_data, proc, map_addr, 0x200000);
+		virtmemUnlock();
+	}
+
+	if (R_FAILED(rc)) {
+		SaltySD_printf("SaltySD: load_elf_proc failed mapping 0x%lx to 0x%lx with 0x%x\n", heap, elf_data, rc);
+		return 1;
+	}
+
+	fread(elf_data, elf_size, 1, f);
 	
 	elf32_parser::Elf32_parser elf(elf_data);
 
@@ -277,7 +352,11 @@ Result load_elf32_proc(Handle proc, uint64_t pid, uint32_t heap, uint32_t* start
 	// Debug the process to write into the heap addr provided
 	// Note: Could probably just use buffer descs for this but whatever.
 	ret = svcDebugActiveProcess(&debug, pid);
-	if (ret) return ret;
+	if (ret) {
+		svcUnmapProcessMemory(elf_data, proc, map_addr, 0x200000);
+		svcUnmapProcessCodeMemory(proc, map_addr, heap+0x200000, 0x200000);
+		return ret;
+	}
 
 	for (auto seg : elf.get_segments())
 	{
@@ -286,7 +365,11 @@ Result load_elf32_proc(Handle proc, uint64_t pid, uint32_t heap, uint32_t* start
 	}
 
 	svcCloseHandle(debug);
-	if (ret) return ret;
+	if (ret) {
+		svcUnmapProcessMemory(elf_data, proc, map_addr, 0x200000);
+		svcUnmapProcessCodeMemory(proc, map_addr, heap+0x200000, 0x200000);
+		return ret;
+	}
 	
 	// Unmap heap, map new code
 	
@@ -299,7 +382,11 @@ Result load_elf32_proc(Handle proc, uint64_t pid, uint32_t heap, uint32_t* start
 		ret = svcMapProcessCodeMemory(proc, load_addr, heap, (max_vaddr - min_vaddr));
 	}
 	while (ret == 0xDC01 || ret == 0xD401);
-	if (ret) return ret;
+	if (ret) {
+		svcUnmapProcessMemory(elf_data, proc, map_addr, 0x200000);
+		svcUnmapProcessCodeMemory(proc, map_addr, heap+0x200000, 0x200000);
+		return ret;
+	}
 	
 	SaltySD_printf("SaltySD: Found free address space at %lx, size %lx\n", load_addr, (max_vaddr - min_vaddr));
 	
@@ -337,7 +424,11 @@ Result load_elf32_proc(Handle proc, uint64_t pid, uint32_t heap, uint32_t* start
 	elf.relocate(load_addr, data_addr, read_addr);
 
 	ret = svcDebugActiveProcess(&debug, pid);
-	if (ret) return ret;
+	if (ret) {
+		svcUnmapProcessMemory(elf_data, proc, map_addr, 0x200000);
+		svcUnmapProcessCodeMemory(proc, map_addr, heap+0x200000, 0x200000);
+		return ret;
+	}
 
 	for (auto seg : elf.get_segments())
 	{
@@ -348,6 +439,8 @@ Result load_elf32_proc(Handle proc, uint64_t pid, uint32_t heap, uint32_t* start
 
 	*start = load_addr;
 	*total_size = (max_vaddr - min_vaddr);
-	
+
+	svcUnmapProcessMemory(elf_data, proc, map_addr, 0x200000);
+	svcUnmapProcessCodeMemory(proc, map_addr, heap+0x200000, 0x200000);
 	return ret;
 }
