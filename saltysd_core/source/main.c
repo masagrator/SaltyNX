@@ -615,7 +615,9 @@ int main(int argc, char *argv[])
 
 	ret = SaltySD_Deinit();
 	if (ret) goto fail;
-
+	
+	void* addr;
+	svcSetHeapSize(&addr, 0x200000);
 	__libnx_exit(0);
 
 fail:
