@@ -176,6 +176,7 @@ Result load_elf_proc(Handle proc, uint64_t pid, uint64_t heap, uint64_t* start, 
 	*total_size = 0;
 	uint8_t* elf_data = 0;
 	u64 map_addr = 0;
+	uint64_t heap_buffer_address = ((heap+0x200000) & ~0x1FFFFF);
 
 	MemoryInfo meminfo;
 	u32 pageinfo;
@@ -189,7 +190,7 @@ Result load_elf_proc(Handle proc, uint64_t pid, uint64_t heap, uint64_t* start, 
 		do
 		{
 			map_addr = randomGet64() & 0xFFFFFF000ull;
-			ret = svcMapProcessCodeMemory(proc, map_addr, ((heap+0x200000) & ~0x1FFFFF), 0x200000);
+			ret = svcMapProcessCodeMemory(proc, map_addr, heap_buffer_address, 0x200000);
 		}
 		while (ret == 0xDC01 || ret == 0xD401);
 		svcSetProcessMemoryPermission(proc, map_addr, 0x200000, Perm_Rw);
@@ -226,7 +227,7 @@ Result load_elf_proc(Handle proc, uint64_t pid, uint64_t heap, uint64_t* start, 
 	ret = svcDebugActiveProcess(&debug, pid);
 	if (ret) {
 		svcUnmapProcessMemory(elf_data, proc, map_addr, 0x200000);
-		svcUnmapProcessCodeMemory(proc, map_addr, heap+0x200000, 0x200000);
+		svcUnmapProcessCodeMemory(proc, map_addr, heap_buffer_address, 0x200000);
 		return ret;
 	}
 
@@ -239,7 +240,7 @@ Result load_elf_proc(Handle proc, uint64_t pid, uint64_t heap, uint64_t* start, 
 	svcCloseHandle(debug);
 	if (ret) {
 		svcUnmapProcessMemory(elf_data, proc, map_addr, 0x200000);
-		svcUnmapProcessCodeMemory(proc, map_addr, heap+0x200000, 0x200000);
+		svcUnmapProcessCodeMemory(proc, map_addr, heap_buffer_address, 0x200000);
 		return ret;
 	}
 	
@@ -257,7 +258,7 @@ Result load_elf_proc(Handle proc, uint64_t pid, uint64_t heap, uint64_t* start, 
 		while (ret == 0xDC01 || ret == 0xD401);
 		if (ret) {
 			svcUnmapProcessMemory(elf_data, proc, map_addr, 0x200000);
-			svcUnmapProcessCodeMemory(proc, map_addr, heap+0x200000, 0x200000);
+			svcUnmapProcessCodeMemory(proc, map_addr, heap_buffer_address, 0x200000);
 			return ret;
 		}
 	}
@@ -290,7 +291,7 @@ Result load_elf_proc(Handle proc, uint64_t pid, uint64_t heap, uint64_t* start, 
 	*start = load_addr;
 	*total_size = (max_vaddr - min_vaddr);
 	svcUnmapProcessMemory(elf_data, proc, map_addr, 0x200000);
-	svcUnmapProcessCodeMemory(proc, map_addr, heap+0x200000, 0x200000);
+	svcUnmapProcessCodeMemory(proc, map_addr, heap_buffer_address, 0x200000);
 	return ret;
 }
 
@@ -304,6 +305,7 @@ Result load_elf32_proc(Handle proc, uint64_t pid, uint32_t heap, uint32_t* start
 	u64 map_addr = 0;
 
 	uint8_t* elf_data = 0;
+	uint64_t heap_buffer_address = ((heap+0x200000) & ~0x1FFFFF);
 
 	MemoryInfo meminfo;
 	u32 pageinfo;
@@ -317,7 +319,7 @@ Result load_elf32_proc(Handle proc, uint64_t pid, uint32_t heap, uint32_t* start
 		do
 		{
 			map_addr = randomGet64() & 0xFFFFFF000ull;
-			ret = svcMapProcessCodeMemory(proc, map_addr, ((heap+0x200000) & ~0x1FFFFF), 0x200000);
+			ret = svcMapProcessCodeMemory(proc, map_addr, heap_buffer_address, 0x200000);
 		}
 		while (ret == 0xDC01 || ret == 0xD401);
 		svcSetProcessMemoryPermission(proc, map_addr, 0x200000, Perm_Rw);
@@ -354,7 +356,7 @@ Result load_elf32_proc(Handle proc, uint64_t pid, uint32_t heap, uint32_t* start
 	ret = svcDebugActiveProcess(&debug, pid);
 	if (ret) {
 		svcUnmapProcessMemory(elf_data, proc, map_addr, 0x200000);
-		svcUnmapProcessCodeMemory(proc, map_addr, heap+0x200000, 0x200000);
+		svcUnmapProcessCodeMemory(proc, map_addr, heap_buffer_address, 0x200000);
 		return ret;
 	}
 
@@ -367,7 +369,7 @@ Result load_elf32_proc(Handle proc, uint64_t pid, uint32_t heap, uint32_t* start
 	svcCloseHandle(debug);
 	if (ret) {
 		svcUnmapProcessMemory(elf_data, proc, map_addr, 0x200000);
-		svcUnmapProcessCodeMemory(proc, map_addr, heap+0x200000, 0x200000);
+		svcUnmapProcessCodeMemory(proc, map_addr, heap_buffer_address, 0x200000);
 		return ret;
 	}
 	
@@ -384,7 +386,7 @@ Result load_elf32_proc(Handle proc, uint64_t pid, uint32_t heap, uint32_t* start
 	while (ret == 0xDC01 || ret == 0xD401);
 	if (ret) {
 		svcUnmapProcessMemory(elf_data, proc, map_addr, 0x200000);
-		svcUnmapProcessCodeMemory(proc, map_addr, heap+0x200000, 0x200000);
+		svcUnmapProcessCodeMemory(proc, map_addr, heap_buffer_address, 0x200000);
 		return ret;
 	}
 	
@@ -426,7 +428,7 @@ Result load_elf32_proc(Handle proc, uint64_t pid, uint32_t heap, uint32_t* start
 	ret = svcDebugActiveProcess(&debug, pid);
 	if (ret) {
 		svcUnmapProcessMemory(elf_data, proc, map_addr, 0x200000);
-		svcUnmapProcessCodeMemory(proc, map_addr, heap+0x200000, 0x200000);
+		svcUnmapProcessCodeMemory(proc, map_addr, heap_buffer_address, 0x200000);
 		return ret;
 	}
 
@@ -441,6 +443,6 @@ Result load_elf32_proc(Handle proc, uint64_t pid, uint32_t heap, uint32_t* start
 	*total_size = (max_vaddr - min_vaddr);
 
 	svcUnmapProcessMemory(elf_data, proc, map_addr, 0x200000);
-	svcUnmapProcessCodeMemory(proc, map_addr, heap+0x200000, 0x200000);
+	svcUnmapProcessCodeMemory(proc, map_addr, heap_buffer_address, 0x200000);
 	return ret;
 }
