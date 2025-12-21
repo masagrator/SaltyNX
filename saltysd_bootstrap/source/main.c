@@ -13,8 +13,9 @@
 #endif
 
 void* __saltysd_exit_func = svcExitProcess;
+Handle saltysd;
 
-Result saltySDTerm(Handle salt)
+Result saltySDTerm()
 {
 	Result ret;
 	IpcCommand c;
@@ -36,7 +37,7 @@ Result saltySDTerm(Handle salt)
 	raw->cmd_id = 0;
 	raw->zero = 0;
 
-	ret = ipcDispatch(salt);
+	ret = ipcDispatch(saltysd);
 
 	if (R_SUCCEEDED(ret)) 
 	{
@@ -57,7 +58,7 @@ Result saltySDTerm(Handle salt)
 	return ret;
 }
 
-Result saltySDLoadELF(Handle salt, uintptr_t heap, uintptr_t* elf_addr, size_t* elf_size, char* name)
+Result saltySDLoadELF(uintptr_t heap, uintptr_t* elf_addr, size_t* elf_size, char* name)
 {
 	Result ret;
 	IpcCommand c;
@@ -82,7 +83,7 @@ Result saltySDLoadELF(Handle salt, uintptr_t heap, uintptr_t* elf_addr, size_t* 
 	raw->heap = heap;
 	memcpy(raw->name, name, 63);
 
-	ret = ipcDispatch(salt);
+	ret = ipcDispatch(saltysd);
 
 	if (R_SUCCEEDED(ret)) 
 	{
@@ -110,16 +111,8 @@ size_t g_heapSize;
 void setupAppHeap(void)
 {
 	void* addr = 0;
-	Result rc = 0;
 
-	rc = svcSetHeapSize(&addr, 0x200000);
-
-	if (rc || addr == 0)
-	{
-		#if defined(SWITCH) || defined(OUNCE)
-		write_log("SaltySD Bootstrap: svcSetHeapSize failed with err %x\n", rc);
-		#endif
-	}
+	svcSetHeapSize(&addr, 0x400000);
 
 	g_heapAddr = (uintptr_t)addr;
 	g_heapSize = 0x200000;
@@ -128,49 +121,35 @@ void setupAppHeap(void)
 int main(int argc, char *argv[])
 {
 	Result ret;
-	Handle saltysd;
 
 	#if defined(SWITCH) || defined(OUNCE)
 	write_log("SaltySD Bootstrap: we in here\n");
 	#endif
-	
-	setupAppHeap();
-	
+
 	do
 	{
 		ret = svcConnectToNamedPort(&saltysd, "SaltySD");
 		svcSleepThread(1000*1000);
 	}
 	while (ret);
+	
+	setupAppHeap();
 
-	#if defined(SWITCH) || defined(OUNCE)
-	write_log("SaltySD Bootstrap: Got handle %x, loading ELF...\n", saltysd);
-	#endif
 	uintptr_t new_addr;
 	size_t new_size;
 	#if defined(SWITCH32) || defined(OUNCE32)
-	ret = saltySDLoadELF(saltysd, g_heapAddr, &new_addr, &new_size, "saltysd_core32.elf");
+	ret = saltySDLoadELF(g_heapAddr, &new_addr, &new_size, "saltysd_core32.elf");
 	#else
-	ret = saltySDLoadELF(saltysd, g_heapAddr, &new_addr, &new_size, "saltysd_core.elf");
+	ret = saltySDLoadELF(g_heapAddr, &new_addr, &new_size, "saltysd_core.elf");
 	#endif
 	if (ret) goto fail;
 	
-	ret = saltySDTerm(saltysd);
+	ret = saltySDTerm();
 	if (ret) goto fail;
 	
-	#if defined(SWITCH) || defined(OUNCE)
-	write_log("SaltySD Bootstrap: ELF loaded to %p\n", (void*)new_addr);
-	#endif
 	__saltysd_exit_func = (void*)new_addr;
-
-	svcCloseHandle(saltysd);
-
-	return 0;
-
 fail:
-	#if defined(SWITCH) || defined(OUNCE)
-	write_log("SaltySD Bootstrap: failed with retcode %x\n", ret);
-	#endif
+	svcCloseHandle(saltysd);
 	return 0;
 }
 
