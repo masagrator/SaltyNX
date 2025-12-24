@@ -11,6 +11,7 @@
 #include "spawner_ipc.h"
 
 #include "loadelf.h"
+#define NANOPRINTF_IMPLEMENTATION
 #include "useful.h"
 #include "dmntcht.h"
  #include <malloc.h>
@@ -32,7 +33,7 @@ struct MinMax {
 };
 
 Handle saltyport, sdcard, injectserv;
-static char g_heap[0x70000];
+static char g_heap[0x30000];
 bool should_terminate = false;
 bool already_hijacking = false;
 DebugEventInfo eventinfo;
@@ -64,6 +65,23 @@ uintptr_t game_start_address = 0;
     uint64_t systemtickfrequency = 0;
 #endif
 static_assert(systemtickfrequency != 0);
+
+//This is done to save some space as they have no practical use in our case
+void* __real___cxa_throw(void *thrown_exception, void *pvar, void (*dest)(void *));
+void* __real__Unwind_Resume();
+void* __real___gxx_personality_v0();
+
+void __wrap___cxa_throw(void *thrown_exception, void *pvar, void (*dest)(void *)) {
+    abort();
+}
+
+void __wrap__Unwind_Resume() {
+    return;
+}
+
+void __wrap___gxx_personality_v0() {
+    return;
+}
 
 void __libnx_initheap(void)
 {
@@ -124,7 +142,7 @@ bool isCheatsFolderInstalled() {
     char romfspath[0x40] = "";
     bool flag = false;
 
-    snprintf(romfspath, 0x40, "sdmc:/atmosphere/contents/%016lx/cheats", TIDnow);
+    npf_snprintf(romfspath, 0x40, "sdmc:/atmosphere/contents/%016lx/cheats", TIDnow);
 
     DIR* dir = opendir(romfspath);
     if (dir) {
@@ -140,8 +158,8 @@ void renameCheatsFolder() {
     char cheatspath[0x3C] = "";
     char cheatspathtemp[0x40] = "";
 
-    snprintf(cheatspath, 0x3C, "sdmc:/atmosphere/contents/%016lx/cheats", TIDnow);
-    snprintf(cheatspathtemp, 0x40, "%stemp", cheatspath);
+    npf_snprintf(cheatspath, 0x3C, "sdmc:/atmosphere/contents/%016lx/cheats", TIDnow);
+    npf_snprintf(cheatspathtemp, 0x40, "%stemp", cheatspath);
     if (!check) {
         rename(cheatspath, cheatspathtemp);
         check = true;
@@ -157,7 +175,7 @@ bool isModInstalled() {
     char romfspath[0x40] = "";
     bool flag = false;
 
-    snprintf(romfspath, 0x40, "sdmc:/atmosphere/contents/%016lx/romfs", TIDnow);
+    npf_snprintf(romfspath, 0x40, "sdmc:/atmosphere/contents/%016lx/romfs", TIDnow);
 
     DIR* dir = opendir(romfspath);
     if (dir) {
@@ -259,7 +277,7 @@ bool hijack_bootstrap(Handle* debug, u64 pid, u64 tid, bool isA64)
         FILE* file = 0;
         file = fopen("sdmc:/SaltySD/saltysd_bootstrap.elf", "rb");
         if (!file) {
-            SaltySD_printf("SaltySD: SaltySD/saltysd_bootstrap.elf not found, aborting...\n", ret);
+            SaltySD_printf("SaltySD: SaltySD/saltysd_bootstrap.elf not found, aborting...\n");
             svcCloseHandle(*debug);
             return false;
         }
@@ -372,7 +390,7 @@ void hijack_pid(u64 pid)
                 char exceptions[20];
                 char titleidnumX[20];
 
-                snprintf(titleidnumX, sizeof titleidnumX, "X%016lx", eventinfo.tid);
+                npf_snprintf(titleidnumX, sizeof titleidnumX, "X%016lx", eventinfo.tid);
                 while (fgets(exceptions, sizeof(exceptions), except)) {
                     titleidnumX[0] = 'X';
                     if (!strncasecmp(exceptions, titleidnumX, 17)) {
@@ -493,26 +511,24 @@ Result handleServiceCmd(int cmd)
         
         memcpy(name, resp->name, 64);
         
-        SaltySD_printf("SaltySD: cmd 1 handler, proc handle %x, heap %llx, path %s\n", proc, heap, name);
+        SaltySD_printf("SaltySD: cmd 1 handler, proc handle %x, heap %lx, path %s\n", proc, heap, name);
         
         char* path = malloc(96);
-        uint8_t* elf_data = NULL;
         u32 elf_size = 0;
         bool arm32 = false;
         if (!strncmp(name, "saltysd_core32.elf", 18)) arm32 = true;
 
-        snprintf(path, 96, "sdmc:/SaltySD/plugins/%s", name);
+        npf_snprintf(path, 96, "sdmc:/SaltySD/plugins/%s", name);
         FILE* f = fopen(path, "rb");
         if (!f)
         {
-            snprintf(path, 96, "sdmc:/SaltySD/%s", name);
+            npf_snprintf(path, 96, "sdmc:/SaltySD/%s", name);
             f = fopen(path, "rb");
         }
 
         if (!f)
         {
             SaltySD_printf("SaltySD: failed to load plugin `%s'!\n", name);
-            elf_data = NULL;
             elf_size = 0;
         }
         else
@@ -522,21 +538,14 @@ Result handleServiceCmd(int cmd)
             fseek(f, 0, SEEK_SET);
             
             SaltySD_printf("SaltySD: loading %s, size 0x%x\n", path, elf_size);
-            
-            elf_data = malloc(elf_size);
-            if (elf_data) {
-                fread(elf_data, elf_size, 1, f);
-            }
-            else SaltySD_printf("SaltySD: Not enough memory to load elf file! Aborting...\n");
-            fclose(f);
         }
         free(path);
         
         u64 new_start = 0, new_size = 0;
-        if (elf_data && elf_size) {
+        if (f && elf_size) {
             if (!arm32)
-                ret = load_elf_proc(proc, r.Pid, heap, &new_start, &new_size, elf_data, elf_size);
-            else ret = load_elf32_proc(proc, r.Pid, (u32)heap, (u32*)&new_start, (u32*)&new_size, elf_data, elf_size);
+                ret = load_elf_proc(proc, r.Pid, heap, &new_start, &new_size, f, elf_size);
+            else ret = load_elf32_proc(proc, r.Pid, (u32)heap, (u32*)&new_start, (u32*)&new_size, f, elf_size);
             if (ret) SaltySD_printf("Load_elf arm32: %d, ret: 0x%x\n", arm32, ret);
         }
         else
@@ -544,8 +553,8 @@ Result handleServiceCmd(int cmd)
 
         svcCloseHandle(proc);
         
-        if (elf_data)
-            free(elf_data);
+        if (f)
+            fclose(f);
         
         // Ship off results
         struct {
@@ -629,7 +638,7 @@ Result handleServiceCmd(int cmd)
         raw->magic = SFCO_MAGIC;
         raw->result = ret;
 
-        SaltySD_printf("SaltySD: cmd 3 handler, memcpy(%llx, %llx, %llx)\n", to, from, size);
+        SaltySD_printf("SaltySD: cmd 3 handler, memcpy(%lx, %lx, %lx)\n", to, from, size);
 
         return 0;
     }
@@ -641,7 +650,6 @@ Result handleServiceCmd(int cmd)
     }
     else if (cmd == 5) // Log
     {
-        SaltySD_printf("SaltySD: cmd 5 handler\n");
 
         IpcParsedCommand r = {0};
         ipcParse(&r);
@@ -654,6 +662,8 @@ Result handleServiceCmd(int cmd)
         } *resp = r.Raw;
 
         SaltySD_printf(resp->log);
+
+        SaltySD_printf("SaltySD: cmd 5 handler\n");
 
         ret = 0;
     }

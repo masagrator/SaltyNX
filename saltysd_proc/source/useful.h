@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <sys/stat.h>
+#include "nanoprintf.h"
 #ifdef __cplusplus
 	#include <cctype>
 #else
@@ -93,7 +94,7 @@ static inline void SaltySD_printf(const char* format, ...)
 
 	va_list args;
 	va_start(args, format);
-	vsnprintf(buffer, 256, format, args);
+	npf_vsnprintf(buffer, 256, format, args);
 	va_end(args);
 	
 	svcOutputDebugString(buffer, strlen(buffer));
@@ -110,7 +111,7 @@ static inline void SaltySD_printf(const char* format, ...)
 			char timer[] = "[244444444:24:24] ";
 			uint64_t deltaTick = svcGetSystemTick() - tick;
 			uint64_t deltaSeconds = deltaTick / systemtickfrequency;
-			snprintf(timer, sizeof(timer), "[%02ld:%02ld:%02ld] ", (deltaSeconds/3600) % 1000000000, ((deltaSeconds/60) % 60), deltaSeconds % 60);
+			npf_snprintf(timer, sizeof(timer), "[%02ld:%02ld:%02ld] ", (deltaSeconds/3600) % 1000000000, ((deltaSeconds/60) % 60), deltaSeconds % 60);
 			fwrite(timer, strlen(timer), 1, f);
 		}
 		if (buffer[strlen(buffer)-1] == '\n') {
@@ -124,7 +125,7 @@ static inline void SaltySD_printf(const char* format, ...)
 
 
 #define debug_log(...) \
-	{char log_buf[0x200]; snprintf(log_buf, 0x200, __VA_ARGS__); \
+	{char log_buf[0x200]; npf_snprintf(log_buf, 0x200, __VA_ARGS__); \
 	svcOutputDebugString(log_buf, strlen(log_buf));}
 	
 #endif // USEFUL_H

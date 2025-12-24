@@ -390,16 +390,16 @@ void LoadDockedModeAllowedSave() {
     }
     char path[128] = "";
     int crc32 = crc32Calculate(&edid, sizeof(edid));
-    snprintf(path, sizeof(path), "sdmc:/SaltySD/plugins/FPSLocker/ExtDisplays/%08X.dat", crc32);
+    npf_snprintf(path, sizeof(path), "sdmc:/SaltySD/plugins/FPSLocker/ExtDisplays/%08X.dat", crc32);
     if (file_or_directory_exists(path) == false) {
         FILE* file = fopen(path, "wb");
         if (file) {
             fwrite(&edid, sizeof(edid), 1, file);
             fclose(file);
         }
-        else SaltySD_printf("SaltySD: Couldn't dump EDID to sdcard!\n", &path[31]);
+        else SaltySD_printf("SaltySD: Couldn't dump EDID to sdcard!\n");
     }
-    snprintf(path, sizeof(path), "sdmc:/SaltySD/plugins/FPSLocker/ExtDisplays/%08X.ini", crc32);
+    npf_snprintf(path, sizeof(path), "sdmc:/SaltySD/plugins/FPSLocker/ExtDisplays/%08X.ini", crc32);
     if (file_or_directory_exists(path) == true) {
         FILE* file = fopen(path, "r");
         if (!file) {

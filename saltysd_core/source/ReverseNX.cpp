@@ -5,6 +5,7 @@
 #include "saltysd_dynamic.h"
 #include <cerrno>
 #include <utility>
+#include "nanoprintf.h"
 
 enum ReverseNX_state {
 	ReverseNX_Switch_Invalid = -1,
@@ -98,9 +99,9 @@ ReverseNX_state loadSave() {
     uint64_t titid = 0;
     svcGetInfo(&titid, InfoType_TitleId, CUR_PROCESS_HANDLE, 0);
 	#if defined(SWITCH32) || defined(OUNCE32)
-	snprintf(path, sizeof(path), "sdmc:/SaltySD/plugins/ReverseNX-RT/%016llX.dat", titid);
+	npf_snprintf(path, sizeof(path), "sdmc:/SaltySD/plugins/ReverseNX-RT/%016llX.dat", titid);
 	#else
-	snprintf(path, sizeof(path), "sdmc:/SaltySD/plugins/ReverseNX-RT/%016lX.dat", titid);
+	npf_snprintf(path, sizeof(path), "sdmc:/SaltySD/plugins/ReverseNX-RT/%016lX.dat", titid);
 	#endif
 	errno = 0;
 	FILE* save_file = SaltySDCore_fopen(path, "rb");
@@ -154,7 +155,7 @@ bool TryPopNotificationMessage(int* msg) {
 	static bool compare = false;
 	static bool compare2 = false;
 
-	ReverseNX_RT->pluginActive = true;
+	if (!ReverseNX_RT->pluginActive) ReverseNX_RT->pluginActive = true;
 
 	if (ReverseNX_RT->def) {
 		if (!check1) {
@@ -196,8 +197,8 @@ bool TryPopNotificationMessage(int* msg) {
 }
 
 int PopNotificationMessage() {
+	int msg = 0;
 	while (true) {
-		int msg;
 		if (TryPopNotificationMessage(&msg)) {
 			return msg;
 		}
@@ -357,7 +358,7 @@ void LinkMultiWaitHolder(void* MultiWaitType, void* MultiWaitHolderType) {
 void* WaitAny(void* MultiWaitType) {
 	if (multiWaitCopy != MultiWaitType)
 		return ((nnosWaitAny)(Address_weaks.WaitAny))(MultiWaitType);
-	ReverseNX_RT->pluginActive = true;
+	if (!ReverseNX_RT->pluginActive) ReverseNX_RT->pluginActive = true;
 	void* ret_value = ((nnosTimedWaitAny)(Address_weaks.TimedWaitAny))(MultiWaitType, 1000000);
 	if (ret_value != NULL) return ret_value;
 	multiWaitHack = true;

@@ -6,7 +6,7 @@ file = open("size.txt", "r")
 size = int(file.read(), base=10)
 file.close()
 
-deadbeef_bytes = 0xDEADBEEF.to_bytes(8, "little")
+deadbeef_bytes = 0xDEEDBEEF.to_bytes(8, "little")
 
 deadbeef = DATA.find(deadbeef_bytes)
 if (deadbeef == -1):

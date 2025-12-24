@@ -5,6 +5,7 @@
 #include <string.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include "nanoprintf.h"
 
 #define LINKABLE __attribute__ ((weak))
 
@@ -20,7 +21,7 @@ void SaltySDCore_printf(const char* format, ...)
 
 	va_list args;
 	va_start(args, format);
-	vsnprintf(buffer, 256, format, args);
+	npf_vsnprintf(buffer, 256, format, args);
 	va_end(args);
 	
 	#if defined(SWITCH32) || defined(OUNCE32)
@@ -36,7 +37,7 @@ void SaltySDCore_printf(const char* format, ...)
 }
 
 #define debug_log(...) \
-	{char log_buf[0x200]; snprintf(log_buf, 0x200, __VA_ARGS__); \
+	{char log_buf[0x200]; npf_snprintf(log_buf, 0x200, __VA_ARGS__); \
 	svcOutputDebugString(log_buf, strlen(log_buf));}
 	
 #endif // USEFUL_H
