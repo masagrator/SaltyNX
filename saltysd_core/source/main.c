@@ -548,7 +548,9 @@ size_t GetAllModuleInfo(struct ModuleInfo** modules, void* buffer, size_t buffer
 int main(int argc, char *argv[])
 {
 	Result ret;
+	#if defined(SWITCH) || defined(OUNCE)
 	svcGetInfo(&g_heapAddr, InfoType_HeapRegionAddress, CUR_PROCESS_HANDLE, 0);
+	#endif
 
 	SaltySDCore_RegisterExistingModules();
 	strtod_ptr = SaltySDCore_FindSymbolBuiltin("strtod");
