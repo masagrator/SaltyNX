@@ -123,7 +123,6 @@ void SaltySDCore_LoadPatches() {
 				filename[namelen - 6] = 0;
 				uintptr_t position = SaltySDCore_FindSymbol(filename);
 				if (position) {
-					#
 					SaltySDCore_printf("SaltySD Patcher: Symbol Position: 0x%lX\n", position);
 					SaltySD_Memcpy(position, (uintptr_t)instr, size);
 				}
@@ -136,13 +135,13 @@ void SaltySDCore_LoadPatches() {
 	}
 
 	svcGetInfo(&tid, 18, CUR_PROCESS_HANDLE, 0);
-	
-	SaltySDCore_printf("SaltySD Patcher: Searching patches in dir '/%016lX'...\n", tid);
-	
+		
 	#if defined(SWITCH32) || defined(OUNCE32)
 	npf_snprintf(tmp4, 0x100, "sdmc:/SaltySD/patches/%016llx/", tid);
+	SaltySDCore_printf("SaltySD Patcher: Searching patches in dir '/%016llX'...\n", tid);
 	#else
 	npf_snprintf(tmp4, 0x100, "sdmc:/SaltySD/patches/%016lx/", tid);
+	SaltySDCore_printf("SaltySD Patcher: Searching patches in dir '/%016lX'...\n", tid);
 	#endif
 
 	d = opendir(tmp4);
