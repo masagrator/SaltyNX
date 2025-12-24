@@ -181,12 +181,12 @@ Result load_elf_proc(Handle proc, uint64_t pid, uint64_t heap, uint64_t* start, 
 	MemoryInfo meminfo;
 	u32 pageinfo;
 
-	Result rc = svcQueryProcessMemory(&meminfo, &pageinfo, proc, heap);
+	Result rc = svcQueryProcessMemory(&meminfo, &pageinfo, proc, heap_buffer_address);
 	if (R_FAILED(rc)) {
-		SaltySD_printf("SaltySD: load_elf_proc failed query mapping 0x%lx with 0x%x\n", heap, rc);
+		SaltySD_printf("SaltySD: load_elf_proc failed query mapping 0x%lx with 0x%x\n", heap_buffer_address, rc);
 	}
 	else {
-		SaltySD_printf("SaltySD: load_elf_proc query mapping 0x%lx, addr: 0x%lx, Perm: %d, size: 0x%lx\n", heap, meminfo.addr, meminfo.perm, meminfo.size);
+		SaltySD_printf("SaltySD: load_elf_proc query mapping 0x%lx, addr: 0x%lx, Perm: %d, size: 0x%lx\n", heap_buffer_address, meminfo.addr, meminfo.perm, meminfo.size);
 		do
 		{
 			map_addr = randomGet64() & 0xFFFFFF000ull;
@@ -201,11 +201,13 @@ Result load_elf_proc(Handle proc, uint64_t pid, uint64_t heap, uint64_t* start, 
 	}
 
 	if (R_FAILED(rc)) {
-		SaltySD_printf("SaltySD: load_elf_proc failed mapping 0x%lx to 0x%lx with 0x%x\n", heap, elf_data, rc);
+		SaltySD_printf("SaltySD: load_elf_proc failed mapping 0x%lx to 0x%lx with 0x%x\n", heap_buffer_address, elf_data, rc);
 		return 1;
 	}
 
 	fread(elf_data, elf_size, 1, f);
+
+	SaltySD_printf("SaltySD: load_elf_proc loaded ELF to buffer.\n");
 	
 	Elf_parser elf(elf_data);
 
