@@ -203,14 +203,14 @@ void setupELFHeap(void)
 
 uintptr_t find_next_elf_heap()
 {
-	uintptr_t addr = g_heapAddr;
+	uintptr_t addr = 0;
 	while (1)
 	{
 		MemoryInfo info;
 		u32 pageinfo;
 		Result ret = svcQueryMemory(&info, &pageinfo, addr);
 		
-		if (info.perm == Perm_Rw)
+		if (info.perm == Perm_Rw && info.type == MemType_Heap)
 			return info.addr;
 
 		addr = info.addr + info.size;
@@ -365,7 +365,7 @@ void** SaltySDCore_LoadPluginsInDir(char* path, void** entries, size_t* num_elfs
 			if (dot && !strcmp(dot, ".elf"))
 			{
 				u64 elf_addr, elf_size;
-				setupELFHeap();
+				//setupELFHeap();
 				npf_snprintf(tmp, 0x100, "%s%s", path, dir->d_name);
 				SaltySD_LoadELF(find_next_elf_heap(), &elf_addr, &elf_size, tmp);
 				*num_elfs = *num_elfs + 1;
@@ -548,6 +548,9 @@ size_t GetAllModuleInfo(struct ModuleInfo** modules, void* buffer, size_t buffer
 int main(int argc, char *argv[])
 {
 	Result ret;
+	#if defined(SWITCH) || defined(OUNCE)
+	svcGetInfo(&g_heapAddr, InfoType_HeapRegionAddress, CUR_PROCESS_HANDLE, 0);
+	#endif
 
 	SaltySDCore_RegisterExistingModules();
 	strtod_ptr = SaltySDCore_FindSymbolBuiltin("strtod");

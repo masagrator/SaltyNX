@@ -136,7 +136,7 @@ Result SaltySD_LoadELF(u64 heap, u64* elf_addr, u64* elf_size, char* name)
 		u64 cmd_id;
 		u64 heap;
 		char name[64];
-		u64 reserved[2];
+		u32 reserved[2];
 	} *raw;
 
 	raw = ipcPrepareHeader(&c, sizeof(*raw));
