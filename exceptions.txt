@@ -37,10 +37,6 @@
 010079C017F5E001
 010079C017F5E002
 
-;Plants vs. Zombies: Battle for Neighborville
-;1.0.3 crash on boot
-0100C56010FD8000
-
 ;EA SPORTS FC 24
 ;1.0.0 - v1.55.bc14 crash
 0100BDB01A0E6000
