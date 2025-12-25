@@ -1,25 +1,12 @@
-;Luigi's Mansion 3
-;1.0.0-1.4.0 crash
-0100DCA0064A6000
-
 ;YouTube
 ;Stucks in infinite loop
 01003A400C3DA000
-
-;Immortals Fenyx Rising
-;1.0.3, 1.3.4 crash
-01004A600EC0A000
 
 ;Olympic Games Tokyo 2020 – The Official Video Game
 ;1.0.0-1.0.2 crash on boot
 ;1.0.9 crash on boot
 010034B00E14C000
 01004CE00AAE2000
-
-;The Lara Croft Collection
-;1.0.0 - Games in collection are crashing on boot, only launcher doesn't
-010079C017F5E001
-010079C017F5E002
 
 ;EA SPORTS FC 24
 ;1.0.0 - v1.55.bc14 crash
