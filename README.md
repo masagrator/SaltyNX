@@ -89,6 +89,7 @@ Remember to restart Switch.
 | Plants vs. Zombies: Battle for Neighborville | Heap related |
 | Radiant Silvergun | 32-bit games don't support plugins |
 | Sherlock Holmes and The Hound of The Baskervilles | 32-bit games don't support plugins |
+| Stubbs the Zombie in Rebel Without a Pulse | heap related |
 | The Lara Croft Collection | heap related |
 | Tokyo Mirage Session #FE Encore | 32-bit games don't support plugins |
 | Valkyria Chronicles | 32-bit games don't support plugins |
