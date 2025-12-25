@@ -1,17 +1,3 @@
 ;YouTube
 ;Stucks in infinite loop
 01003A400C3DA000
-
-;Olympic Games Tokyo 2020 – The Official Video Game
-;1.0.0-1.0.2 crash on boot
-;1.0.9 crash on boot
-010034B00E14C000
-01004CE00AAE2000
-
-;EA SPORTS FC 24
-;1.0.0 - v1.55.bc14 crash
-0100BDB01A0E6000
-
-;Company of Heroes Collection
-;1.5_66915 crashes
-0100ABD0156F8000
