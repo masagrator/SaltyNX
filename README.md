@@ -57,25 +57,18 @@ Remember to restart Switch.
 
 | Title | Why? |
 | ------------- | ------------- |
-| Alien: Isolation | Heap related |
 | Azure Striker Gunvolt: Striker Pack | 32-bit games don't support plugins |
 | Baldur's Gate and Baldur's Gate II: Enhanced Editions | 32-bit games don't support plugins |
 | CelDamage HD | 32-bit games don't support plugins |
-| Company of Heroes Collection | heap related |
 | DEADLY PREMONITION Origins | 32-bit games don't support plugins |
 | Death Road to Canada | 32-bit games don't support plugins |
 | Dies irae Amantes amentes For Nintendo Switch | 32-bit games don't support plugins |
-| EA SPORTS FC 24 | heap related |
 | Goat Simulator | 32-bit games don't support plugins |
 | Gothic | 32-bit games don't support plugins |
 | Grandia Collection | Only launcher is 64-bit, actual games are 32-bit, so plugins are not supported |
-| Grid: Autosport | Heap related |
-| Immortals Fenyx Rising | Heap related |
 | LIMBO | 32-bit games don't support plugins |
 | Luigi's Mansions 2 HD | 32-bit games don't support plugins |
-| Luigi's Mansion 3 | Heap related |
 | Mario Kart 8 Deluxe (1.0.0-3.0.3) | 32-bit games don't support plugins |
-| Mario Strikers: Battle League | Heap related |
 | Megadimension Neptunia VII | 32-bit games don't support plugins |
 | Moero Chronicle Hyper | 32-bit games don't support plugins |
 | Moero Crystal H | 32-bit games don't support plugins |
@@ -83,14 +76,10 @@ Remember to restart Switch.
 | Monster Hunter XX Nintendo Switch Ver. | 32-bit games don't support plugins |
 | New Super Mario Bros. U Deluxe | 32-bit games don't support plugins |
 | Ni no Kuni: Wrath of the White Witch | 32-bit games don't support plugins |
-| Olympic Games Tokyo 2020 – The Official Video Game™ | heap related |
 | Pikmin 3 Deluxe | 32-bit games don't support plugins |
 | Planescape: Torment and Icewind Dale | 32-bit games don't support plugins |
-| Plants vs. Zombies: Battle for Neighborville | Heap related |
 | Radiant Silvergun | 32-bit games don't support plugins |
 | Sherlock Holmes and The Hound of The Baskervilles | 32-bit games don't support plugins |
-| Stubbs the Zombie in Rebel Without a Pulse | heap related |
-| The Lara Croft Collection | heap related |
 | Tokyo Mirage Session #FE Encore | 32-bit games don't support plugins |
 | Valkyria Chronicles | 32-bit games don't support plugins |
 | World of Goo | 32-bit games don't support plugins |
