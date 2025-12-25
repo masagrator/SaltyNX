@@ -57,7 +57,6 @@ Remember to restart Switch.
 
 | Title | Why? |
 | ------------- | ------------- |
-| Alien: Isolation | Heap related |
 | Azure Striker Gunvolt: Striker Pack | 32-bit games don't support plugins |
 | Baldur's Gate and Baldur's Gate II: Enhanced Editions | 32-bit games don't support plugins |
 | CelDamage HD | 32-bit games don't support plugins |
@@ -69,13 +68,9 @@ Remember to restart Switch.
 | Goat Simulator | 32-bit games don't support plugins |
 | Gothic | 32-bit games don't support plugins |
 | Grandia Collection | Only launcher is 64-bit, actual games are 32-bit, so plugins are not supported |
-| Grid: Autosport | Heap related |
-| Immortals Fenyx Rising | Heap related |
 | LIMBO | 32-bit games don't support plugins |
 | Luigi's Mansions 2 HD | 32-bit games don't support plugins |
-| Luigi's Mansion 3 | Heap related |
 | Mario Kart 8 Deluxe (1.0.0-3.0.3) | 32-bit games don't support plugins |
-| Mario Strikers: Battle League | Heap related |
 | Megadimension Neptunia VII | 32-bit games don't support plugins |
 | Moero Chronicle Hyper | 32-bit games don't support plugins |
 | Moero Crystal H | 32-bit games don't support plugins |
@@ -89,7 +84,6 @@ Remember to restart Switch.
 | Plants vs. Zombies: Battle for Neighborville | Heap related |
 | Radiant Silvergun | 32-bit games don't support plugins |
 | Sherlock Holmes and The Hound of The Baskervilles | 32-bit games don't support plugins |
-| The Lara Croft Collection | heap related |
 | Tokyo Mirage Session #FE Encore | 32-bit games don't support plugins |
 | Valkyria Chronicles | 32-bit games don't support plugins |
 | World of Goo | 32-bit games don't support plugins |
