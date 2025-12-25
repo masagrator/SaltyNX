@@ -60,11 +60,9 @@ Remember to restart Switch.
 | Azure Striker Gunvolt: Striker Pack | 32-bit games don't support plugins |
 | Baldur's Gate and Baldur's Gate II: Enhanced Editions | 32-bit games don't support plugins |
 | CelDamage HD | 32-bit games don't support plugins |
-| Company of Heroes Collection | heap related |
 | DEADLY PREMONITION Origins | 32-bit games don't support plugins |
 | Death Road to Canada | 32-bit games don't support plugins |
 | Dies irae Amantes amentes For Nintendo Switch | 32-bit games don't support plugins |
-| EA SPORTS FC 24 | heap related |
 | Goat Simulator | 32-bit games don't support plugins |
 | Gothic | 32-bit games don't support plugins |
 | Grandia Collection | Only launcher is 64-bit, actual games are 32-bit, so plugins are not supported |
@@ -78,10 +76,8 @@ Remember to restart Switch.
 | Monster Hunter XX Nintendo Switch Ver. | 32-bit games don't support plugins |
 | New Super Mario Bros. U Deluxe | 32-bit games don't support plugins |
 | Ni no Kuni: Wrath of the White Witch | 32-bit games don't support plugins |
-| Olympic Games Tokyo 2020 – The Official Video Game™ | heap related |
 | Pikmin 3 Deluxe | 32-bit games don't support plugins |
 | Planescape: Torment and Icewind Dale | 32-bit games don't support plugins |
-| Plants vs. Zombies: Battle for Neighborville | Heap related |
 | Radiant Silvergun | 32-bit games don't support plugins |
 | Sherlock Holmes and The Hound of The Baskervilles | 32-bit games don't support plugins |
 | Tokyo Mirage Session #FE Encore | 32-bit games don't support plugins |
