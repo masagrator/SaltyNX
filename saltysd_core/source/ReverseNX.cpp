@@ -159,18 +159,18 @@ bool TryPopNotificationMessage(int* msg) {
 
 	if (ReverseNX_RT->def) {
 		if (!check1) {
-			check1 = true;
 			*msg = AppletNotificationMessage_OperationModeChanged;
+			check1 = true;
 			return true;
 		}
 		else if (!check2) {
-			check2 = true;
 			*msg = AppletNotificationMessage_PerformanceModeChanged;
+			check2 = true;
 			return true;
 		}
 		else if (multiWaitHack == true) {
-			multiWaitHack = false;
 			*msg = 0xFF;
+			multiWaitHack = false;
 			return true;
 		}
 		else return ((_ZN2nn2oe25TryPopNotificationMessageEPj)(Address_weaks.TryPopNotificationMessage))(msg);
@@ -179,9 +179,8 @@ bool TryPopNotificationMessage(int* msg) {
 	check1 = false;
 	check2 = false;
 	if (compare2 != ReverseNX_RT->isDocked) {
-		compare2 = ReverseNX_RT->isDocked;
 		*msg = AppletNotificationMessage_OperationModeChanged;
-
+		compare2 = ReverseNX_RT->isDocked;
 		return true;
 	}
 	if (compare != ReverseNX_RT->isDocked) {
@@ -190,8 +189,8 @@ bool TryPopNotificationMessage(int* msg) {
 		return true;
 	}
 	if (multiWaitHack == true) {
-		multiWaitHack = false;
 		*msg = 0xFF;
+		multiWaitHack = false;
 		return true;
 	}
 	return ((_ZN2nn2oe25TryPopNotificationMessageEPj)(Address_weaks.TryPopNotificationMessage))(msg);
