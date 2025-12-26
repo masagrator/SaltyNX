@@ -160,12 +160,12 @@ bool TryPopNotificationMessage(int* msg) {
 	if (ReverseNX_RT->def) {
 		if (!check1) {
 			check1 = true;
-			*msg = AppletNotificationMessage_PerformanceModeChanged;
+			*msg = AppletNotificationMessage_OperationModeChanged;
 			return true;
 		}
 		else if (!check2) {
 			check2 = true;
-			*msg = AppletNotificationMessage_OperationModeChanged;
+			*msg = AppletNotificationMessage_PerformanceModeChanged;
 			return true;
 		}
 		else if (multiWaitHack == true) {
@@ -180,12 +180,13 @@ bool TryPopNotificationMessage(int* msg) {
 	check2 = false;
 	if (compare2 != ReverseNX_RT->isDocked) {
 		compare2 = ReverseNX_RT->isDocked;
-		*msg = AppletNotificationMessage_PerformanceModeChanged;
+		*msg = AppletNotificationMessage_OperationModeChanged;
+
 		return true;
 	}
 	if (compare != ReverseNX_RT->isDocked) {
+		*msg = AppletNotificationMessage_PerformanceModeChanged;
 		compare = ReverseNX_RT->isDocked;
-		*msg = AppletNotificationMessage_OperationModeChanged;
 		return true;
 	}
 	if (multiWaitHack == true) {
@@ -384,7 +385,7 @@ extern "C" {
 			}
 			else {
 				ReverseNX_RT->isDocked = false;
-				ReverseNX_RT->def = true;				
+				ReverseNX_RT->def = true;
 			}
 			Address_weaks.GetPerformanceMode = SaltySDCore_FindSymbolBuiltin("_ZN2nn2oe18GetPerformanceModeEv");
 			Address_weaks.GetOperationMode = SaltySDCore_FindSymbolBuiltin("_ZN2nn2oe16GetOperationModeEv");
