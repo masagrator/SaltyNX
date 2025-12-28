@@ -34,7 +34,7 @@ Handle saltyport, sdcard, injectserv;
 static char g_heap[0x30000];
 bool should_terminate = false;
 bool already_hijacking = false;
-DebugEventInfo eventinfo;
+DebugEvent event;
 bool check = false;
 u64 exception = 0x0;
 SharedMemory _sharedMemory = {0};
@@ -335,7 +335,7 @@ void hijack_pid(u64 pid)
 
     while (1)
     {
-        ret = svcGetDebugEventInfo(&eventinfo, debug);
+        ret = svcGetDebugEvent(&event, debug);
 
         switch(ret) {
             case 0:
@@ -344,32 +344,32 @@ void hijack_pid(u64 pid)
                 SaltySD_printf("SaltySD: PID %d is not allowing debugging, aborting...\n", pid);
                 goto abort_bootstrap;
             case 0x8C01:
-                SaltySD_printf("SaltySD: PID %d svcGetDebugEventInfo: end of events...\n", pid);
+                SaltySD_printf("SaltySD: PID %d svcGetDebugevent: end of events...\n", pid);
                 break;
             default:
-                SaltySD_printf("SaltySD: PID %d svcGetDebugEventInfo returned %x, breaking...\n", pid, ret);
+                SaltySD_printf("SaltySD: PID %d svcGetDebugevent returned %x, breaking...\n", pid, ret);
                 break;
         }
         if (ret)
             break;
 
         if (!check) {
-            TIDnow = eventinfo.info.create_process.program_id;
+            TIDnow = event.info.create_process.program_id;
             exception = 0;
             renameCheatsFolder();
         }
 
-        if (eventinfo.type == DebugEvent_CreateProcess)
+        if (event.type == DebugEventType_CreateProcess)
         {
 
-            if (eventinfo.info.create_process.program_id <= 0x010000000000FFFF)
+            if (event.info.create_process.program_id <= 0x010000000000FFFF)
             {
-                SaltySD_printf("SaltySD: %s TID %016lx is a system application, aborting bootstrap...\n", eventinfo.info.create_process.name, eventinfo.info.create_process.program_id);
+                SaltySD_printf("SaltySD: %s TID %016lx is a system application, aborting bootstrap...\n", event.info.create_process.name, event.info.create_process.program_id);
                 goto abort_bootstrap;
             }
-            if (eventinfo.info.create_process.program_id > 0x01FFFFFFFFFFFFFF || (eventinfo.info.create_process.program_id & 0x1F00) != 0)
+            if (event.info.create_process.program_id > 0x01FFFFFFFFFFFFFF || (event.info.create_process.program_id & 0x1F00) != 0)
             {
-                SaltySD_printf("SaltySD: %s TID %016lx is a homebrew application, aborting bootstrap...\n", eventinfo.info.create_process.name, eventinfo.info.create_process.program_id);
+                SaltySD_printf("SaltySD: %s TID %016lx is a homebrew application, aborting bootstrap...\n", event.info.create_process.name, event.info.create_process.program_id);
                 goto abort_bootstrap;
             }
             uintptr_t shmem = (uintptr_t)shmemGetAddr(&_sharedMemory);
@@ -377,7 +377,7 @@ void hijack_pid(u64 pid)
                 memset((void*)(shmem+4), 0, shmem_size-4);
             }
             char* hbloader = "hbloader";
-            if (strcasecmp(eventinfo.info.create_process.name, hbloader) == 0)
+            if (strcasecmp(event.info.create_process.name, hbloader) == 0)
             {
                 SaltySD_printf("SaltySD: Detected title replacement mode, aborting bootstrap...\n");
                 goto abort_bootstrap;
@@ -388,11 +388,11 @@ void hijack_pid(u64 pid)
                 char exceptions[20];
                 char titleidnumX[20];
 
-                npf_snprintf(titleidnumX, sizeof titleidnumX, "X%016lx", eventinfo.info.create_process.program_id);
+                npf_snprintf(titleidnumX, sizeof titleidnumX, "X%016lx", event.info.create_process.program_id);
                 while (fgets(exceptions, sizeof(exceptions), except)) {
                     titleidnumX[0] = 'X';
                     if (!strncasecmp(exceptions, titleidnumX, 17)) {
-                        SaltySD_printf("SaltySD: %s TID %016lx is forced in exceptions.txt, aborting bootstrap...\n", eventinfo.info.create_process.name, eventinfo.info.create_process.program_id);
+                        SaltySD_printf("SaltySD: %s TID %016lx is forced in exceptions.txt, aborting bootstrap...\n", event.info.create_process.name, event.info.create_process.program_id);
                         fclose(except);
                         goto abort_bootstrap;
                     }
@@ -400,14 +400,14 @@ void hijack_pid(u64 pid)
                         titleidnumX[0] = 'R';
                         if (!strncasecmp(exceptions, titleidnumX, 17)) {
                             if (isModInstalled()) {
-                                SaltySD_printf("SaltySD: %s TID %016lx is in exceptions.txt as romfs excluded, aborting bootstrap...\n", eventinfo.info.create_process.name, eventinfo.info.create_process.program_id);
+                                SaltySD_printf("SaltySD: %s TID %016lx is in exceptions.txt as romfs excluded, aborting bootstrap...\n", event.info.create_process.name, event.info.create_process.program_id);
                                 fclose(except);
                                 goto abort_bootstrap;
                             }
-                            else SaltySD_printf("SaltySD: %s TID %016lx is in exceptions.txt as romfs excluded, but no romfs mod was detected...\n", eventinfo.info.create_process.name, eventinfo.info.create_process.program_id);
+                            else SaltySD_printf("SaltySD: %s TID %016lx is in exceptions.txt as romfs excluded, but no romfs mod was detected...\n", event.info.create_process.name, event.info.create_process.program_id);
                         }
                         else if (!strncasecmp(exceptions, &titleidnumX[1], 16)) {
-                            SaltySD_printf("SaltySD: %s TID %016lx is in exceptions.txt, aborting loading plugins...\n", eventinfo.info.create_process.name, eventinfo.info.create_process.program_id);
+                            SaltySD_printf("SaltySD: %s TID %016lx is in exceptions.txt, aborting loading plugins...\n", event.info.create_process.name, event.info.create_process.program_id);
                             exception = 0x1;
                         }
                     }
@@ -415,18 +415,18 @@ void hijack_pid(u64 pid)
                 fclose(except);
             }
             CreateProcessFlags ProcessFlags;
-            ProcessFlags.raw = eventinfo.info.create_process.flags;
+            ProcessFlags.raw = event.info.create_process.flags;
             SaltySD_printf("SaltySD: found valid CreateProcess event:\n");
-            SaltySD_printf("		 tid %016lx pid %lu\n", eventinfo.info.create_process.program_id, eventinfo.info.create_process.process_id);
-            SaltySD_printf("		 name %s\n", eventinfo.info.create_process.name);
+            SaltySD_printf("		 tid %016lx pid %lu\n", event.info.create_process.program_id, event.info.create_process.process_id);
+            SaltySD_printf("		 name %s\n", event.info.create_process.name);
             SaltySD_printf("		 isA64 %01x addrSpace %01x enableDebug %01x\n", ProcessFlags.flags.is_64bit, ProcessFlags.flags.address_space, ProcessFlags.flags.enable_debug);
             SaltySD_printf("		 enableAslr %01x poolPartition %01x\n", ProcessFlags.flags.enable_aslr, ProcessFlags.flags.pool_partition);
-            SaltySD_printf("		 exception 0x%p\n", eventinfo.info.create_process.user_exception_context_address);
+            SaltySD_printf("		 exception 0x%p\n", event.info.create_process.user_exception_context_address);
             isA64 = ProcessFlags.flags.is_64bit;
         }
         else
         {
-            SaltySD_printf("SaltySD: debug event %x, passing...\n", eventinfo.type);
+            SaltySD_printf("SaltySD: debug event %x, passing...\n", event.type);
             continue;
         }
     }

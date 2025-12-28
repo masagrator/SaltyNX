@@ -8,12 +8,12 @@
 
 /// DebugEvent types
 typedef enum {
-    DebugEvent_CreateProcess = 0,
-    DebugEvent_CreateThread  = 1,
-    DebugEvent_ExitProcess   = 2,
-    DebugEvent_ExitThread    = 3,
-    DebugEvent_Exception     = 4,
-} DebugEvent;
+    DebugEventType_CreateProcess = 0,
+    DebugEventType_CreateThread  = 1,
+    DebugEventType_ExitProcess   = 2,
+    DebugEventType_ExitThread    = 3,
+    DebugEventType_Exception     = 4,
+} DebugEventType;
 
 /// Process exit reasons
 typedef enum {
@@ -57,10 +57,10 @@ typedef enum {
 
 /// Address space types for CreateProcessFlags
 typedef enum {
-    CreateProcessFlagAddressSpace_32bit = 0,
-    CreateProcessFlagAddressSpace_64bitDeprecated = 1,
+    CreateProcessFlagAddressSpace_32bit             = 0,
+    CreateProcessFlagAddressSpace_64bitDeprecated   = 1,
     CreateProcessFlagAddressSpace_32bitWithoutAlias = 2,
-    CreateProcessFlagAddressSpace_64bit = 3,
+    CreateProcessFlagAddressSpace_64bit             = 3,
 } CreateProcessFlagAddressSpace;
 
 /// Flags for svcCreateProcess and CreateProcess event
@@ -71,95 +71,93 @@ typedef union {
         u32 enable_debug: 1;                       ///< [2.0.0+]
         u32 enable_aslr: 1;
         u32 is_application: 1;
-        u32 use_secure_memory: 1;                  ///< [1.0.0-3.0.2]
-        u32 pool_partition: 4;                     ///< [5.0.0+] \ref PhysicalMemorySystemInfo
+        u32 pool_partition: 4;                     ///< [4.0.0-4.1.0] 1 = UseSecureMemory, [5.0.0+] \ref PhysicalMemorySystemInfo
         u32 optimize_memory_allocation: 1;         ///< [7.0.0+] Only allowed in combination with is_application
         u32 disable_device_address_space_merge: 1; ///< [11.0.0+]
         u32 enable_alias_region_extra_size: 1;     ///< [18.0.0+]
-        u32 reserved: 17;
+        u32 reserved: 18;
     } flags;
     u32 raw;
 } CreateProcessFlags;
 
+/// DebugEvent structure
 typedef struct {
-    u32 type;                                              ///< \ref DebugEvent
+    u32 type;                                              ///< \ref DebugEventType
     u32 flags;                                             ///< \ref DebugEventFlag
     u64 thread_id;
 
     union {
+        /// DebugEventType_CreateProcess
         struct {
             u64 program_id;
             u64 process_id;
             char name[0xC];
             u32 flags;                                     ///< \ref CreateProcessFlags
             void* user_exception_context_address;          ///< [5.0.0+]
-        } create_process;                                  ///< DebugEvent_CreateProcess
+        } create_process; 
 
+        /// DebugEventType_CreateThread
         struct {
             u64 thread_id;
             void* tls_address;
             void* entrypoint;                              ///< [1.0.0-10.2.0]
-        } create_thread;                                   ///< DebugEvent_CreateThread
+        } create_thread;
 
+        /// DebugEventType_ExitProcess
         struct {
             u32 reason;                                    ///< \ref ProcessExitReason
-        } exit_process;                                    ///< DebugEvent_ExitProcess
+        } exit_process;
 
+        /// DebugEventType_ExitThread
         struct {
             u32 reason;                                    ///< \ref ThreadExitReason
-        } exit_thread;                                     ///< DebugEvent_ExitThread
+        } exit_thread;
 
+        /// DebugEventType_Exception
         struct {
             u32 type;                                      ///< \ref DebugException
             void* address;
             union {
+                /// DebugException_UndefinedInstruction
                 struct {
                     u32 insn;
-                } undefined_instruction;                   ///< DebugException_UndefinedInstruction
+                } undefined_instruction;
 
+                /// DebugException_DataAbort
                 struct {
                     void* address;
-                } data_abort;                              ///< DebugException_DataAbort
+                } data_abort;
 
+                /// DebugException_AlignmentFault
                 struct {
                     void* address;
-                } alignment_fault;                         ///< DebugException_AlignmentFault
+                } alignment_fault;
 
+                /// DebugException_BreakPoint
                 struct {
                     u32 type;                              ///< \ref BreakPointType
                     void* address;
-                } break_point;                             ///< \ref DebugException_BreakPoint
+                } break_point;
 
+                /// DebugException_UserBreak
                 struct {
                     u32 break_reason;                      ///< \ref BreakReason
                     void* address;
                     size_t size;
-                } user_break;                              ///< \ref DebugException_UserBreak
+                } user_break;
 
+                /// DebugException_DebuggerBreak
                 struct {
                     u64 active_thread_ids[4];
-                } debugger_break;                          ///< DebugException_DebuggerBreak
+                } debugger_break;
 
+                /// DebugException_UndefinedSystemCall
                 struct {
                     u32 id;
-                } undefined_system_call;                   ///< DebugException_UndefinedSystemCall
+                } undefined_system_call;
 
                 u64 raw;
             } specific;
-        } exception;                                       ///< DebugEvent_Exception
+        } exception;
     } info;
-} DebugEventInfo;
-
-
-#ifndef LIBNX_NO_EXTRA_ADAPT
-/**
- * @brief Gets an incoming debug event from a debugging session.
- * @return Result code.
- * @note Syscall number 0x63.
- * @warning This is a privileged syscall. Use \ref envIsSyscallHinted to check if it is available.
- */
-inline Result svcGetDebugEventInfo(DebugEventInfo* event_out, Handle debug)
-{
-    return svcGetDebugEvent((u8*)event_out, debug);
-}
-#endif
+} DebugEvent;
