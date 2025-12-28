@@ -8,8 +8,6 @@
 #include <dirent.h>
 #include "svc_extra.h"
 
-#include "spawner_ipc.h"
-
 #include "loadelf.h"
 #define NANOPRINTF_IMPLEMENTATION
 #include "useful.h"
