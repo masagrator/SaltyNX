@@ -42,7 +42,7 @@ static bool hijack_bootstrap(Handle* debug, u64 pid, u64 tid, bool isA64)
     ret = svcGetDebugThreadContext(&context, *debug, tid, RegisterGroup_All);
     if (ret)
     {
-        SaltySD_printf("SaltySD: svcGetDebugThreadContext returned %x, aborting...\n", ret);
+        SaltySD_printf("SaltyNX: svcGetDebugThreadContext returned %x, aborting...\n", ret);
         
         svcCloseHandle(*debug);
         return false;
@@ -56,7 +56,7 @@ static bool hijack_bootstrap(Handle* debug, u64 pid, u64 tid, bool isA64)
         FILE* file = 0;
         file = fopen("sdmc:/SaltySD/saltysd_bootstrap.elf", "rb");
         if (!file) {
-            SaltySD_printf("SaltySD: SaltySD/saltysd_bootstrap.elf not found, aborting...\n");
+            SaltySD_printf("SaltyNX: SaltySD/saltysd_bootstrap.elf not found, aborting...\n");
             svcCloseHandle(*debug);
             return false;
         }
@@ -76,7 +76,7 @@ static bool hijack_bootstrap(Handle* debug, u64 pid, u64 tid, bool isA64)
     ret = svcSetDebugThreadContext(*debug, tid, &context, RegisterGroup_All);
     if (ret)
     {
-        SaltySD_printf("SaltySD: svcSetDebugThreadContext returned %x!\n", ret);
+        SaltySD_printf("SaltyNX: svcSetDebugThreadContext returned %x!\n", ret);
     }
      
     svcCloseHandle(*debug);
@@ -124,7 +124,7 @@ void hijack_pid(u64 pid)
     Handle debug;
         
     if (file_or_directory_exists("sdmc:/SaltySD/flags/disable.flag") == true) {
-        SaltySD_printf("SaltySD: Detected disable.flag, aborting bootstrap...\n");
+        SaltySD_printf("SaltyNX: Detected disable.flag, aborting bootstrap...\n");
         return;
     }
     
@@ -134,14 +134,14 @@ void hijack_pid(u64 pid)
 
     if (already_hijacking)
     {
-        SaltySD_printf("SaltySD: PID %d spawned before last hijack finished bootstrapping! Ignoring...\n", pid);
+        SaltySD_printf("SaltyNX: PID %d spawned before last hijack finished bootstrapping! Ignoring...\n", pid);
         return;
     }
     
     already_hijacking = true;
     Result rc = svcDebugActiveProcess(&debug, pid);
     if (R_FAILED(rc)) {
-        SaltySD_printf("SaltySD: PID %d is not allowing debugging, error 0x%x, aborting...\n", pid, rc);
+        SaltySD_printf("SaltyNX: PID %d is not allowing debugging, error 0x%x, aborting...\n", pid, rc);
         goto abort_bootstrap;
     }
 
@@ -155,13 +155,13 @@ void hijack_pid(u64 pid)
             case 0:
                 break;
             case 0xE401:
-                SaltySD_printf("SaltySD: PID %d is not allowing debugging, aborting...\n", pid);
+                SaltySD_printf("SaltyNX: PID %d is not allowing debugging, aborting...\n", pid);
                 goto abort_bootstrap;
             case 0x8C01:
-                SaltySD_printf("SaltySD: PID %d svcGetDebugevent: end of events...\n", pid);
+                SaltySD_printf("SaltyNX: PID %d svcGetDebugevent: end of events...\n", pid);
                 break;
             default:
-                SaltySD_printf("SaltySD: PID %d svcGetDebugevent returned %x, breaking...\n", pid, ret);
+                SaltySD_printf("SaltyNX: PID %d svcGetDebugevent returned %x, breaking...\n", pid, ret);
                 break;
         }
         if (ret)
@@ -178,12 +178,12 @@ void hijack_pid(u64 pid)
 
             if (event.info.create_process.program_id <= 0x010000000000FFFF)
             {
-                SaltySD_printf("SaltySD: %s TID %016lx is a system application, aborting bootstrap...\n", event.info.create_process.name, event.info.create_process.program_id);
+                SaltySD_printf("SaltyNX: %s TID %016lx is a system application, aborting bootstrap...\n", event.info.create_process.name, event.info.create_process.program_id);
                 goto abort_bootstrap;
             }
             if (event.info.create_process.program_id > 0x01FFFFFFFFFFFFFF || (event.info.create_process.program_id & 0x1F00) != 0)
             {
-                SaltySD_printf("SaltySD: %s TID %016lx is a homebrew application, aborting bootstrap...\n", event.info.create_process.name, event.info.create_process.program_id);
+                SaltySD_printf("SaltyNX: %s TID %016lx is a homebrew application, aborting bootstrap...\n", event.info.create_process.name, event.info.create_process.program_id);
                 goto abort_bootstrap;
             }
             uintptr_t shmem = (uintptr_t)shmemGetAddr(&_sharedMemory);
@@ -193,44 +193,45 @@ void hijack_pid(u64 pid)
             char* hbloader = "hbloader";
             if (strcasecmp(event.info.create_process.name, hbloader) == 0)
             {
-                SaltySD_printf("SaltySD: Detected title replacement mode, aborting bootstrap...\n");
+                SaltySD_printf("SaltyNX: Detected title replacement mode, aborting bootstrap...\n");
                 goto abort_bootstrap;
             }
             
             FILE* except = fopen("sdmc:/SaltySD/exceptions.txt", "r");
             if (except) {
                 char exceptions[20];
-                char titleidnumX[20];
+                char titleidnum[17];
+                npf_snprintf(titleidnum, sizeof titleidnum, "%016lx", event.info.create_process.program_id);
 
-                npf_snprintf(titleidnumX, sizeof titleidnumX, "X%016lx", event.info.create_process.program_id);
                 while (fgets(exceptions, sizeof(exceptions), except)) {
-                    titleidnumX[0] = 'X';
-                    if (!strncasecmp(exceptions, titleidnumX, 17)) {
-                        SaltySD_printf("SaltySD: %s TID %016lx is forced in exceptions.txt, aborting bootstrap...\n", event.info.create_process.name, event.info.create_process.program_id);
-                        fclose(except);
-                        goto abort_bootstrap;
-                    }
-                    else {
-                        titleidnumX[0] = 'R';
-                        if (!strncasecmp(exceptions, titleidnumX, 17)) {
-                            if (isModInstalled()) {
-                                SaltySD_printf("SaltySD: %s TID %016lx is in exceptions.txt as romfs excluded, aborting bootstrap...\n", event.info.create_process.name, event.info.create_process.program_id);
+                    char firstChara = exceptions[0];
+                    bool ForcedAbort = firstChara == 'X';
+                    bool romfsExcluded = firstChara == 'R';
+                    if (ForcedAbort || romfsExcluded) {
+                        if (!strncasecmp(&exceptions[1], titleidnum, 16)) {
+                            if (ForcedAbort) {
+                                SaltySD_printf("SaltyNX: %s TID %016lx is forced in exceptions.txt, aborting bootstrap...\n", event.info.create_process.name, event.info.create_process.program_id);
                                 fclose(except);
                                 goto abort_bootstrap;
                             }
-                            else SaltySD_printf("SaltySD: %s TID %016lx is in exceptions.txt as romfs excluded, but no romfs mod was detected...\n", event.info.create_process.name, event.info.create_process.program_id);
+                            else if (isModInstalled()) {
+                                SaltySD_printf("SaltyNX: %s TID %016lx is in exceptions.txt as romfs excluded, aborting bootstrap...\n", event.info.create_process.name, event.info.create_process.program_id);
+                                fclose(except);
+                                goto abort_bootstrap;
+                            }
+                            else SaltySD_printf("SaltyNX: %s TID %016lx is in exceptions.txt as romfs excluded, but no romfs mod was detected...\n", event.info.create_process.name, event.info.create_process.program_id);
                         }
-                        else if (!strncasecmp(exceptions, &titleidnumX[1], 16)) {
-                            SaltySD_printf("SaltySD: %s TID %016lx is in exceptions.txt, aborting loading plugins...\n", event.info.create_process.name, event.info.create_process.program_id);
-                            exception = 0x1;
-                        }
+                    }
+                    else if (!strncasecmp(exceptions, titleidnum, 16)) {
+                        SaltySD_printf("SaltyNX: %s TID %016lx is in exceptions.txt, aborting loading plugins...\n", event.info.create_process.name, event.info.create_process.program_id);
+                        exception = 0x1;    
                     }
                 }
                 fclose(except);
             }
             CreateProcessFlags ProcessFlags;
             memcpy(&ProcessFlags, &event.info.create_process.flags, 4);
-            SaltySD_printf("SaltySD: found valid CreateProcess event:\n");
+            SaltySD_printf("SaltyNX: found valid CreateProcess event:\n");
             SaltySD_printf("		 tid %016lx pid %lu\n", event.info.create_process.program_id, event.info.create_process.process_id);
             SaltySD_printf("		 name %s\n", event.info.create_process.name);
             SaltySD_printf("		 isA64 %01x addrSpace %01x enableDebug %01x\n", ProcessFlags.is_64bit, ProcessFlags.address_space, ProcessFlags.enable_debug);
@@ -240,7 +241,7 @@ void hijack_pid(u64 pid)
         }
         else
         {
-            SaltySD_printf("SaltySD: debug event %x, passing...\n", event.type);
+            SaltySD_printf("SaltyNX: debug event %x, passing...\n", event.type);
             continue;
         }
     }
@@ -250,7 +251,7 @@ void hijack_pid(u64 pid)
     uint64_t tick_start = svcGetSystemTick();
     do {
         if (svcGetSystemTick() - tick_start > systemtickfrequency * 30) {
-            SaltySD_printf("SaltySD: Waiting for main thread timeout! Aborting...\n");
+            SaltySD_printf("SaltyNX: Waiting for main thread timeout! Aborting...\n");
             goto abort_bootstrap;
         }
         ret = svcGetThreadList(&threads, &threadid, 1, debug);
@@ -262,7 +263,7 @@ void hijack_pid(u64 pid)
     renameCheatsFolder();
 
     if (passed_time_in_ticks > systemtickfrequency * 10) {
-        SaltySD_printf("SaltySD: Waiting for main thread: %d ms, longer than normal!\n", passed_time_in_ticks / (systemtickfrequency / 1000));
+        SaltySD_printf("SaltyNX: Waiting for main thread: %d ms, longer than normal!\n", passed_time_in_ticks / (systemtickfrequency / 1000));
     }
     
     if (hijack_bootstrap(&debug, pid, threadid, isA64)) {
@@ -273,10 +274,10 @@ void hijack_pid(u64 pid)
         ret = ldrDmntGetProcessModuleInfo(pid, module_infos, 2, &module_infos_count);
         if (R_SUCCEEDED(ret)) {
             BIDnow = __builtin_bswap64(*(uint64_t*)&module_infos[1].build_id[0]);
-            SaltySD_printf("SaltySD: BID: %016lX\n", BIDnow);
+            SaltySD_printf("SaltyNX: BID: %016lX\n", BIDnow);
             ret = 0;
         }
-        else SaltySD_printf("SaltySD: cmd 8 ldrDmntGetProcessModuleInfo failed! RC: 0x%X\n", ret);
+        else SaltySD_printf("SaltyNX: cmd 8 ldrDmntGetProcessModuleInfo failed! RC: 0x%X\n", ret);
     }
     else {
         already_hijacking = false;
@@ -293,15 +294,6 @@ abort_bootstrap:
 
 static void saltynxLoadELF(IpcCommand* c, void* arg, Handle proc, u64 Pid) {
 
-    struct {
-        u64 magic;
-        u64 result;
-        u64 new_addr;
-        u64 new_size;
-    } *raw;
-    raw = ipcPrepareHeader(c, sizeof(*raw));
-    raw->magic = SFCO_MAGIC;
-
     Result ret = 0;
 
     struct {
@@ -310,11 +302,11 @@ static void saltynxLoadELF(IpcCommand* c, void* arg, Handle proc, u64 Pid) {
     } *resp = arg;
 
     u64 heap = resp->heap;
-    char name[64];
-    
+    char name[65];
+    name[64] = 0;
     memcpy(name, resp->name, 64);
     
-    SaltySD_printf("SaltyNX: cmd LoadELF, proc handle %x, heap %lx, path %s\n", proc, heap, name);
+    SaltySD_printf("SaltyNX: cmd LoadELF, proc handle %x, heap 0x%lx, path %s\n", proc, heap, name);
     
     char* path = malloc(96);
     u32 elf_size = 0;
@@ -358,6 +350,15 @@ static void saltynxLoadELF(IpcCommand* c, void* arg, Handle proc, u64 Pid) {
     
     if (f)
         fclose(f);
+
+    struct {
+        u64 magic;
+        u64 result;
+        u64 new_addr;
+        u64 new_size;
+    } *raw;
+    raw = ipcPrepareHeader(c, sizeof(*raw));
+    raw->magic = SFCO_MAGIC;
 
     raw->new_addr = new_start;
     raw->new_size = new_size;
@@ -653,6 +654,17 @@ static void saltynxSetDisplaySyncRefreshRate60WhenOutOfFocus(void* arg) {
     return;
 }
 
+static void saltynxLog(void* arg) {
+    struct {
+        char log[64];
+    } *resp = arg;
+
+    char text[65];
+    text[64] = 0;
+    memcpy(text, resp->log, 64);
+    SaltySD_printf(text);
+}
+
 typedef enum {
     saltynxServiceIpcCmd_EndSession,
     saltynxServiceIpcCmd_LoadELF,
@@ -684,10 +696,15 @@ static Result handleServiceCmd(int cmd)
     IpcCommand c;
     ipcInitialize(&c);
     ipcSendPid(&c);
-    IpcParsedCommand r = {0};
+    IpcParsedCommand r;
     ipcParse(&r);
 
-    void* raw_r = (void*)((uintptr_t)r.Raw + 0x10);
+    ssize_t rawSize = r.RawSize-0x10;
+    if (rawSize < 0) rawSize = 0;
+    void* raw_r = malloc(rawSize);
+
+    if (rawSize > 0) memcpy(raw_r, (void*)((uintptr_t)(r.Raw) + 0x10), rawSize);
+    
     SaltySD_printf("SaltyNX: cmd %d handler\n", cmd);
 
     switch(cmd) {
@@ -707,7 +724,7 @@ static Result handleServiceCmd(int cmd)
             ipcSendHandleCopy(&c, sdcard);
             break;
         case saltynxServiceIpcCmd_Log:
-            SaltySD_printf((const char*)raw_r);
+            saltynxLog(raw_r);
             break;
         case saltynxServiceIpcCmd_CheckIfSharedMemoryAvailable:
             saltynxCheckIfSharedMemoryAvailable(&c, raw_r);
@@ -754,6 +771,8 @@ static Result handleServiceCmd(int cmd)
         default:
             ret = 0xEE01;
     }
+
+    free(raw_r);
     
     struct {
         u64 magic;
@@ -772,7 +791,7 @@ static Result handleServiceCmd(int cmd)
 void serviceThread(void* buf)
 {
     Result ret;
-    SaltySD_printf("SaltySD: accepting service calls\n");
+    SaltySD_printf("SaltyNX: accepting service calls\n");
     should_terminate = false;
 
     while (1)
