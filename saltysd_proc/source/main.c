@@ -415,14 +415,14 @@ void hijack_pid(u64 pid)
                 fclose(except);
             }
             CreateProcessFlags ProcessFlags;
-            ProcessFlags.raw = event.info.create_process.flags;
+            memcpy(&ProcessFlags, &event.info.create_process.flags, 4);
             SaltySD_printf("SaltySD: found valid CreateProcess event:\n");
             SaltySD_printf("		 tid %016lx pid %lu\n", event.info.create_process.program_id, event.info.create_process.process_id);
             SaltySD_printf("		 name %s\n", event.info.create_process.name);
-            SaltySD_printf("		 isA64 %01x addrSpace %01x enableDebug %01x\n", ProcessFlags.flags.is_64bit, ProcessFlags.flags.address_space, ProcessFlags.flags.enable_debug);
-            SaltySD_printf("		 enableAslr %01x poolPartition %01x\n", ProcessFlags.flags.enable_aslr, ProcessFlags.flags.pool_partition);
+            SaltySD_printf("		 isA64 %01x addrSpace %01x enableDebug %01x\n", ProcessFlags.is_64bit, ProcessFlags.address_space, ProcessFlags.enable_debug);
+            SaltySD_printf("		 enableAslr %01x poolPartition %01x\n", ProcessFlags.enable_aslr, ProcessFlags.pool_partition);
             SaltySD_printf("		 exception 0x%p\n", event.info.create_process.user_exception_context_address);
-            isA64 = ProcessFlags.flags.is_64bit;
+            isA64 = ProcessFlags.is_64bit;
         }
         else
         {
