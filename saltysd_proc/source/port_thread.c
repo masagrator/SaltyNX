@@ -32,7 +32,7 @@ uintptr_t game_start_address = 0;
 bool should_terminate = false;
 bool matchLowestDocked = false;
 
-bool hijack_bootstrap(Handle* debug, u64 pid, u64 tid, bool isA64)
+static bool hijack_bootstrap(Handle* debug, u64 pid, u64 tid, bool isA64)
 {
     ThreadContext context;
     Result ret;
@@ -291,6 +291,391 @@ abort_bootstrap:
     svcCloseHandle(debug);
 }
 
+static void saltynxLoadELF(IpcCommand* c, void* arg, Handle proc, u64 Pid) {
+
+    struct {
+        u64 magic;
+        u64 result;
+        u64 new_addr;
+        u64 new_size;
+    } *raw;
+    raw = ipcPrepareHeader(c, sizeof(*raw));
+    raw->magic = SFCO_MAGIC;
+
+    Result ret = 0;
+
+    struct {
+        u64 heap;
+        char name[64];
+    } *resp = arg;
+
+    u64 heap = resp->heap;
+    char name[64];
+    
+    memcpy(name, resp->name, 64);
+    
+    SaltySD_printf("SaltyNX: cmd LoadELF, proc handle %x, heap %lx, path %s\n", proc, heap, name);
+    
+    char* path = malloc(96);
+    u32 elf_size = 0;
+    bool arm32 = false;
+    if (!strncmp(name, "saltysd_core32.elf", 18)) arm32 = true;
+
+    npf_snprintf(path, 96, "sdmc:/SaltySD/plugins/%s", name);
+    FILE* f = fopen(path, "rb");
+    if (!f)
+    {
+        npf_snprintf(path, 96, "sdmc:/SaltySD/%s", name);
+        f = fopen(path, "rb");
+    }
+
+    if (!f)
+    {
+        SaltySD_printf("SaltyNX: failed to load plugin `%s'!\n", name);
+        elf_size = 0;
+    }
+    else
+    {
+        fseek(f, 0, SEEK_END);
+        elf_size = ftell(f);
+        fseek(f, 0, SEEK_SET);
+        
+        SaltySD_printf("SaltyNX: loading %s, size 0x%x\n", path, elf_size);
+    }
+    free(path);
+    
+    u64 new_start = 0, new_size = 0;
+    if (f && elf_size) {
+        if (!arm32)
+            ret = load_elf_proc(proc, Pid, heap, &new_start, &new_size, f, elf_size);
+        else ret = load_elf32_proc(proc, Pid, (u32)heap, (u32*)&new_start, (u32*)&new_size, f, elf_size);
+        if (ret) SaltySD_printf("SaltyNX: Load_elf arm32: %d, ret: 0x%x\n", arm32, ret);
+    }
+    else
+        ret = MAKERESULT(MODULE_SALTYSD, 1);
+
+    svcCloseHandle(proc);
+    
+    if (f)
+        fclose(f);
+
+    raw->new_addr = new_start;
+    raw->new_size = new_size;
+    raw->result = ret;
+
+    return;
+}
+
+static void saltynxRestoreBootstrapCode(u64 Pid) {
+    Handle debug;
+    Result ret = svcDebugActiveProcess(&debug, Pid);
+    if (!ret)
+    {
+        ret = restore_elf_debug(debug);
+    }
+    
+    // Bootstrapping is done, we can handle another process now.
+    already_hijacking = false;
+    svcCloseHandle(debug);
+    if (R_FAILED(ret)) SaltySD_printf("SaltyNX: cmd RestoreBootstrapCode failed: 0x%x\n", ret);
+}
+
+static void saltynxMemcpy(IpcCommand* c, void* arg, u64 Pid) {
+
+    struct {
+        u64 magic;
+        u64 result;
+        u64 reserved[2];
+    } *raw;
+    raw = ipcPrepareHeader(c, sizeof(*raw));
+    raw->magic = SFCO_MAGIC;
+
+    Result ret = 0;
+    struct {
+        u64 to;
+        u64 from;
+        u64 size;
+    } *resp = arg;
+    
+    u64 to = resp->to;
+    u64 from = resp->from;
+    u64 size = resp->size;
+    
+    Handle debug;
+    ret = svcDebugActiveProcess(&debug, Pid);
+    if (!ret)
+    {
+        u8* tmp = malloc(size);
+
+        ret = svcReadDebugProcessMemory(tmp, debug, from, size);
+        if (!ret)
+            ret = svcWriteDebugProcessMemory(debug, tmp, to, size);
+
+        free(tmp);
+        
+        svcCloseHandle(debug);
+    }
+    raw->result = ret;
+    SaltySD_printf("SaltyNX: cmd Memcpy(%lx, %lx, %lx)\n", to, from, size);
+}
+
+static void saltynxCheckIfSharedMemoryAvailable(IpcCommand* c, void* arg) {
+
+    struct {
+        u64 magic;
+        u64 result;
+        u64 offset;
+        u64 reserved;
+    } *raw;
+    raw = ipcPrepareHeader(c, sizeof(*raw));
+    raw->magic = SFCO_MAGIC;
+
+    struct {
+        u64 size;
+    } *resp = arg;
+    u64 new_size = resp->size;
+    
+    if (!new_size) {
+        SaltySD_printf("SaltyNX: cmd CheckIfSharedMemoryAvailable failed. Wrong size.");
+        raw->result = 0xFFE;
+    }
+    else if (new_size < (shmem_size - reservedSharedMemory)) {
+        if (shmemGetAddr(&_sharedMemory)) {
+            if (!reservedSharedMemory) {
+                uintptr_t shmem = (uintptr_t)shmemGetAddr(&_sharedMemory);
+                if (shmem) memset((void*)(shmem+4), 0, shmem_size-4);
+            }
+            raw->offset = reservedSharedMemory;
+            reservedSharedMemory += new_size;
+            if (reservedSharedMemory % 4 != 0) {
+                reservedSharedMemory += (4 - (reservedSharedMemory % 4));
+            }
+            raw->result = 0;
+        }
+        else {
+            SaltySD_printf("SaltyNX: cmd CheckIfSharedMemoryAvailable failed. shmemMap error.");
+            raw->result = 0xFFE;
+        }
+    }
+    else {
+        SaltySD_printf("SaltyNX: cmd CheckIfSharedMemoryAvailable failed. Not enough free space. Left: %d\n", (shmem_size - reservedSharedMemory));
+        raw->result = 0xFFE;
+    }
+    return;
+}
+
+static Result saltynxSetDisplayRefreshRate(void* arg) {
+
+    struct {
+        u64 refreshRate;
+    } *resp = arg;
+
+    u64 refreshRate_temp = resp -> refreshRate;
+
+    SaltySD_printf("SaltyNX: cmd SetDisplayRefreshRate -> %d\n", refreshRate_temp);
+
+    if (SetDisplayRefreshRate(refreshRate_temp)) {
+        refreshRate = refreshRate_temp;
+        return 0;
+    }
+    return 0x1234;
+}
+
+static void saltynxSetDisplaySync(void* arg) {
+
+    struct {
+        u64 value;
+    } *resp = arg;
+
+    displaySync = (bool)(resp -> value);
+    if (displaySync) {
+        FILE* file = fopen("sdmc:/SaltySD/flags/displaysync.flag", "wb");
+        fclose(file);
+    }
+    else {
+        remove("sdmc:/SaltySD/flags/displaysync.flag");
+    }
+    SaltySD_printf("SaltyNX: cmd SetDisplaySync -> %d\n", displaySync);
+    return;
+}
+
+static void saltynxGetBID(IpcCommand* c) {
+    struct {
+        u64 magic;
+        u64 BID;
+    } *raw;
+    raw = ipcPrepareHeader(c, sizeof(*raw));
+    raw->magic = SFCO_MAGIC;
+    raw->BID = BIDnow;
+    return;
+}
+
+static void saltynxException(IpcCommand* c) {
+    struct {
+        u64 magic;
+        u64 result;
+        u64 reserved[2];
+    } *raw;
+
+    raw = ipcPrepareHeader(c, sizeof(*raw));
+
+    raw->magic = SFCO_MAGIC;
+    raw->result = exception;
+
+    return;
+}
+
+static void saltynxGetDisplayRefreshRate(IpcCommand* c) {
+    struct {
+        u64 magic;
+        u64 result;
+        u64 refreshRate;
+        u64 reserved[2];
+    } *raw;
+
+    raw = ipcPrepareHeader(c, sizeof(*raw));
+
+    raw->magic = SFCO_MAGIC;
+    uint32_t temp_refreshRate = 0;
+    raw->result = !GetDisplayRefreshRate(&temp_refreshRate, false);
+    raw->refreshRate = temp_refreshRate;
+    return;
+}
+
+static void saltynxSetAllowedDockedRefreshRates(void* arg) {
+    struct {
+        u32 refreshRate;
+        u32 is720p;
+    } *resp = arg;
+
+    setAllowedDockedRefreshRatesIPC(resp -> refreshRate, (bool)resp->is720p);
+    SaltySD_printf("SaltyNX: cmd SetAllowedDockedRefreshRates -> 0x%x, is720p: %d\n", resp -> refreshRate, resp->is720p);
+    return;
+}
+
+static void saltynxSetDontForce60InDocked(void* arg) {
+    struct {
+        u64 force;
+    } *resp = arg;
+
+    dontForce60InDocked = (bool)(resp -> force);
+    SaltySD_printf("SaltyNX: cmd SetDontForce60InDocked -> %d\n", dontForce60InDocked);
+
+    return;
+}
+
+static void saltynxSetMatchLowestRR(void* arg) {
+    struct {
+        u64 force;
+    } *resp = arg;
+
+    matchLowestDocked = (bool)(resp -> force);
+    SaltySD_printf("SaltyNX: cmd SetMatchLowestRR -> %d\n", matchLowestDocked);
+
+    return;
+}
+
+static void saltynxGetDockedHighestRefreshRate(IpcCommand* c) {    
+    struct {
+        u64 magic;
+        u64 result;
+        u32 refreshRate;
+        u32 linkRate;
+        u64 reserved;
+    } *raw;
+
+    raw = ipcPrepareHeader(c, sizeof(*raw));
+
+    raw->magic = SFCO_MAGIC;
+    raw->result = 0;
+    raw->refreshRate = dockedHighestRefreshRate;
+    raw->linkRate = dockedLinkRate;
+
+    return;
+}
+
+static void saltynxIsPossiblyRetroRemake(IpcCommand* c) {
+    struct {
+        u64 magic;
+        u64 result;
+        u64 value;
+        u64 reserved;
+    } *raw;
+
+    raw = ipcPrepareHeader(c, sizeof(*raw));
+
+    raw->magic = SFCO_MAGIC;
+    raw->result = 0;
+    raw->value = isPossiblySpoofedRetro;
+
+    return;
+}
+
+static void saltynxSetDisplaySyncDocked(void* arg) {
+    struct {
+        u64 value;
+    } *resp = arg;
+
+    displaySyncDocked = (bool)(resp -> value);
+    if (displaySyncDocked) {
+        FILE* file = fopen("sdmc:/SaltySD/flags/displaysyncdocked.flag", "wb");
+        fclose(file);
+    }
+    else {
+        remove("sdmc:/SaltySD/flags/displaysyncdocked.flag");
+    }
+    SaltySD_printf("SaltyNX: cmd SetDisplaySyncDocked handler -> %d\n", displaySyncDocked);
+    return;
+}
+
+static void saltynxSetDisplaySyncRefreshRate60WhenOutOfFocus(void* arg) {
+    struct {
+        u32 value;
+        u32 inDocked;
+    } *resp = arg;
+
+    bool inDocked = (bool)(resp -> inDocked);
+    if (inDocked) {
+        displaySyncDockedOutOfFocus60 = (bool)(resp -> value);
+    }
+    else {
+        displaySyncOutOfFocus60 = (bool)(resp -> value);
+        if (displaySyncOutOfFocus60) {
+            FILE* file = fopen("sdmc:/SaltySD/flags/displaysync_outoffocus.flag", "wb");
+            fclose(file);
+        }
+        else {
+            remove("sdmc:/SaltySD/flags/displaysync_outoffocus.flag");
+        }
+    }
+    SaltySD_printf("SaltyNX: cmd SetDisplaySyncRefreshRate60WhenOutOfFocus -> %d, inDocked: %d\n", displaySyncOutOfFocus60, inDocked);
+
+    return;
+}
+
+typedef enum {
+    saltynxServiceIpcCmd_EndSession,
+    saltynxServiceIpcCmd_LoadELF,
+    saltynxServiceIpcCmd_RestoreBootstrapCode,
+    saltynxServiceIpcCmd_Memcpy,
+    saltynxServiceIpcCmd_GetSDCard,
+    saltynxServiceIpcCmd_Log,
+    saltynxServiceIpcCmd_CheckIfSharedMemoryAvailable,
+    saltynxServiceIpcCmd_GetSharedMemoryHandle,
+    saltynxServiceIpcCmd_GetBID,
+    saltynxServiceIpcCmd_Exception,
+    saltynxServiceIpcCmd_GetDisplayRefreshRate,
+    saltynxServiceIpcCmd_SetDisplayRefreshRate,
+    saltynxServiceIpcCmd_SetDisplaySync,
+    saltynxServiceIpcCmd_SetAllowedDockedRefreshRates,
+    saltynxServiceIpcCmd_SetDontForce60InDocked,
+    saltynxServiceIpcCmd_SetMatchLowestRR,
+    saltynxServiceIpcCmd_GetDockedHighestRefreshRate,
+    saltynxServiceIpcCmd_IsPossiblyRetroRemake,
+    saltynxServiceIpcCmd_SetDisplaySyncDocked,
+    saltynxServiceIpcCmd_SetDisplaySyncRefreshRate60WhenOutOfFocus
+} saltynxServiceIpcCmd;
+
 static Result handleServiceCmd(int cmd)
 {
     Result ret = 0;
@@ -299,519 +684,75 @@ static Result handleServiceCmd(int cmd)
     IpcCommand c;
     ipcInitialize(&c);
     ipcSendPid(&c);
-
-    if (cmd == 0) // EndSession
-    {
-        ret = 0;
-        should_terminate = true;
-        //SaltySD_printf("SaltySD: cmd 0, terminating\n");
-    }
-    else if (cmd == 1) // LoadELF
-    {
-        IpcParsedCommand r = {0};
-        ipcParse(&r);
-
-        struct {
-            u64 magic;
-            u64 command;
-            u64 heap;
-            char name[64];
-            u32 reserved[2];
-        } *resp = r.Raw;
-
-        Handle proc = r.Handles[0];
-        u64 heap = resp->heap;
-        char name[64];
-        
-        memcpy(name, resp->name, 64);
-        
-        SaltySD_printf("SaltySD: cmd 1 handler, proc handle %x, heap %lx, path %s\n", proc, heap, name);
-        
-        char* path = malloc(96);
-        u32 elf_size = 0;
-        bool arm32 = false;
-        if (!strncmp(name, "saltysd_core32.elf", 18)) arm32 = true;
-
-        npf_snprintf(path, 96, "sdmc:/SaltySD/plugins/%s", name);
-        FILE* f = fopen(path, "rb");
-        if (!f)
-        {
-            npf_snprintf(path, 96, "sdmc:/SaltySD/%s", name);
-            f = fopen(path, "rb");
-        }
-
-        if (!f)
-        {
-            SaltySD_printf("SaltySD: failed to load plugin `%s'!\n", name);
-            elf_size = 0;
-        }
-        else
-        {
-            fseek(f, 0, SEEK_END);
-            elf_size = ftell(f);
-            fseek(f, 0, SEEK_SET);
-            
-            SaltySD_printf("SaltySD: loading %s, size 0x%x\n", path, elf_size);
-        }
-        free(path);
-        
-        u64 new_start = 0, new_size = 0;
-        if (f && elf_size) {
-            if (!arm32)
-                ret = load_elf_proc(proc, r.Pid, heap, &new_start, &new_size, f, elf_size);
-            else ret = load_elf32_proc(proc, r.Pid, (u32)heap, (u32*)&new_start, (u32*)&new_size, f, elf_size);
-            if (ret) SaltySD_printf("Load_elf arm32: %d, ret: 0x%x\n", arm32, ret);
-        }
-        else
-            ret = MAKERESULT(MODULE_SALTYSD, 1);
-
-        svcCloseHandle(proc);
-        
-        if (f)
-            fclose(f);
-        
-        // Ship off results
-        struct {
-            u64 magic;
-            u64 result;
-            u64 new_addr;
-            u64 new_size;
-        } *raw;
-
-        raw = ipcPrepareHeader(&c, sizeof(*raw));
-
-        raw->magic = SFCO_MAGIC;
-        raw->result = ret;
-        raw->new_addr = new_start;
-        raw->new_size = new_size;
-        
-        if (R_SUCCEEDED(ret)) debug_log("SaltySD: new_addr to %lx, %x\n", new_start, ret);
-
-        return 0;
-    }
-    else if (cmd == 2) // RestoreBootstrapCode
-    {
-        IpcParsedCommand r = {0};
-        ipcParse(&r);
-
-        SaltySD_printf("SaltySD: cmd 2 handler\n");
-        
-        Handle debug;
-        ret = svcDebugActiveProcess(&debug, r.Pid);
-        if (!ret)
-        {
-            ret = restore_elf_debug(debug);
-        }
-        
-        // Bootstrapping is done, we can handle another process now.
-        already_hijacking = false;
-        svcCloseHandle(debug);
-    }
-    else if (cmd == 3) // Memcpy
-    {
-        IpcParsedCommand r = {0};
-        ipcParse(&r);
-
-        struct {
-            u64 magic;
-            u64 command;
-            u64 to;
-            u64 from;
-            u64 size;
-        } *resp = r.Raw;
-        
-        u64 to, from, size;
-        to = resp->to;
-        from = resp->from;
-        size = resp->size;
-        
-        Handle debug;
-        ret = svcDebugActiveProcess(&debug, r.Pid);
-        if (!ret)
-        {
-            u8* tmp = malloc(size);
-
-            ret = svcReadDebugProcessMemory(tmp, debug, from, size);
-            if (!ret)
-                ret = svcWriteDebugProcessMemory(debug, tmp, to, size);
-
-            free(tmp);
-            
-            svcCloseHandle(debug);
-        }
-        
-        // Ship off results
-        struct {
-            u64 magic;
-            u64 result;
-            u64 reserved[2];
-        } *raw;
-
-        raw = ipcPrepareHeader(&c, sizeof(*raw));
-
-        raw->magic = SFCO_MAGIC;
-        raw->result = ret;
-
-        SaltySD_printf("SaltySD: cmd 3 handler, memcpy(%lx, %lx, %lx)\n", to, from, size);
-
-        return 0;
-    }
-    else if (cmd == 4) // GetSDCard
-    {		
-        ipcSendHandleCopy(&c, sdcard);
-
-        SaltySD_printf("SaltySD: cmd 4 handler\n"); 
-    }
-    else if (cmd == 5) // Log
-    {
-
-        IpcParsedCommand r = {0};
-        ipcParse(&r);
-
-        struct {
-            u64 magic;
-            u64 command;
-            char log[64];
-            u32 reserved[2];
-        } *resp = r.Raw;
-
-        SaltySD_printf(resp->log);
-
-        SaltySD_printf("SaltySD: cmd 5 handler\n");
-
-        ret = 0;
-    }
-    else if (cmd == 6) // CheckIfSharedMemoryAvailable
-    {		
-        IpcParsedCommand r = {0};
-        ipcParse(&r);
-
-        struct {
-            u64 magic;
-            u64 cmd_id;
-            u64 size;
-            u64 reserved;
-        } *resp = r.Raw;
-
-        u64 new_size = resp->size;
-
-        SaltySD_printf("SaltySD: cmd 6 handler, size: %d\n", new_size);
-
-        struct {
-            u64 magic;
-            u64 result;
-            u64 offset;
-            u64 reserved;
-        } *raw;
-
-        raw = ipcPrepareHeader(&c, sizeof(*raw));
-
-        raw->magic = SFCO_MAGIC;
-        if (!new_size) {
-            SaltySD_printf("SaltySD: cmd 6 failed. Wrong size.");
-            raw->offset = 0;
-            raw->result = 0xFFE;
-        }
-        else if (new_size < (shmem_size - reservedSharedMemory)) {
-            if (shmemGetAddr(&_sharedMemory)) {
-                if (!reservedSharedMemory) {
-                    uintptr_t shmem = (uintptr_t)shmemGetAddr(&_sharedMemory);
-                    if (shmem) memset((void*)(shmem+4), 0, shmem_size-4);
-                }
-                raw->result = 0;
-                raw->offset = reservedSharedMemory;
-                reservedSharedMemory += new_size;
-                if (reservedSharedMemory % 4 != 0) {
-                    reservedSharedMemory += (4 - (reservedSharedMemory % 4));
-                }
-            }
-            else {
-                SaltySD_printf("SaltySD: cmd 6 failed. shmemMap error.");
-                raw->offset = -1;
-                raw->result = 0xFFE;
-            }
-        }
-        else {
-            SaltySD_printf("SaltySD: cmd 6 failed. Not enough free space. Left: %d\n", (shmem_size - reservedSharedMemory));
-            raw->offset = -1;
-            raw->result = 0xFFE;
-        }
-
-        return 0;
-    }
-    else if (cmd == 7) // GetSharedMemoryHandle
-    {
-        SaltySD_printf("SaltySD: cmd 7 handler\n");
-
-        ipcSendHandleCopy(&c, _sharedMemory.handle);
-    }
-    else if (cmd == 8) { // Get BID
-
-        IpcParsedCommand r = {0};
-        ipcParse(&r);
-
-        SaltySD_printf("SaltySD: cmd 8 handler PID: %ld\n", PIDnow);
-
-        struct {
-            u64 magic;
-            u64 result;
-        } *raw;
-
-        raw = ipcPrepareHeader(&c, sizeof(*raw));
-        raw->magic = SFCO_MAGIC;
-        raw->result = BIDnow;
-
-        return 0;
-    }
-    else if (cmd == 9) // Exception
-    {
-        IpcParsedCommand r = {0};
-        ipcParse(&r);
-        
-        // Ship off results
-        struct {
-            u64 magic;
-            u64 result;
-            u64 reserved[2];
-        } *raw;
-
-        raw = ipcPrepareHeader(&c, sizeof(*raw));
-
-        raw->magic = SFCO_MAGIC;
-        raw->result = exception;
-
-        return 0;
-    }
-    else if (cmd == 10) // GetDisplayRefreshRate
-    {
-        IpcParsedCommand r = {0};
-        ipcParse(&r);
-
-        SaltySD_printf("SaltySD: cmd 10 handler\n");
-        
-        // Ship off results
-        struct {
-            u64 magic;
-            u64 result;
-            u64 refreshRate;
-            u64 reserved[2];
-        } *raw;
-
-        raw = ipcPrepareHeader(&c, sizeof(*raw));
-
-        raw->magic = SFCO_MAGIC;
-        uint32_t temp_refreshRate = 0;
-        raw->result = !GetDisplayRefreshRate(&temp_refreshRate, false);
-        raw->refreshRate = temp_refreshRate;
-
-        return 0;
-    }
-    else if (cmd == 11) // SetDisplayRefreshRate
-    {
-        IpcParsedCommand r = {0};
-        ipcParse(&r);
-
-        struct {
-            u64 magic;
-            u64 cmd_id;
-            u64 refreshRate;
-            u64 reserved;
-        } *resp = r.Raw;
-
-        u64 refreshRate_temp = resp -> refreshRate;
-
-        if (SetDisplayRefreshRate(refreshRate_temp)) {
-            refreshRate = refreshRate_temp;
-            ret = 0;
-        }
-        else ret = 0x1234;
-        SaltySD_printf("SaltySD: cmd 11 handler -> %d\n", refreshRate_temp);
-    }
-    else if (cmd == 12) // SetDisplaySync
-    {
-        IpcParsedCommand r = {0};
-        ipcParse(&r);
-
-        struct {
-            u64 magic;
-            u64 cmd_id;
-            u64 value;
-            u64 reserved;
-        } *resp = r.Raw;
-
-        displaySync = (bool)(resp -> value);
-        if (displaySync) {
-            FILE* file = fopen("sdmc:/SaltySD/flags/displaysync.flag", "wb");
-            fclose(file);
-            SaltySD_printf("SaltySD: cmd 12 handler -> %d\n", displaySync);
-        }
-        else {
-            remove("sdmc:/SaltySD/flags/displaysync.flag");
-            SaltySD_printf("SaltySD: cmd 12 handler -> %d\n", displaySync);
-        }
-
-        ret = 0;
-    }
-    else if (cmd == 13) // SetAllowedDockedRefreshRates
-    {
-        IpcParsedCommand r = {0};
-        ipcParse(&r);
-
-        struct {
-            u64 magic;
-            u64 cmd_id;
-            u32 refreshRate;
-            u32 is720p;
-            u32 reserved[2];
-        } *resp = r.Raw;
-
-        setAllowedDockedRefreshRatesIPC(resp -> refreshRate, (bool)resp->is720p);
-        SaltySD_printf("SaltySD: cmd 13 handler\n");
-
-        ret = 0;
-    }
-    else if (cmd == 14) // SetDontForce60InDocked
-    {
-        IpcParsedCommand r = {0};
-        ipcParse(&r);
-
-        struct {
-            u64 magic;
-            u64 cmd_id;
-            u64 force;
-            u64 reserved;
-        } *resp = r.Raw;
-
-        dontForce60InDocked = (bool)(resp -> force);
-        SaltySD_printf("SaltySD: cmd 14 handler\n");
-
-        ret = 0;
-    }
-    else if (cmd == 15) // SetMatchLowestRR
-    {
-        IpcParsedCommand r = {0};
-        ipcParse(&r);
-
-        struct {
-            u64 magic;
-            u64 cmd_id;
-            u64 force;
-            u64 reserved;
-        } *resp = r.Raw;
-
-        matchLowestDocked = (bool)(resp -> force);
-        SaltySD_printf("SaltySD: cmd 15 handler\n");
-
-        ret = 0;
-    }
-    else if (cmd == 16) // GetDockedHighestRefreshRate
-    {
-        IpcParsedCommand r = {0};
-        ipcParse(&r);
-
-        SaltySD_printf("SaltySD: cmd 16 handler\n");
-        
-        // Ship off results
-        struct {
-            u64 magic;
-            u64 result;
-            u32 refreshRate;
-            u32 linkRate;
-            u64 reserved;
-        } *raw;
-
-        raw = ipcPrepareHeader(&c, sizeof(*raw));
-
-        raw->magic = SFCO_MAGIC;
-        raw->result = 0;
-        raw->refreshRate = dockedHighestRefreshRate;
-        raw->linkRate = dockedLinkRate;
-
-        return 0;
-    }
-    else if (cmd == 17) // IsPossiblyRetroRemake
-    {
-        IpcParsedCommand r = {0};
-        ipcParse(&r);
-
-        SaltySD_printf("SaltySD: cmd 17 handler\n");
-        
-        // Ship off results
-        struct {
-            u64 magic;
-            u64 result;
-            u64 value;
-            u64 reserved;
-        } *raw;
-
-        raw = ipcPrepareHeader(&c, sizeof(*raw));
-
-        raw->magic = SFCO_MAGIC;
-        raw->result = 0;
-        raw->value = isPossiblySpoofedRetro;
-
-        return 0;
-    }
-    else if (cmd == 18) // SetDisplaySyncDocked
-    {
-        IpcParsedCommand r = {0};
-        ipcParse(&r);
-
-        struct {
-            u64 magic;
-            u64 cmd_id;
-            u64 value;
-            u64 reserved;
-        } *resp = r.Raw;
-
-        displaySyncDocked = (bool)(resp -> value);
-        if (displaySyncDocked) {
-            FILE* file = fopen("sdmc:/SaltySD/flags/displaysyncdocked.flag", "wb");
-            fclose(file);
-            SaltySD_printf("SaltySD: cmd 18 handler -> %d\n", displaySyncDocked);
-        }
-        else {
-            remove("sdmc:/SaltySD/flags/displaysyncdocked.flag");
-            SaltySD_printf("SaltySD: cmd 18 handler -> %d\n", displaySyncDocked);
-        }
-
-        ret = 0;
-    }
-    else if (cmd == 19) // SetDisplaySyncRefreshRate60WhenOutOfFocus
-    {
-        IpcParsedCommand r = {0};
-        ipcParse(&r);
-
-        struct {
-            u64 magic;
-            u64 cmd_id;
-            u32 value;
-            u32 inDocked;
-            u64 reserved;
-        } *resp = r.Raw;
-
-        bool inDocked = (bool)(resp -> inDocked);
-        if (inDocked) {
-            displaySyncDockedOutOfFocus60 = (bool)(resp -> value);
-        }
-        else {
-            displaySyncOutOfFocus60 = (bool)(resp -> value);
-            if (displaySyncOutOfFocus60) {
-                FILE* file = fopen("sdmc:/SaltySD/flags/displaysync_outoffocus.flag", "wb");
-                fclose(file);
-                SaltySD_printf("SaltySD: cmd 19 handler -> %d\n", displaySyncOutOfFocus60);
-            }
-            else {
-                remove("sdmc:/SaltySD/flags/displaysync_outoffocus.flag");
-                SaltySD_printf("SaltySD: cmd 19 handler -> %d\n", displaySyncOutOfFocus60);
-            }
-        }
-
-        ret = 0;
-    }
-    else
-    {
-        ret = 0xEE01;
+    IpcParsedCommand r = {0};
+    ipcParse(&r);
+
+    void* raw_r = (void*)((uintptr_t)r.Raw + 0x10);
+    SaltySD_printf("SaltyNX: cmd %d handler\n", cmd);
+
+    switch(cmd) {
+        case saltynxServiceIpcCmd_EndSession:
+            should_terminate = true;
+            break;
+        case saltynxServiceIpcCmd_LoadELF:
+            saltynxLoadELF(&c, raw_r, r.Handles[0], r.Pid);
+            return 0;
+        case saltynxServiceIpcCmd_RestoreBootstrapCode:
+            saltynxRestoreBootstrapCode(r.Pid);
+            break;
+        case saltynxServiceIpcCmd_Memcpy:
+            saltynxMemcpy(&c, raw_r, r.Pid);
+            return 0;
+        case saltynxServiceIpcCmd_GetSDCard:
+            ipcSendHandleCopy(&c, sdcard);
+            break;
+        case saltynxServiceIpcCmd_Log:
+            SaltySD_printf((const char*)raw_r);
+            break;
+        case saltynxServiceIpcCmd_CheckIfSharedMemoryAvailable:
+            saltynxCheckIfSharedMemoryAvailable(&c, raw_r);
+            return 0;
+        case saltynxServiceIpcCmd_GetSharedMemoryHandle:
+            ipcSendHandleCopy(&c, _sharedMemory.handle);
+            break;
+        case saltynxServiceIpcCmd_GetBID:
+            saltynxGetBID(&c);
+            return 0;
+        case saltynxServiceIpcCmd_Exception:
+            saltynxException(&c);
+            return 0;
+        case saltynxServiceIpcCmd_GetDisplayRefreshRate:
+            saltynxGetDisplayRefreshRate(&c);
+            return 0;
+        case saltynxServiceIpcCmd_SetDisplayRefreshRate:
+            saltynxSetDisplayRefreshRate(raw_r);
+            break;
+        case saltynxServiceIpcCmd_SetDisplaySync:
+            saltynxSetDisplaySync(raw_r);
+            break;
+        case saltynxServiceIpcCmd_SetAllowedDockedRefreshRates:
+            saltynxSetAllowedDockedRefreshRates(raw_r);
+            break;
+        case saltynxServiceIpcCmd_SetDontForce60InDocked:
+            saltynxSetDontForce60InDocked(raw_r);
+            break;
+        case saltynxServiceIpcCmd_SetMatchLowestRR:
+            saltynxSetMatchLowestRR(raw_r);
+            break;
+        case saltynxServiceIpcCmd_GetDockedHighestRefreshRate:
+            saltynxGetDockedHighestRefreshRate(&c);
+            return 0;
+        case saltynxServiceIpcCmd_IsPossiblyRetroRemake:
+            saltynxIsPossiblyRetroRemake(&c);
+            return 0;
+        case saltynxServiceIpcCmd_SetDisplaySyncDocked:
+            saltynxSetDisplaySyncDocked(raw_r);
+            break;
+        case saltynxServiceIpcCmd_SetDisplaySyncRefreshRate60WhenOutOfFocus:
+            saltynxSetDisplaySyncRefreshRate60WhenOutOfFocus(raw_r);
+            break;
+        default:
+            ret = 0xEE01;
     }
     
     struct {
@@ -840,11 +781,11 @@ void serviceThread(void* buf)
         ret = svcAcceptSession(&session, saltyport);
         if (ret && ret != 0xf201)
         {
-            SaltySD_printf("SaltySD: svcAcceptSession returned %x\n", ret);
+            SaltySD_printf("SaltyNX: svcAcceptSession returned %x\n", ret);
         }
         else if (!ret)
         {
-            SaltySD_printf("SaltySD: session %x being handled\n", session);
+            SaltySD_printf("SaltyNX: session %x being handled\n", session);
 
             int handle_index;
             Handle replySession = 0;
@@ -852,10 +793,8 @@ void serviceThread(void* buf)
             {
                 ret = svcReplyAndReceive(&handle_index, &session, 1, replySession, UINT64_MAX);
                 
-                if (should_terminate) break;
-                
-                if (ret) break;
-                
+                if (should_terminate || ret) break;
+                                
                 IpcParsedCommand r;
                 ipcParse(&r);
 
@@ -884,5 +823,5 @@ void serviceThread(void* buf)
         svcSleepThread(1000*1000*100);
     }
     
-    SaltySD_printf("SaltySD: done accepting service calls\n");
+    SaltySD_printf("SaltyNX: done accepting service calls\n");
 }
