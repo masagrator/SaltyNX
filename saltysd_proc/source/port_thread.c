@@ -788,7 +788,7 @@ static Result handleServiceCmd(int cmd)
     return ret;
 }
 
-void serviceThread(void* buf)
+__attribute__((noinline)) void serviceThread(void* buf)
 {
     Result ret;
     SaltySD_printf("SaltyNX: accepting service calls\n");
