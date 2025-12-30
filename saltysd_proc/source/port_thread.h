@@ -1,4 +1,4 @@
 #include <switch.h>
 
-void serviceThread(void* buf);
+void serviceThread(Handle saltyport);
 void hijack_pid(u64 pid);

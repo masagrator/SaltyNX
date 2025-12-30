@@ -1,9 +1,15 @@
 #include "useful.h"
 
+Mutex printf_mutex;
+
 void SaltySD_printf(const char* format, ...)
 {
+	mutexLock(&printf_mutex);
 	FILE* logflag = fopen("sdmc:/SaltySD/flags/log.flag", "r");
-	if (logflag == NULL) return;
+	if (logflag == NULL) {
+		mutexUnlock(&printf_mutex);
+		return;
+	}
 	fclose(logflag);
 	
 	char buffer[256];
@@ -35,4 +41,5 @@ void SaltySD_printf(const char* format, ...)
 		fwrite(buffer, strlen(buffer), 1, f);
 		fclose(f);
 	}
+	mutexUnlock(&printf_mutex);
 }

@@ -94,5 +94,7 @@ void SaltySD_printf(const char* format, ...);
 #define debug_log(...) \
 	{char log_buf[0x200]; npf_snprintf(log_buf, 0x200, __VA_ARGS__); \
 	svcOutputDebugString(log_buf, strlen(log_buf));}
+
+extern Mutex printf_mutex;
 	
 #endif // USEFUL_H
