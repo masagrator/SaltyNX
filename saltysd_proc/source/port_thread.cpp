@@ -668,7 +668,7 @@ static void saltynxLog(void* arg) {
     SaltySD_printf(text);
 }
 
-consteval u32 getVersion() {
+static consteval u32 getVersion() {
     const char version[] = APP_VERSION;
     u32 return_value = APP_VERSION[0] - 0x30;
     u8 value;
