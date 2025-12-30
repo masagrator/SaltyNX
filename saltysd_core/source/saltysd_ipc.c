@@ -13,12 +13,11 @@ void SaltySD_Init()
 {
 	Result ret;
 
-	for (int i = 0; i < 200; i++)
+	while (1)
 	{
-		ret = svcConnectToNamedPort(&saltysd, "SaltySD");
-		svcSleepThread(1000*1000);
-		
+		ret = svcConnectToNamedPort(&saltysd, "SaltyNX");
 		if (!ret) break;
+		svcSleepThread(1000*1000);
 	}
 	
 	//debug_log("SaltySD Core: Got handle %x\n", saltysd);
