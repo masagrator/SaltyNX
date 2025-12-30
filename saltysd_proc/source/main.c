@@ -25,7 +25,7 @@ struct MinMax {
 };
 
 Handle saltysdport, saltynxport, sdcard, injectserv;
-static char g_heap[0x30000];
+static char g_heap[0x34000];
 bool already_hijacking = false;
 SharedMemory _sharedMemory = {0};
 uint64_t clkVirtAddr = 0;
@@ -68,18 +68,26 @@ void __wrap___gxx_personality_v0() {
     return;
 }
 
-void __libnx_initheap(void)
-{
+void virtmemSetup(void);
+void newlibSetup(void);
+void argvSetup(void);
+void __libnx_init_thread(void);
+void __libc_init_array(void);
+
+void __libnx_init(void* ctx, Handle main_thread, void* saved_lr) {
+    envSetup(ctx, main_thread, saved_lr);
+    newlibSetup();
+    virtmemSetup();
+
     extern char* fake_heap_start;
     extern char* fake_heap_end;
 
     fake_heap_start = &g_heap[0];
     fake_heap_end   = &g_heap[sizeof g_heap];
-}
 
-void __appInit(void)
-{
+    __libnx_init_thread();
     svcSleepThread(1*1000*1000*1000);
+    __libc_init_array();
 }
 
 void __appExit(void)
@@ -208,11 +216,11 @@ __attribute__((noinline)) Result isApplicationOutOfFocus(bool* outOfFocus) {
 void saltysdServiceLoop(void*) {
     while(1) {
         // If someone is waiting for us, handle them.
-        if (!svcWaitSynchronizationSingle(saltysdport, 5000000))
+        if (!svcWaitSynchronizationSingle(saltysdport, 10000000))
         {
             serviceThread(saltysdport);
         }
-        if (!svcWaitSynchronizationSingle(injectserv, 5000000)) {
+        if (!svcWaitSynchronizationSingle(injectserv, 0)) {
             Handle sesja;
             svcAcceptSession(&sesja, injectserv);
             svcCloseHandle(sesja);
@@ -249,7 +257,7 @@ int main(int argc, char *argv[])
     smExit_old();
     mutexInit(&printf_mutex);
 
-    SaltySD_printf("SaltySD " APP_VERSION ": got SD card.\n");
+    SaltySD_printf("SaltyNX " APP_VERSION ": got SD card.\n");
 
     ABORT_IF_FAILED(smInitialize(), 5);
     ABORT_IF_FAILED(setsysInitialize(), 10);
@@ -260,26 +268,26 @@ int main(int argc, char *argv[])
         hosversionSet(MAKEHOSVERSION(fw.major, fw.minor, fw.micro));
     }
     else {
-        SaltySD_printf("SaltySD: Couldn't retrieve Firmware Version! rc: 0x%x.\n", rc);
+        SaltySD_printf("SaltyNX: Couldn't retrieve Firmware Version! rc: 0x%x.\n", rc);
     }
 
     SetSysProductModel model;
     if (R_SUCCEEDED(setsysGetProductModel(&model))) {
         if (model == SetSysProductModel_Aula) {
-            SaltySD_printf("SaltySD: Detected OLED model. Locking minimum refresh rate to 45 Hz.\n");
+            SaltySD_printf("SaltyNX: Detected OLED model. Locking minimum refresh rate to 45 Hz.\n");
             isOLED = true;
             HandheldModeRefreshRateAllowed.min = 45;
         }
         else if (model == SetSysProductModel_Hoag) {
             isLite = true;
-            SaltySD_printf("SaltySD: Detected Lite model. Docked refresh rate will be blocked.\n");
+            SaltySD_printf("SaltyNX: Detected Lite model. Docked refresh rate will be blocked.\n");
         }
     }
     
     ABORT_IF_FAILED(nvInitialize(), 6);
     u32 fd = 0;
     if (R_FAILED(nvOpen(&fd, "/dev/nvdisp-disp0"))) {
-        SaltySD_printf("SaltySD: Couldn't open /dev/nvdisp-disp0! Can't check if using Retro Remake display.\n");
+        SaltySD_printf("SaltyNX: Couldn't open /dev/nvdisp-disp0! Can't check if using Retro Remake display.\n");
     }
     else {
         struct vendorID {
@@ -339,13 +347,13 @@ int main(int argc, char *argv[])
     uint64_t dummy = 0;
     rc = svcQueryMemoryMapping(&clkVirtAddr, &dummy, 0x60006000, 0x1000);
     if (R_FAILED(rc)) {
-        SaltySD_printf("SaltySD: Retrieving virtual address for 0x60006000 failed. RC: 0x%x.\n", rc);
+        SaltySD_printf("SaltyNX: Retrieving virtual address for 0x60006000 failed. RC: 0x%x.\n", rc);
         clkVirtAddr = 0;
     }
     if (isOLED) {
         Result rc = svcQueryMemoryMapping(&dsiVirtAddr, &dummy, 0x54300000, 0x40000);
         if (R_FAILED(rc)) {
-            SaltySD_printf("SaltySD: Retrieving virtual address for 0x54300000 failed. RC: 0x%x.\n", rc);
+            SaltySD_printf("SaltyNX: Retrieving virtual address for 0x54300000 failed. RC: 0x%x.\n", rc);
             dsiVirtAddr = 0;
         }
     }
@@ -501,7 +509,7 @@ int main(int argc, char *argv[])
             hijack_pid(max);
         }
 
-        svcSleepThread(5000000);
+        svcSleepThread(10000000);
     }
     free(pids);
 
