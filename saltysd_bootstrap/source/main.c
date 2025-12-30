@@ -123,12 +123,12 @@ int main(int argc, char *argv[])
 	Result ret;
 
 	#if defined(SWITCH) || defined(OUNCE)
-	write_log("SaltySD Bootstrap: we in here\n");
+	write_log("SaltyNX Bootstrap: we in here\n");
 	#endif
 
 	do
 	{
-		ret = svcConnectToNamedPort(&saltysd, "SaltySD");
+		ret = svcConnectToNamedPort(&saltysd, "SaltyNX");
 		svcSleepThread(1000*1000);
 	}
 	while (ret);
