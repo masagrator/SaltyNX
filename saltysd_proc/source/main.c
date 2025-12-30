@@ -25,7 +25,7 @@ struct MinMax {
 };
 
 Handle saltysdport, saltynxport, sdcard, injectserv;
-static char g_heap[0x40000];
+static char g_heap[0x30000];
 bool already_hijacking = false;
 SharedMemory _sharedMemory = {0};
 uint64_t clkVirtAddr = 0;
@@ -210,7 +210,7 @@ void saltysdServiceLoop(void*) {
         // If someone is waiting for us, handle them.
         if (!svcWaitSynchronizationSingle(saltysdport, 5000000))
         {
-            serviceThread(saltysdport, false);
+            serviceThread(saltysdport);
         }
         if (!svcWaitSynchronizationSingle(injectserv, 5000000)) {
             Handle sesja;
@@ -225,7 +225,7 @@ void saltynxServiceLoop(void*) {
         // If someone is waiting for us, handle them.
         if (!svcWaitSynchronizationSingle(saltynxport, UINT64_MAX))
         {
-            serviceThread(saltynxport, true);
+            serviceThread(saltynxport);
         }
     }
 }

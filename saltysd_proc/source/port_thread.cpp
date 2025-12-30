@@ -20,7 +20,6 @@ extern u64 BIDnow;
 extern u64 PIDnow;
 extern SharedMemory _sharedMemory;
 extern Handle sdcard;
-extern Handle saltyport;
 extern uint8_t refreshRate;
 extern bool displaySync;
 extern bool displaySyncOutOfFocus60;
@@ -848,7 +847,7 @@ static Result handleServiceCmd(int cmd)
     return ret;
 }
 
-extern "C" void serviceThread(void* buf)
+extern "C" void serviceThread(Handle saltyport)
 {
     Result ret;
     SaltySD_printf("SaltyNX: accepting service calls\n");
