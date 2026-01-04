@@ -14,19 +14,6 @@ static struct {
 
 static size_t g_smOverridesNum = 0;
 
-static const u8 InitializeClientHeader[] = {
-    0x04, 0x00, 0x00, 0x00, 0x0A, 0x00, 0x00, 0x80, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x53, 0x46, 0x43, 0x49, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-};
-
-static const u8 GetServiceHandleHeader[] = {
-    0x04, 0x00, 0x00, 0x00, 0x0A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x53, 0x46, 0x43, 0x49, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-};
-
 /// Atomically increments a 64-bit value.
 static inline u64 atomicIncrement64(u64* p) {
     return __atomic_fetch_add(p, 1, __ATOMIC_SEQ_CST);
@@ -57,11 +44,23 @@ u64 smEncodeName_old(const char* name)
     return name_encoded;
 }
 
-Result smGetServiceOriginal_old(Handle* handle_out, u64 name)
+static Result smGetServiceOriginal_old(Handle* handle_out, u64 name)
 {
-    memcpy(armGetTls(), GetServiceHandleHeader, sizeof(GetServiceHandleHeader));
-    memcpy((u8 *)armGetTls() + 0x20, &name, sizeof(name));
+    IpcCommand c;
+    ipcInitialize(&c);
 
+    struct 
+    {
+        u64 magic;
+        u64 cmd_id;
+        u64 name;
+    } *raw;
+
+    raw = ipcPrepareHeader(&c, sizeof(*raw));
+    raw->magic = SFCI_MAGIC;
+    raw->cmd_id = 1;
+    raw->name = name;
+    
     Result rc = serviceIpcDispatch(&g_smSrv);
 
     if (R_SUCCEEDED(rc)) {
@@ -92,6 +91,40 @@ void smExit_old(void)
     }
 }
 
+static Result smRegisterClient(void) {
+    IpcCommand c;
+    ipcInitialize(&c);
+    ipcSendPid(&c);
+
+    struct 
+    {
+        u64 magic;
+        u64 cmd_id;
+        u64 reserved;
+    } *raw;
+
+    raw = ipcPrepareHeader(&c, sizeof(*raw));
+
+    raw->magic = SFCI_MAGIC;
+    raw->cmd_id = 0;
+    raw->reserved = 0;
+
+    Result rc = serviceIpcDispatch(&g_smSrv);
+
+    IpcParsedCommand r;
+
+    struct {
+        u64 magic;
+        u64 result;
+    } *resp;
+    serviceIpcParse(&g_smSrv, &r, sizeof(*resp));
+
+    resp = r.Raw;
+    rc = resp->result;
+
+    return rc;
+}
+
 Result smInitialize_old(void)
 {
     atomicIncrement64(&g_refCnt);
@@ -112,21 +145,9 @@ Result smInitialize_old(void)
 
     Handle tmp;
     if (R_SUCCEEDED(rc) && smGetServiceOriginal_old(&tmp, smEncodeName_old("")) == 0x415) {
-        memcpy(armGetTls(), InitializeClientHeader, sizeof(InitializeClientHeader));
-
-        rc = serviceIpcDispatch(&g_smSrv);
 
         if (R_SUCCEEDED(rc)) {
-            IpcParsedCommand r;
-
-            struct {
-                u64 magic;
-                u64 result;
-            } *resp;
-            serviceIpcParse(&g_smSrv, &r, sizeof(*resp));
-
-            resp = r.Raw;
-            rc = resp->result;
+            rc = smRegisterClient();
         }
     }
 
