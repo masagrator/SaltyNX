@@ -15,6 +15,8 @@ This fork includes many new features (aforementioned NX-FPS and ReverseNX-RT), c
 > It is required to have FW installed at least 10.0.0 version
 > 
 > No technical support for anything else than stock Atmosphere.
+>
+> Using it in online games such as Splatoon 3 can lead to ban as it injects custom code, be aware of that.
 
 > [!IMPORTANT]
 > Known issues:
