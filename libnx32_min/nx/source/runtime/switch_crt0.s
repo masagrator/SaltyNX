@@ -2,9 +2,12 @@
 .global _start
 
 _start:
-    b startup
+    b entrypoint
     .word __nx_mod0 - _start
-    .ascii "HOMEBREW"
+
+entrypoint:
+	b startup
+    .ascii "SALTYNX"
 
 .org _start+0x80
 startup:
