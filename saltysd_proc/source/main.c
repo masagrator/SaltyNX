@@ -6,7 +6,6 @@
 
 #include <stdlib.h>
 #include <dirent.h>
-#include "svc_extra.h"
 
 #include "loadelf.h"
 #define NANOPRINTF_IMPLEMENTATION

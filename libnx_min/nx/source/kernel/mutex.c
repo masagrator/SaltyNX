@@ -65,31 +65,3 @@ void mutexUnlock(Mutex* m) {
         svcArbitrateUnlock((u32*)m);
     }
 }
-
-void rmutexLock(RMutex* m) {
-    if (m->thread_tag != _GetTag()) {
-        mutexLock(&m->lock);
-        m->thread_tag = _GetTag();
-    }
-
-    m->counter++;
-}
-
-bool rmutexTryLock(RMutex* m) {
-    if (m->thread_tag != _GetTag()) {
-        if (!mutexTryLock(&m->lock)) {
-            return false;
-        }
-        m->thread_tag = _GetTag();
-    }
-
-    m->counter++;
-    return true;
-}
-
-void rmutexUnlock(RMutex* m) {
-    if (--m->counter == 0) {
-        m->thread_tag = 0;
-        mutexUnlock(&m->lock);
-    }
-}
