@@ -148,9 +148,9 @@ struct dpaux_read_0x100 {
     u32 size;
     struct {
         unsigned char link_rate;
-        unsigned int lane_count: 5;
-        unsigned int unk1: 2;
-        unsigned int isFramingEnhanced: 1;
+        unsigned char lane_count: 5;
+        unsigned char unk1: 2;
+        unsigned char isFramingEnhanced: 1;
         unsigned char downspread;
         unsigned char training_pattern;
         unsigned char lane_pattern[4];
@@ -513,12 +513,12 @@ struct dpaux_read {
     u32 addr;
     u32 size;
     struct {
-        unsigned int rev_minor : 4;
-        unsigned int rev_major : 4;
+        unsigned char rev_minor : 4;
+        unsigned char rev_major : 4;
         unsigned char link_rate;
-        unsigned int lane_count: 5;
-        unsigned int unk1: 2;
-        unsigned int isFramingEnhanced: 1;
+        unsigned char lane_count: 5;
+        unsigned char unk1: 2;
+        unsigned char isFramingEnhanced: 1;
         unsigned char unk2[13];
     } DPCD;
 };
@@ -932,3 +932,4 @@ extern "C" bool GetDisplayRefreshRate(uint32_t* out_refreshRate, bool internal) 
     return true;
 
 }
+
