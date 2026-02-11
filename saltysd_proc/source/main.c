@@ -6,7 +6,6 @@
 
 #include <stdlib.h>
 #include <dirent.h>
-#include "svc_extra.h"
 
 #include "loadelf.h"
 #define NANOPRINTF_IMPLEMENTATION
@@ -34,7 +33,7 @@ Handle saltyport, sdcard, injectserv;
 static char g_heap[0x30000];
 bool should_terminate = false;
 bool already_hijacking = false;
-DebugEvent event;
+DebugEventInfo event;
 bool check = false;
 u64 exception = 0x0;
 SharedMemory _sharedMemory = {0};
