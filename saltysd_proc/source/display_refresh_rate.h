@@ -8,6 +8,7 @@ extern bool DockedModeRefreshRateAllowed[];
 extern struct MinMax HandheldModeRefreshRateAllowed;
 extern uint8_t dockedHighestRefreshRate;
 extern uint8_t dockedLinkRate;
+extern uint8_t dockedLaneCount;
 extern bool isRetroSUPER;
 extern bool isPossiblySpoofedRetro;
 extern bool wasRetroSuperTurnedOff;

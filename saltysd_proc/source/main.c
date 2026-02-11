@@ -6,6 +6,7 @@
 
 #include <stdlib.h>
 #include <dirent.h>
+#include "svc_extra.h"
 
 #include "loadelf.h"
 #define NANOPRINTF_IMPLEMENTATION
@@ -33,7 +34,7 @@ Handle saltyport, sdcard, injectserv;
 static char g_heap[0x30000];
 bool should_terminate = false;
 bool already_hijacking = false;
-DebugEventInfo event;
+DebugEvent event;
 bool check = false;
 u64 exception = 0x0;
 SharedMemory _sharedMemory = {0};
@@ -902,7 +903,8 @@ Result handleServiceCmd(int cmd)
             u64 result;
             u32 refreshRate;
             u32 linkRate;
-            u64 reserved;
+            u32 laneCount;
+            u32 reserved;
         } *raw;
 
         raw = ipcPrepareHeader(&c, sizeof(*raw));
@@ -911,6 +913,7 @@ Result handleServiceCmd(int cmd)
         raw->result = 0;
         raw->refreshRate = dockedHighestRefreshRate;
         raw->linkRate = dockedLinkRate;
+        raw->laneCount = dockedLaneCount;
 
         return 0;
     }
