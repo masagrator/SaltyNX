@@ -309,7 +309,7 @@ extern "C" uint8_t getDockedHighestRefreshRateAllowed() {
     return 60;
 }
 
-constexpr uint8_t getDockedRefreshRateIterator(uint32_t refreshRate) {
+consteval uint8_t getDockedRefreshRateIterator(uint32_t refreshRate) {
     for (size_t i = 0; i < sizeof(DockedModeRefreshRateAllowedValues); i++) {
         if (DockedModeRefreshRateAllowedValues[i] == refreshRate)
             return i;
@@ -937,4 +937,5 @@ extern "C" bool GetDisplayRefreshRate(uint32_t* out_refreshRate, bool internal) 
     return true;
 
 }
+
 
