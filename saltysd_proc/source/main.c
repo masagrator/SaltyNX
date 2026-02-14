@@ -902,7 +902,8 @@ Result handleServiceCmd(int cmd)
             u64 result;
             u32 refreshRate;
             u32 linkRate;
-            u64 reserved;
+            u32 laneCount;
+            u32 reserved;
         } *raw;
 
         raw = ipcPrepareHeader(&c, sizeof(*raw));
@@ -911,6 +912,7 @@ Result handleServiceCmd(int cmd)
         raw->result = 0;
         raw->refreshRate = dockedHighestRefreshRate;
         raw->linkRate = dockedLinkRate;
+        raw->laneCount = dockedLaneCount;
 
         return 0;
     }

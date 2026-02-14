@@ -12,6 +12,7 @@
 
 uint8_t dockedHighestRefreshRate = 60;
 uint8_t dockedLinkRate = 10;
+uint8_t dockedLaneCount = 0;
 bool isRetroSUPER = false;
 bool isPossiblySpoofedRetro = false;
 bool wasRetroSuperTurnedOff = false;
@@ -281,7 +282,11 @@ void getDockedHighestRefreshRate(uint32_t fd_in) {
     nvrc = nvIoctl(fd, NVDISP_GET_PANEL_DATA, &dpaux);
     if (R_SUCCEEDED(nvrc)) {
         dockedLinkRate = dpaux.set.link_rate;
-        if (DISPLAY_B.hActive == 1920 && DISPLAY_B.vActive == 1080 && highestRefreshRate > 75 && dpaux.set.link_rate < 20) highestRefreshRate = 75;
+        dockedLaneCount = dpaux.set.lane_count;
+        if (DISPLAY_B.hActive == 1920 && DISPLAY_B.vActive == 1080 && highestRefreshRate > 75) {
+            if ((dockedLaneCount * dpaux.set.link_rate) < 40)
+                highestRefreshRate = 75;
+        }
     }
     else SaltySD_printf("SaltySD: NVDISP_GET_PANEL_DATA for /dev/nvdisp-disp1 returned error 0x%x!\n", nvrc);
     if (!fd_in) nvClose(fd);
