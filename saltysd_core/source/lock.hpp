@@ -61,46 +61,17 @@ namespace LOCK {
 		return false;
 	}
 
-	uint8_t read8(uint8_t* buffer) {
-		uint8_t ret = buffer[offset];
-		offset += sizeof(uint8_t);
-		return ret;
-	}
-
-	uint16_t read16(uint8_t* buffer) {
-		uint16_t ret = *(uint16_t*)(&buffer[offset]);
-		offset += sizeof(uint16_t);
-		return ret;
-	}
-
-	uint32_t read32(uint8_t* buffer) {
-		uint32_t ret = *(uint32_t*)(&buffer[offset]);
-		offset += sizeof(uint32_t);
-		return ret;
-	}
-
-	uint64_t read64(uint8_t* buffer) {
-		uint64_t ret = *(uint64_t*)(&buffer[offset]);
-		offset += sizeof(uint64_t);
-		return ret;
-	}
-
-	float readFloat(uint8_t* buffer) {
-		float ret = *(float*)(&buffer[offset]);
-		offset += sizeof(float);
-		return ret;
-	}
-
-	double readDouble(uint8_t* buffer) {
-		double ret = *(double*)(&buffer[offset]);
-		offset += sizeof(double);
+	template <typename T>
+	T read(uint8_t* buffer) {
+		T ret;
+		memcpy(&ret, &buffer[offset], sizeof(T));
+		offset += sizeof(T);
 		return ret;
 	}
 
 	template <typename T>
 	void writeValue(T value, uintptr_t address) {
-		if (*(T*)address != value)
-			*(T*)address = value;
+		memcpy((void*)address, &value, sizeof(T));
 	}
 
 	bool unsafeCheck = false;
@@ -126,9 +97,9 @@ namespace LOCK {
 
 	intptr_t NOINLINE getAddress(uint8_t* buffer) {
 		bool unsafe_address = !unsafeCheck;
-		if (gen == 4) unsafe_address = (bool)read8(buffer);
-		int8_t offsets_count = read8(buffer);
-		uint8_t region = read8(buffer);
+		if (gen == 4) unsafe_address = read<bool>(buffer);
+		int8_t offsets_count = read<int8_t>(buffer);
+		uint8_t region = read<uint8_t>(buffer);
 		offsets_count -= 1;
 		int64_t address = 0;
 		switch(region) {
@@ -156,14 +127,14 @@ namespace LOCK {
 		}
 		for (int i = 0; i < offsets_count; i++) {
 			#if defined(SWITCH32) || defined(OUNCE32)
-			int32_t temp_offset = (int32_t)read32(buffer);
+			int32_t temp_offset = read<int32_t>(buffer);
 			address += temp_offset;
 			if (i+1 < offsets_count) {
 				if (unsafe_address && !isAddressValid(*(uintptr_t*)address)) return -2;
 				address = *(uintptr_t*)address;
 			}
 			#else
-			uint32_t temp_offset = read32(buffer);
+			uint32_t temp_offset = read<uint32_t>(buffer);
 			if (region > 0 && region < 4) {
 				int32_t temp_offset_int = 0;
 				memcpy(&temp_offset_int, &temp_offset, 4);
@@ -461,7 +432,7 @@ namespace LOCK {
 		offset = header_size;
 		uint16_t temp_offset = header_size;
 		while(true) {
-			uint8_t OPCODE = read8(in_buffer);
+			uint8_t OPCODE = read<uint8_t>(in_buffer);
 			if (OPCODE == 1 || OPCODE == 0x81) {
 				bool evaluate = false;
 				if (OPCODE == 0x81) {
@@ -469,17 +440,17 @@ namespace LOCK {
 					OPCODE = 1;
 				}
 				out_buffer[temp_offset++] = OPCODE;
-				if (gen == 4) out_buffer[temp_offset++] = read8(in_buffer);
-				uint8_t address_count = read8(in_buffer);
+				if (gen == 4) out_buffer[temp_offset++] = read<uint8_t>(in_buffer);
+				uint8_t address_count = read<uint8_t>(in_buffer);
 				out_buffer[temp_offset++] = address_count;
-				out_buffer[temp_offset++] = read8(in_buffer);
+				out_buffer[temp_offset++] = read<uint8_t>(in_buffer);
 				for (size_t i = 1; i < address_count; i++) {
-					*(uint32_t*)&out_buffer[temp_offset] = read32(in_buffer);
+					*(uint32_t*)&out_buffer[temp_offset] = read<uint32_t>(in_buffer);
 					temp_offset += 4;
 				}
-				uint8_t value_type = read8(in_buffer);
+				uint8_t value_type = read<uint8_t>(in_buffer);
 				out_buffer[temp_offset++] = value_type;
-				uint8_t value_count = read8(in_buffer);
+				uint8_t value_count = read<uint8_t>(in_buffer);
 				out_buffer[temp_offset++] = value_count;
 				if (!evaluate) for (size_t i = 0; i < value_count; i++) {
 					memcpy(&out_buffer[temp_offset], &in_buffer[offset], value_type % 0x10);
@@ -499,31 +470,31 @@ namespace LOCK {
 					OPCODE = 2;
 				}
 				out_buffer[temp_offset++] = OPCODE;
-				if (gen == 4) out_buffer[temp_offset++] = read8(in_buffer);
-				uint8_t address_count = read8(in_buffer);
+				if (gen == 4) out_buffer[temp_offset++] = read<uint8_t>(in_buffer);
+				uint8_t address_count = read<uint8_t>(in_buffer);
 				out_buffer[temp_offset++] = address_count;
-				out_buffer[temp_offset++] = read8(in_buffer); //compare address region
+				out_buffer[temp_offset++] = read<uint8_t>(in_buffer); //compare address region
 				for (size_t i = 1; i < address_count; i++) {
-					*(uint32_t*)&out_buffer[temp_offset] = read32(in_buffer);
+					*(uint32_t*)&out_buffer[temp_offset] = read<uint32_t>(in_buffer);
 					temp_offset += 4;
 				}
-				out_buffer[temp_offset++] = read8(in_buffer); //compare_type
-				uint8_t value_type = read8(in_buffer);
+				out_buffer[temp_offset++] = read<uint8_t>(in_buffer); //compare_type
+				uint8_t value_type = read<uint8_t>(in_buffer);
 				out_buffer[temp_offset++] = value_type;
 				memcpy(&out_buffer[temp_offset], &in_buffer[offset], value_type % 0x10);
 				temp_offset += value_type % 0x10;
 				offset += value_type % 0x10;
-				if (gen == 4) out_buffer[temp_offset++] = read8(in_buffer);
-				address_count = read8(in_buffer);
+				if (gen == 4) out_buffer[temp_offset++] = read<uint8_t>(in_buffer);
+				address_count = read<uint8_t>(in_buffer);
 				out_buffer[temp_offset++] = address_count;
-				out_buffer[temp_offset++] = read8(in_buffer); //address region
+				out_buffer[temp_offset++] = read<uint8_t>(in_buffer); //address region
 				for (size_t i = 1; i < address_count; i++) {
-					*(uint32_t*)&out_buffer[temp_offset] = read32(in_buffer);
+					*(uint32_t*)&out_buffer[temp_offset] = read<uint32_t>(in_buffer);
 					temp_offset += 4;
 				}
-				value_type = read8(in_buffer);
+				value_type = read<uint8_t>(in_buffer);
 				out_buffer[temp_offset++] = value_type;
-				uint8_t value_count = read8(in_buffer);
+				uint8_t value_count = read<uint8_t>(in_buffer);
 				out_buffer[temp_offset++] = value_count;
 				if (!evaluate) for (size_t i = 0; i < value_count; i++) {
 					memcpy(&out_buffer[temp_offset], &in_buffer[offset], value_type % 0x10);
@@ -538,7 +509,7 @@ namespace LOCK {
 			}
 			else if (OPCODE == 3) {
 				out_buffer[temp_offset++] = OPCODE;
-				out_buffer[temp_offset++] = read8(in_buffer);
+				out_buffer[temp_offset++] = read<uint8_t>(in_buffer);
 			}
 			else if (OPCODE == 255) {
 				out_buffer[temp_offset++] = OPCODE;
@@ -584,7 +555,7 @@ namespace LOCK {
 				3	=	block
 				-1	=	endExecution
 			*/
-			int8_t OPCODE = read8(buffer);
+			int8_t OPCODE = read<int8_t>(buffer);
 			if (OPCODE == 1) {
 				#if defined(SWITCH32) || defined(OUNCE32)
 				uintptr_t address = getAddress(buffer);
@@ -605,14 +576,14 @@ namespace LOCK {
 					0x24	=	float
 					0x28	=	double
 				*/
-				uint8_t value_type = read8(buffer);
-				uint8_t loops = read8(buffer);
+				uint8_t value_type = read<uint8_t>(buffer);
+				uint8_t loops = read<uint8_t>(buffer);
 				switch(value_type) {
 					case 1:
 					case 0x11: {
 						if (!address) return 0x3007;
 						for (uint8_t i = 0; i < loops; i++) {
-							*(uint8_t*)address = read8(buffer);
+							*(uint8_t*)address = read<uint8_t>(buffer);
 							address += 1;
 						}
 						break;
@@ -621,7 +592,7 @@ namespace LOCK {
 					case 0x12: {
 						if (!address) return 0x3007;
 						for (uint8_t i = 0; i < loops; i++) {
-							*(uint16_t*)address = read16(buffer);
+							*(uint16_t*)address = read<uint16_t>(buffer);
 							address += 2;
 						}
 						break;
@@ -631,7 +602,7 @@ namespace LOCK {
 					case 0x24: {
 						if (!address) return 0x3007;
 						for (uint8_t i = 0; i < loops; i++) {
-							*(uint32_t*)address = read32(buffer);
+							*(uint32_t*)address = read<uint32_t>(buffer);
 							address += 4;
 						}
 						break;
@@ -641,14 +612,14 @@ namespace LOCK {
 					case 0x28: {
 						if (!address) return 0x3007;
 						for (uint8_t i = 0; i < loops; i++) {
-							*(uint64_t*)address = read64(buffer);
+							*(uint64_t*)address = read<uint64_t>(buffer);
 							address += 8;
 						}
 						break;
 					}
 					case 0x38: {
 						for (uint8_t i = 0; i < loops; i++) {
-							overwriteRefreshRate = readDouble(buffer);
+							overwriteRefreshRate = read<double>(buffer);
 							address += 8;
 						}
 						break;
@@ -673,67 +644,67 @@ namespace LOCK {
 					5	=	==
 					6	=	!=
 				*/
-				uint8_t compare_type = read8(buffer);
-				uint8_t value_type = read8(buffer);
+				uint8_t compare_type = read<uint8_t>(buffer);
+				uint8_t value_type = read<uint8_t>(buffer);
 				bool passed = false;
 				switch(value_type) {
 					case 1: {
 						uint8_t uint8_compare = *(uint8_t*)address;
-						uint8_t uint8_tocompare = read8(buffer);
+						uint8_t uint8_tocompare = read<uint8_t>(buffer);
 						passed = compareValues(uint8_compare, uint8_tocompare, compare_type);
 						break;
 					}
 					case 2: {
 						uint16_t uint16_compare = *(uint16_t*)address;
-						uint16_t uint16_tocompare = read16(buffer);
+						uint16_t uint16_tocompare = read<uint16_t>(buffer);
 						passed = compareValues(uint16_compare, uint16_tocompare, compare_type);
 						break;
 					}
 					case 4: {
 						uint32_t uint32_compare = *(uint32_t*)address;
-						uint32_t uint32_tocompare = read32(buffer);
+						uint32_t uint32_tocompare = read<uint32_t>(buffer);
 						passed = compareValues(uint32_compare, uint32_tocompare, compare_type);
 						break;
 					}
 					case 8: {
 						uint64_t uint64_compare = *(uint64_t*)address;
-						uint64_t uint64_tocompare = read64(buffer);
+						uint64_t uint64_tocompare = read<uint64_t>(buffer);
 						passed = compareValues(uint64_compare, uint64_tocompare, compare_type);
 						break;
 					}
 					case 0x11: {
 						int8_t int8_compare = *(int8_t*)address;
-						int8_t int8_tocompare = (int8_t)read8(buffer);
+						int8_t int8_tocompare = read<int8_t>(buffer);
 						passed = compareValues(int8_compare, int8_tocompare, compare_type);
 						break;
 					}
 					case 0x12: {
 						int16_t int16_compare = *(int16_t*)address;
-						int16_t int16_tocompare = (int16_t)read16(buffer);
+						int16_t int16_tocompare = read<int16_t>(buffer);
 						passed = compareValues(int16_compare, int16_tocompare, compare_type);
 						break;
 					}
 					case 0x14: {
 						int32_t int32_compare = *(int32_t*)address;
-						int32_t int32_tocompare = (int32_t)read32(buffer);
+						int32_t int32_tocompare = read<int32_t>(buffer);
 						passed = compareValues(int32_compare, int32_tocompare, compare_type);
 						break;
 					}
 					case 0x18: {
 						int64_t int64_compare = *(int64_t*)address;
-						int64_t int64_tocompare = (int64_t)read64(buffer);
+						int64_t int64_tocompare = read<int64_t>(buffer);
 						passed = compareValues(int64_compare, int64_tocompare, compare_type);
 						break;
 					}
 					case 0x24: {
 						float float_compare = *(float*)address;
-						float float_tocompare = readFloat(buffer);
+						float float_tocompare = read<float>(buffer);
 						passed = compareValues(float_compare, float_tocompare, compare_type);
 						break;
 					}
 					case 0x28: {
 						double double_compare = *(double*)address;
-						double double_tocompare = readDouble(buffer);
+						double double_tocompare = read<double>(buffer);
 						passed = compareValues(double_compare, double_tocompare, compare_type);
 						break;
 					}
@@ -744,14 +715,14 @@ namespace LOCK {
 				address = getAddress(buffer);
 				if (address < 0) 
 					return 6;
-				value_type = read8(buffer);
-				uint8_t loops = read8(buffer);
+				value_type = read<uint8_t>(buffer);
+				uint8_t loops = read<uint8_t>(buffer);
 				switch(value_type) {
 					case 1:
 					case 0x11: {
 						if (!address) return 0x3007;
 						for (uint8_t i = 0; i < loops; i++) {
-							uint8_t value8 = read8(buffer);
+							uint8_t value8 = read<uint8_t>(buffer);
 							if (passed) writeValue(value8, address);
 							address += 1;
 						}
@@ -761,7 +732,7 @@ namespace LOCK {
 					case 0x12: {
 						if (!address) return 0x3007;
 						for (uint8_t i = 0; i < loops; i++) {
-							uint16_t value16 = read16(buffer);
+							uint16_t value16 = read<uint16_t>(buffer);
 							if (passed) writeValue(value16, address);
 							address += 2;
 						}
@@ -772,7 +743,7 @@ namespace LOCK {
 					case 0x24: {
 						if (!address) return 0x3007;
 						for (uint8_t i = 0; i < loops; i++) {
-							uint32_t value32 = read32(buffer);
+							uint32_t value32 = read<uint32_t>(buffer);
 							if (passed) writeValue(value32, address);
 							address += 4;
 						}
@@ -783,7 +754,7 @@ namespace LOCK {
 					case 0x28: {
 						if (!address) return 0x3007;
 						for (uint8_t i = 0; i < loops; i++) {
-							uint64_t value64 = read64(buffer);
+							uint64_t value64 = read<uint64_t>(buffer);
 							if (passed) writeValue(value64, address);
 							address += 8;
 						}
@@ -791,7 +762,7 @@ namespace LOCK {
 					}
 					case 0x38:
 						for (uint8_t i = 0; i < loops; i++) {
-							uint64_t valueDouble = read64(buffer);
+							uint64_t valueDouble = read<uint64_t>(buffer);
 							if (passed) writeValue(valueDouble, (uint64_t)&overwriteRefreshRate);
 						}
 						break;						
@@ -800,7 +771,7 @@ namespace LOCK {
 				}
 			}
 			else if (OPCODE == 3) {
-				switch(read8(buffer)) {
+				switch(read<uint8_t>(buffer)) {
 					case 1:
 						blockDelayFPS = true;
 						break;
