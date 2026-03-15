@@ -340,7 +340,7 @@ namespace nn {
 		if (!bytesRead)
 			bytesRead = &bytesRead_impl;
 		Result ret = ((FileAccessorRead_0)(Address_weaks.FileAccessorRead))(fileHandle, bytesRead, position, buffer, readBytes, ReadOption);
-		if (R_SUCCEEDED(ret)) fileBytesRead += *bytesRead;
+		if (__builtin_expect(R_SUCCEEDED(ret), 1)) fileBytesRead += *bytesRead;
 		return ret;
 	}
 
@@ -349,7 +349,7 @@ namespace nn {
 		if (!bytesRead)
 			bytesRead = &bytesRead_impl;
 		Result ret = ((FileAccessorReadCache_0)(Address_weaks.FileAccessorReadCache))(fileHandle, bytesRead, position, buffer, readBytes, ReadOption, FileDataCacheAccessResult);
-		if (R_SUCCEEDED(ret)) fileBytesRead += *bytesRead;
+		if (__builtin_expect(R_SUCCEEDED(ret), 1)) fileBytesRead += *bytesRead;
 		return ret;
 	}
 
@@ -450,7 +450,7 @@ namespace NX_FPS_Math {
 					range++;
 				}
 			}
-			else if (((uint32_t)std::lround(Stats.FPSavg) == new_fpslock) && (Stats.FPSavg < (float)new_fpslock)) {
+			else if (((uint32_t)std::lroundf(Stats.FPSavg) == new_fpslock) && (Stats.FPSavg < (float)new_fpslock)) {
 				if (range > 0) {
 					range--;
 				}
@@ -515,8 +515,8 @@ namespace NX_FPS_Math {
 
 	template <typename T> void addResToViewports(T m_width, T m_height) {
 		if ((m_height <= (T)160) || (m_height > (T)1440)) return;
-		T ratio = (m_width * 10) / m_height;
-		if (ratio >= (T)6 && ratio <= (T)18) {
+		T scaled = m_width * (T)10;
+		if ((scaled >= ((T)6 * m_height)) && (scaled <= ((T)18 * m_height))) {
 			union {
 				struct {
 					uint16_t width;
@@ -545,8 +545,8 @@ namespace NX_FPS_Math {
 
 	template <typename T> void addResToRender(T m_width, T m_height) {
 		if ((m_height <= (T)160) || (m_height > (T)1440)) return;
-		T ratio = (m_width * 10) / m_height;
-		if (ratio >= (T)6 && ratio <= (T)18) {
+		T scaled = m_width * (T)10;
+		if ((scaled >= ((T)6 * m_height)) && (scaled <= ((T)18 * m_height))) {
 			union {
 				struct {
 					uint16_t width;
@@ -627,7 +627,7 @@ namespace vk {
 			if (check_redirection == true) {
 				return ((vkQueuePresentKHR_0)(pointer))(VkQueue_T, VkPresentInfoKHR);
 			}
-			if (!NX_FPS_Math::starttick) {
+			if (__builtin_expect(!NX_FPS_Math::starttick, 0)) {
 				(Shared -> API) = 3;
 				NX_FPS_Math::starttick = Utils::_getSystemTick();
 				NX_FPS_Math::starttick2 = NX_FPS_Math::starttick;
@@ -814,7 +814,7 @@ namespace EGL {
 
 	bool Swap (const void* EGLDisplay, const void* EGLSurface) {
 
-		if (!NX_FPS_Math::starttick) {
+		if (__builtin_expect(!NX_FPS_Math::starttick, 0)) {
 			(Shared -> API) = 2;
 			NX_FPS_Math::starttick = Utils::_getSystemTick();
 			NX_FPS_Math::starttick2 = NX_FPS_Math::starttick;
@@ -1080,7 +1080,7 @@ namespace NVN {
 	void PresentTexture(const void* _this, const NVNWindow* nvnWindow, int index) {
 
 		//Initialize time calculation;
-		if (!NX_FPS_Math::starttick) {
+		if (__builtin_expect(!NX_FPS_Math::starttick, 0)) {
 			NX_FPS_Math::starttick = Utils::_getSystemTick();
 			NX_FPS_Math::starttick2 = NX_FPS_Math::starttick;
 		}
