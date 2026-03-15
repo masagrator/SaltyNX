@@ -439,7 +439,7 @@ namespace NX_FPS_Math {
 		uint64_t framedelta = endtick - frameend;
 
 		Shared -> FPSticks[FPStickItr++] = framedelta;
-		FPStickItr %= 10;
+		if (FPStickItr >= 10) FPStickItr = 0;
 		
 		frameavg = ((9*frameavg) + framedelta) / 10;
 		Stats.FPSavg = systemtickfrequency / (float)frameavg;
