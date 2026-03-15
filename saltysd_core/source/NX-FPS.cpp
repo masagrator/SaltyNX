@@ -336,7 +336,7 @@ inline uintptr_t getMainAddress() {
 
 namespace nn {
 	Result FileAccessorRead(void* fileHandle, size_t* bytesRead, int64_t position, void* buffer, size_t readBytes, unsigned int* ReadOption) {
-		size_t bytesRead_impl = 0;
+		size_t bytesRead_impl;
 		if (!bytesRead)
 			bytesRead = &bytesRead_impl;
 		Result ret = ((FileAccessorRead_0)(Address_weaks.FileAccessorRead))(fileHandle, bytesRead, position, buffer, readBytes, ReadOption);
@@ -345,7 +345,7 @@ namespace nn {
 	}
 
 	Result FileAccessorReadCache(void* fileHandle, size_t* bytesRead, int64_t position, void* buffer, size_t readBytes, unsigned int* ReadOption, void* FileDataCacheAccessResult) {
-		size_t bytesRead_impl = 0;
+		size_t bytesRead_impl;
 		if (!bytesRead)
 			bytesRead = &bytesRead_impl;
 		Result ret = ((FileAccessorReadCache_0)(Address_weaks.FileAccessorReadCache))(fileHandle, bytesRead, position, buffer, readBytes, ReadOption, FileDataCacheAccessResult);
@@ -433,8 +433,7 @@ namespace NX_FPS_Math {
 	}
 
 	void PostFrame() {
-		last_viewport.first = 0;
-		last_viewport.second = 0;
+		last_viewport = {0, 0};
 		Shared->frameNumber++;
 		uint64_t endtick = Utils::_getSystemTick();
 		uint64_t framedelta = endtick - frameend;
@@ -586,8 +585,7 @@ namespace vk {
 		if (resolutionLookup) for (uint i = firstViewport; i < firstViewport+viewportCount; i++) {
 			if (pViewports[i].height > 1.f && pViewports[i].width > 1.f && pViewports[i].x == 0.f && pViewports[i].y == 0.f) {
 				NX_FPS_Math::addResToViewports(pViewports[i].width, pViewports[i].height);
-				last_viewport.first = (int)pViewports[i].width;
-				last_viewport.second = (int)pViewports[i].height;
+				last_viewport = {(int)pViewports[i].width, (int)pViewports[i].height};
 			}
 		}
 		return ((vkCmdSetViewport_0)(Address_weaks.vkCmdSetViewport))(commandBuffer, firstViewport, viewportCount, pViewports);
@@ -597,8 +595,7 @@ namespace vk {
 		if (resolutionLookup) for (uint i = 0; i < viewportCount; i++) {
 			if (pViewports[i].height > 1.f && pViewports[i].width > 1.f && pViewports[i].x == 0.f && pViewports[i].y == 0.f) {
 				NX_FPS_Math::addResToViewports(pViewports[i].width, pViewports[i].height);
-				last_viewport.first = (int)pViewports[i].width;
-				last_viewport.second = (int)pViewports[i].height;
+				last_viewport = {(int)pViewports[i].width, (int)pViewports[i].height};
 			}
 		}
 		return ((vkCmdSetViewportWithCount_0)(Address_weaks.vkCmdSetViewportWithCount))(commandBuffer, viewportCount, pViewports);
@@ -1184,8 +1181,7 @@ namespace NVN {
 		if (resolutionLookup) for (int i = start; i < start+count; i++) {
 			if (viewports[i].height > 1.f && viewports[i].width > 1.f && viewports[i].x == 0.f && viewports[i].y == 0.f) {
 				NX_FPS_Math::addResToViewports(viewports[i].width, viewports[i].height);
-				last_viewport.first = (int)viewports[i].width;
-				last_viewport.second = (int)viewports[i].height;
+				last_viewport = {(int)viewports[i].width, (int)viewports[i].height};
 			}
 		}
 		return ((nvnCommandBufferSetViewports_0)(Address_weaks.nvnCommandBufferSetViewports))(cmdBuf, start, count, viewports);
@@ -1194,8 +1190,7 @@ namespace NVN {
 	void* CommandBufferSetViewport(const nvnCommandBuffer* cmdBuf, int x, int y, int width, int height) {
 		if (resolutionLookup && height > 1 && width > 1 && !x && !y) {
 			NX_FPS_Math::addResToViewports(width, height);
-				last_viewport.first = width;
-				last_viewport.second = height;
+				last_viewport = {width, height};
 		}
 		return ((nvnCommandBufferSetViewport_0)(Address_weaks.nvnCommandBufferSetViewport))(cmdBuf, x, y, width, height);
 	}
