@@ -108,7 +108,7 @@ ReverseNX_state loadSave() {
 	if (save_file) {
 		uint32_t MAGIC = 0;
 		SaltySDCore_fread(&MAGIC, 4, 1, save_file);
-		if (MAGIC != 0x5452584E) {
+		if (MAGIC != *(uint32_t*)&"NXRT") {
 			SaltySDCore_fclose(save_file);
 			SaltySDCore_printf("ReverseNX: Save had wrong magic!\n", path);
 			return ReverseNX_Switch_Invalid;
@@ -375,7 +375,7 @@ extern "C" {
 			SaltySDCore_printf("ReverseNX: SharedMemory MemoryOffset: %d\n", SharedMemoryOffset2);
 
 			ReverseNX_RT = (Shared*)((uintptr_t)shmemGetAddr(_sharedmemory) + SharedMemoryOffset2);
-			ReverseNX_RT->MAGIC = 0x5452584E;
+			ReverseNX_RT->MAGIC = *(uint32_t*)&"NXRT";
 			ReverseNX_RT->pluginActive = false;
 			ReverseNX_state state = loadSave();
 			if (state == ReverseNX_Switch_Docked || state == ReverseNX_Switch_Handheld) {
