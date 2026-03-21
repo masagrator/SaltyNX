@@ -186,9 +186,10 @@ namespace LOCK {
 		SaltySDCore_fread(&value_type, 1, 1, file);
 		uint8_t elements = 0;
 		SaltySDCore_fread(&elements, 1, 1, file);
-		void* temp_buffer = calloc(elements, value_type % 0x10);
-		SaltySDCore_fread(temp_buffer, value_type % 0x10, elements, file);
-		SaltySD_Memcpy(LOCK::mappings.main_start + main_offset, (u64)temp_buffer, elements * (value_type % 0x10));
+		const uint8_t member_size = value_type % 0x10;
+		void* temp_buffer = calloc(elements, member_size);
+		SaltySDCore_fread(temp_buffer, member_size, elements, file);
+		SaltySD_Memcpy(LOCK::mappings.main_start + main_offset, (u64)temp_buffer, elements * member_size);
 		free(temp_buffer);
 		return 0;
 	}
@@ -202,9 +203,10 @@ namespace LOCK {
 		SaltySDCore_fread(&value_type, 1, 1, file);
 		uint8_t elements = 0;
 		SaltySDCore_fread(&elements, 1, 1, file);
-		void* temp_buffer = calloc(elements, value_type % 0x10);
-		SaltySDCore_fread(temp_buffer, value_type % 0x10, elements, file);
-		SaltySD_Memcpy(LOCK::mappings.variables_start + main_offset, (u64)temp_buffer, elements * (value_type % 0x10));
+		const uint8_t member_size = value_type % 0x10;
+		void* temp_buffer = calloc(elements, member_size);
+		SaltySDCore_fread(temp_buffer, member_size, elements, file);
+		SaltySD_Memcpy(LOCK::mappings.variables_start + main_offset, (u64)temp_buffer, elements * member_size);
 		free(temp_buffer);
 		return 0;
 	}
@@ -379,7 +381,10 @@ namespace LOCK {
 				return 4;
 		}
 
-		memcpy(&buffer[*offset_impl], &tmp, size); //HOS requires from SIMD load/store instructions to have aligned pointers in A32 mode, so we must avoid using VSTR here
+		if (size == 1) memcpy(&buffer[*offset_impl], &tmp, 1);
+		else if (size == 2) memcpy(&buffer[*offset_impl], &tmp, 2);
+		else if (size == 4) memcpy(&buffer[*offset_impl], &tmp, 4);
+		else memcpy(&buffer[*offset_impl], &tmp, 8); //HOS requires from SIMD load/store instructions to have aligned pointers in A32 mode, so we must avoid using VSTR here
 		*offset_impl += size;
 		return 0;
 	}
@@ -440,10 +445,12 @@ namespace LOCK {
 				out_buffer[temp_offset++] = value_type;
 				uint8_t value_count = read<uint8_t>(in_buffer);
 				out_buffer[temp_offset++] = value_count;
-				if (!evaluate) for (size_t i = 0; i < value_count; i++) {
-					memcpy(&out_buffer[temp_offset], &in_buffer[offset], value_type % 0x10);
-					offset += value_type % 0x10;
-					temp_offset += value_type % 0x10;
+				if (!evaluate) {
+					uint8_t member_size = value_type % 0x10;
+					size_t array_size = member_size * value_count;
+					memcpy(&out_buffer[temp_offset], &in_buffer[offset], member_size * value_count);
+					offset += array_size;
+					temp_offset += array_size;
 				}
 				else for (size_t i = 0; i < value_count; i++) {
 					double evaluated_value = evaluateExpression((const char*)&in_buffer[offset], (double)FPS, (double)refreshRate);
@@ -469,9 +476,13 @@ namespace LOCK {
 				out_buffer[temp_offset++] = read<uint8_t>(in_buffer); //compare_type
 				uint8_t value_type = read<uint8_t>(in_buffer);
 				out_buffer[temp_offset++] = value_type;
-				memcpy(&out_buffer[temp_offset], &in_buffer[offset], value_type % 0x10);
-				temp_offset += value_type % 0x10;
-				offset += value_type % 0x10;
+				uint8_t member_size = value_type % 0x10;
+				if (member_size == 1) memcpy(&out_buffer[temp_offset], &in_buffer[offset], 1);
+				else if (member_size == 2) memcpy(&out_buffer[temp_offset], &in_buffer[offset], 2);
+				else if (member_size == 4) memcpy(&out_buffer[temp_offset], &in_buffer[offset], 4);
+				else memcpy(&out_buffer[temp_offset], &in_buffer[offset], 8);
+				temp_offset += member_size;
+				offset += member_size;
 				if (gen == 4) out_buffer[temp_offset++] = read<uint8_t>(in_buffer);
 				address_count = read<uint8_t>(in_buffer);
 				out_buffer[temp_offset++] = address_count;
@@ -484,10 +495,12 @@ namespace LOCK {
 				out_buffer[temp_offset++] = value_type;
 				uint8_t value_count = read<uint8_t>(in_buffer);
 				out_buffer[temp_offset++] = value_count;
-				if (!evaluate) for (size_t i = 0; i < value_count; i++) {
-					memcpy(&out_buffer[temp_offset], &in_buffer[offset], value_type % 0x10);
-					offset += value_type % 0x10;
-					temp_offset += value_type % 0x10;
+				if (!evaluate) {
+					member_size = value_type % 0x10;
+					size_t array_size = member_size * value_count;
+					memcpy(&out_buffer[temp_offset], &in_buffer[offset], member_size * value_count);
+					offset += array_size;
+					temp_offset += array_size;
 				}
 				else for (size_t i = 0; i < value_count; i++) {
 					double evaluated_value = evaluateExpression((const char*)&in_buffer[offset], (double)FPS, (double)refreshRate);
@@ -600,67 +613,17 @@ namespace LOCK {
 				uint8_t value_type = read<uint8_t>(buffer);
 				bool passed = false;
 				switch(value_type) {
-					case 1: {
-						uint8_t uint8_compare = *(uint8_t*)address;
-						uint8_t uint8_tocompare = read<uint8_t>(buffer);
-						passed = compareValues(uint8_compare, uint8_tocompare, compare_type);
-						break;
-					}
-					case 2: {
-						uint16_t uint16_compare = *(uint16_t*)address;
-						uint16_t uint16_tocompare = read<uint16_t>(buffer);
-						passed = compareValues(uint16_compare, uint16_tocompare, compare_type);
-						break;
-					}
-					case 4: {
-						uint32_t uint32_compare = *(uint32_t*)address;
-						uint32_t uint32_tocompare = read<uint32_t>(buffer);
-						passed = compareValues(uint32_compare, uint32_tocompare, compare_type);
-						break;
-					}
-					case 8: {
-						uint64_t uint64_compare = *(uint64_t*)address;
-						uint64_t uint64_tocompare = read<uint64_t>(buffer);
-						passed = compareValues(uint64_compare, uint64_tocompare, compare_type);
-						break;
-					}
-					case 0x11: {
-						int8_t int8_compare = *(int8_t*)address;
-						int8_t int8_tocompare = read<int8_t>(buffer);
-						passed = compareValues(int8_compare, int8_tocompare, compare_type);
-						break;
-					}
-					case 0x12: {
-						int16_t int16_compare = *(int16_t*)address;
-						int16_t int16_tocompare = read<int16_t>(buffer);
-						passed = compareValues(int16_compare, int16_tocompare, compare_type);
-						break;
-					}
-					case 0x14: {
-						int32_t int32_compare = *(int32_t*)address;
-						int32_t int32_tocompare = read<int32_t>(buffer);
-						passed = compareValues(int32_compare, int32_tocompare, compare_type);
-						break;
-					}
-					case 0x18: {
-						int64_t int64_compare = *(int64_t*)address;
-						int64_t int64_tocompare = read<int64_t>(buffer);
-						passed = compareValues(int64_compare, int64_tocompare, compare_type);
-						break;
-					}
-					case 0x24: {
-						float float_compare = *(float*)address;
-						float float_tocompare = read<float>(buffer);
-						passed = compareValues(float_compare, float_tocompare, compare_type);
-						break;
-					}
-					case 0x28: {
-						double double_compare = *(double*)address;
-						double double_tocompare = read<double>(buffer);
-						passed = compareValues(double_compare, double_tocompare, compare_type);
-						break;
-					}
-					default:
+					case 1:    {passed = compareValues(*(uint8_t*)address,  read<uint8_t>(buffer),  compare_type); break;}
+					case 2:    {passed = compareValues(*(uint16_t*)address, read<uint16_t>(buffer), compare_type); break;}
+					case 4:    {passed = compareValues(*(uint32_t*)address, read<uint32_t>(buffer), compare_type); break;}
+					case 8:    {passed = compareValues(*(uint64_t*)address, read<uint64_t>(buffer), compare_type); break;}
+					case 0x11: {passed = compareValues(*(int8_t*)address,   read<int8_t>(buffer),   compare_type); break;}
+					case 0x12: {passed = compareValues(*(int16_t*)address,  read<int16_t>(buffer),  compare_type); break;}
+					case 0x14: {passed = compareValues(*(int32_t*)address,  read<int32_t>(buffer),  compare_type); break;}
+					case 0x18: {passed = compareValues(*(int64_t*)address,  read<int64_t>(buffer),  compare_type); break;}
+					case 0x24: {passed = compareValues(*(float*)address,    read<float>(buffer),    compare_type); break;}
+					case 0x28: {passed = compareValues(*(double*)address,   read<double>(buffer),   compare_type); break;}
+					default: 
 						return 8;
 				}
 
