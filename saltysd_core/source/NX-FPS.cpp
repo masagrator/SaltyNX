@@ -309,7 +309,7 @@ namespace NX_FPS_Math {
 		}
 
 		if ((FPStiming && !LOCK::blockDelayFPS && (new_fpslock && new_fpslock < (Shared -> currentRefreshRate)))) {
-			int64_t FPSTiming_internal = FPStiming + (range * 32);
+			const int64_t FPSTiming_internal = FPStiming + (range * 32);
 			if ((int64_t)(Utils::_getSystemTick() - frameend) < FPSTiming_internal) {
 				FPSlock_delayed = true;
 			}
@@ -323,8 +323,8 @@ namespace NX_FPS_Math {
 	void PostFrame() {
 		last_viewport = {0, 0};
 		Shared->frameNumber++;
-		uint64_t endtick = Utils::_getSystemTick();
-		uint64_t framedelta = endtick - frameend;
+		const uint64_t endtick = Utils::_getSystemTick();
+		const uint64_t framedelta = endtick - frameend;
 
 		Shared -> FPSticks[FPStickItr++] = framedelta;
 		if (FPStickItr >= 10) FPStickItr = 0;
@@ -347,7 +347,7 @@ namespace NX_FPS_Math {
 
 		frameend = endtick;
 		FPS_temp++;
-		uint64_t deltatick = endtick - starttick;
+		const uint64_t deltatick = endtick - starttick;
 		LOCK::overwriteRefreshRate = 0;
 		if (!configRC && FPSlock) {
 			LOCK::applyPatch(configBuffer, FPSlock, (Shared -> currentRefreshRate));
@@ -362,7 +362,7 @@ namespace NX_FPS_Math {
 			}
 			nn::focusHandlingOverwrite = false;
 			if (Address_weaks.FileAccessorRead) {
-				float seconds = (float)Utils::_convertToTimeSpan(deltatick) / 1000000000.f;
+				const float seconds = (float)Utils::_convertToTimeSpan(deltatick) / 1000000000.f;
 				float readSpeedPerSecond = (float)fileBytesRead / seconds;
 				fileBytesRead = 0;
 				if (readSpeedPerSecond == 0.f && Shared -> readSpeedPerSecond != 0.f) readSpeedPerSecond = 1;
@@ -403,7 +403,7 @@ namespace NX_FPS_Math {
 
 	template <typename T> void addResToViewports(T m_width, T m_height) {
 		if ((m_height <= (T)160) || (m_height > (T)1440)) return;
-		T scaled = m_width * (T)10;
+		const T scaled = m_width * (T)10;
 		if ((scaled >= ((T)6 * m_height)) && (scaled <= ((T)18 * m_height))) {
 			union {
 				struct {
@@ -433,7 +433,7 @@ namespace NX_FPS_Math {
 
 	template <typename T> void addResToRender(T m_width, T m_height) {
 		if ((m_height <= (T)160) || (m_height > (T)1440)) return;
-		T scaled = m_width * (T)10;
+		const T scaled = m_width * (T)10;
 		if ((scaled >= ((T)6 * m_height)) && (scaled <= ((T)18 * m_height))) {
 			union {
 				struct {
@@ -557,7 +557,7 @@ namespace vk {
 			
 			NX_FPS_Math::PreFrame();
 			check_redirection = true;
-			int32_t vulkanResult = ((vkQueuePresentKHR_0)(pointer))(VkQueue_T, VkPresentInfoKHR);
+			const int32_t vulkanResult = ((vkQueuePresentKHR_0)(pointer))(VkQueue_T, VkPresentInfoKHR);
 			check_redirection = false;
 			if (vulkanResult >= 0) NX_FPS_Math::PostFrame();
 
@@ -759,11 +759,11 @@ namespace EGL {
 
 		NX_FPS_Math::PreFrame();
 		
-		bool result = ((eglSwapBuffers_0)(Address_weaks.eglSwapBuffers))(EGLDisplay, EGLSurface);
+		const bool result = ((eglSwapBuffers_0)(Address_weaks.eglSwapBuffers))(EGLDisplay, EGLSurface);
 		if (result == true)
 			 NX_FPS_Math::PostFrame();
 		
-		auto new_fpslock = NX_FPS_Math::new_fpslock;
+		const auto new_fpslock = NX_FPS_Math::new_fpslock;
 
 		if (!new_fpslock) {
 			NX_FPS_Math::FPStiming = 0;
@@ -981,7 +981,7 @@ namespace NVN {
 	typedef void (*nvnWindowSetNumActiveTextures_0)(const Window* nvnWindow, int buffers);
 	typedef int (*nvnWindowGetNumActiveTextures_0)(const Window* nvnWindow);
 	typedef bool (*nvnWindowInitialize_0)(const Window* nvnWindow, struct WindowBuilder* windowBuilder);
-	typedef void* (*nvnWindowAcquireTexture_0)(const Window* nvnWindow, const void* nvnSync, const void* index);
+	typedef Result (*nvnWindowAcquireTexture_0)(const Window* nvnWindow, const void* nvnSync, const void* index);
 	typedef void (*nvnSetPresentInterval_0)(const Window* nvnWindow, int mode);
 	typedef int (*nvnGetPresentInterval_0)(const Window* nvnWindow);
 	typedef void* (*nvnSyncWait_0)(const void* _this, uint64_t timeout_ns);
@@ -1046,7 +1046,7 @@ namespace NVN {
 	void* SyncWait0(const void* _this, uint64_t timeout_ns) {
 		if (_this == WindowSync && (Shared -> ActiveBuffers) == 2) {
 			if ((Shared -> ZeroSync) == ZeroSyncType_Semi) {
-				uint64_t endFrameTick = Utils::_getSystemTick();
+				const uint64_t endFrameTick = Utils::_getSystemTick();
 				u64 FrameTarget = (systemtickfrequency/60) - 8000;
 				s64 new_timeout = (FrameTarget - (endFrameTick - startFrameTick)) - (systemtickfrequency / 1000);
 				if (((*sharedOperationMode == 1) ? (Shared -> FPSlockedDocked) : (Shared -> FPSlocked)) == 60) {
@@ -1083,11 +1083,11 @@ namespace NVN {
 			}
 		}
 
-		auto nvnInterval = ((nvnGetPresentInterval_0)(Address_weaks.nvnWindowGetPresentInterval))(nvnWindow);
+		const auto nvnInterval = ((nvnGetPresentInterval_0)(Address_weaks.nvnWindowGetPresentInterval))(nvnWindow);
 
 		(Shared -> FPSmode) = (uint8_t)nvnInterval;
 
-		auto new_fpslock = NX_FPS_Math::new_fpslock;
+		const auto new_fpslock = NX_FPS_Math::new_fpslock;
 		
 		if (!new_fpslock) {
 			NX_FPS_Math::FPStiming = 0;
@@ -1096,7 +1096,7 @@ namespace NVN {
 		}
 		else {
 			changeFPS = true;
-			auto currentRefreshRate = (Shared -> currentRefreshRate);
+			const auto currentRefreshRate = (Shared -> currentRefreshRate);
 			NX_FPS_Math::FPSlock = ((*sharedOperationMode == 1) ? (Shared -> FPSlockedDocked) : (Shared -> FPSlocked));
 			const uint32_t rr = currentRefreshRate ? currentRefreshRate : 60;
 			uint32_t threshold;
@@ -1123,11 +1123,11 @@ namespace NVN {
 		return;
 	}
 
-	void* AcquireTexture(const Window* nvnWindow, const void* nvnSync, const int* index) {
+	Result AcquireTexture(const Window* nvnWindow, const void* nvnSync, const int* index) {
 		if (WindowSync != nvnSync) {
 			WindowSync = (void*)nvnSync;
 		}
-		void* ret = ((nvnWindowAcquireTexture_0)(Address_weaks.nvnWindowAcquireTexture))(nvnWindow, nvnSync, index);
+		Result ret = ((nvnWindowAcquireTexture_0)(Address_weaks.nvnWindowAcquireTexture))(nvnWindow, nvnSync, index);
 		startFrameTick = Utils::_getSystemTick();
 		return ret;
 	}
@@ -1259,8 +1259,7 @@ namespace NVN {
 			if (!Address_weaks.nvnDeviceGetProcAddress) Address_weaks.nvnDeviceGetProcAddress = ((nvnBootstrapLoader_0)(Address_weaks.nvnBootstrapLoader))("nvnDeviceGetProcAddress");
 			return (uintptr_t)&GetProcAddress0;
 		}
-		uintptr_t ptrret = ((nvnBootstrapLoader_0)(Address_weaks.nvnBootstrapLoader))(nvnName);
-		return ptrret;
+		return ((nvnBootstrapLoader_0)(Address_weaks.nvnBootstrapLoader))(nvnName);
 	}
 }
 
