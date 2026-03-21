@@ -612,17 +612,22 @@ namespace LOCK {
 				uint8_t compare_type = read<uint8_t>(buffer);
 				uint8_t value_type = read<uint8_t>(buffer);
 				bool passed = false;
+
+				auto doCompare = [&]<typename T>(std::in_place_type_t<T>) {
+					passed = compareValues(*reinterpret_cast<const T*>(address), read<T>(buffer), compare_type);
+				};
+
 				switch(value_type) {
-					case 1:    {passed = compareValues(*(uint8_t*)address,  read<uint8_t>(buffer),  compare_type); break;}
-					case 2:    {passed = compareValues(*(uint16_t*)address, read<uint16_t>(buffer), compare_type); break;}
-					case 4:    {passed = compareValues(*(uint32_t*)address, read<uint32_t>(buffer), compare_type); break;}
-					case 8:    {passed = compareValues(*(uint64_t*)address, read<uint64_t>(buffer), compare_type); break;}
-					case 0x11: {passed = compareValues(*(int8_t*)address,   read<int8_t>(buffer),   compare_type); break;}
-					case 0x12: {passed = compareValues(*(int16_t*)address,  read<int16_t>(buffer),  compare_type); break;}
-					case 0x14: {passed = compareValues(*(int32_t*)address,  read<int32_t>(buffer),  compare_type); break;}
-					case 0x18: {passed = compareValues(*(int64_t*)address,  read<int64_t>(buffer),  compare_type); break;}
-					case 0x24: {passed = compareValues(*(float*)address,    read<float>(buffer),    compare_type); break;}
-					case 0x28: {passed = compareValues(*(double*)address,   read<double>(buffer),   compare_type); break;}
+					case 1:    doCompare(std::in_place_type<uint8_t>);  break;
+					case 2:    doCompare(std::in_place_type<uint16_t>); break;
+					case 4:    doCompare(std::in_place_type<uint32_t>); break;
+					case 8:    doCompare(std::in_place_type<uint64_t>); break;
+					case 0x11: doCompare(std::in_place_type<int8_t>);   break;
+					case 0x12: doCompare(std::in_place_type<int16_t>);  break;
+					case 0x14: doCompare(std::in_place_type<int32_t>);  break;
+					case 0x18: doCompare(std::in_place_type<int64_t>);  break;
+					case 0x24: doCompare(std::in_place_type<float>);    break;
+					case 0x28: doCompare(std::in_place_type<double>);   break;
 					default: 
 						return 8;
 				}
