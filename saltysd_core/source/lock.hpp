@@ -69,6 +69,12 @@ namespace LOCK {
 		return ret;
 	}
 
+	uintptr_t getBufferOffset(uint8_t* buffer, ptrdiff_t offset_shift) {
+		uintptr_t buffer_ptr = (uintptr_t)&buffer[offset];
+		offset += offset_shift;
+		return buffer_ptr;
+	}
+
 	template <typename T>
 	void writeValue(T value, uintptr_t address) {
 		memcpy((void*)address, &value, sizeof(T));
@@ -345,54 +351,36 @@ namespace LOCK {
 	}
 
 	Result writeExprTo(double value, uint8_t* buffer, uint16_t* offset_impl, uint8_t value_type) {
-		switch(value_type) {
-			case 1:
-				buffer[*offset_impl] = (uint8_t)value;
+		uint8_t size = value_type % 0x10;
+		union {
+			uint64_t u; 
+			int64_t i; 
+			double d; 
+			float f;
+		} tmp;
+
+		switch (value_type >> 4) {
+			case 0: 
+				tmp.u = (uint64_t)value; 
+				break;
+			case 1: 
+				tmp.i = (int64_t)value;
 				break;
 			case 2:
-				*(uint16_t*)(&buffer[*offset_impl]) = (uint16_t)value;
-				break;
-			case 4:
-				*(uint32_t*)(&buffer[*offset_impl]) = (uint32_t)value;
-				break;
-			case 8:
-				*(uint64_t*)(&buffer[*offset_impl]) = (uint64_t)value;
-				break;
-			case 0x11:
-				*(int8_t*)(&buffer[*offset_impl]) = (int8_t)value;
-				break;
-			case 0x12:
-				*(int16_t*)(&buffer[*offset_impl]) = (int16_t)value;
-				break;
-			case 0x14:
-				*(int32_t*)(&buffer[*offset_impl]) = (int32_t)value;
-				break;
-			case 0x18:
-				*(int64_t*)(&buffer[*offset_impl]) = (int64_t)value;
-				break;
-			case 0x24: {
-				#if defined(SWITCH32) || defined(OUNCE32)
-				//HOS requires from SIMD load/store instructions to have aligned pointers in A32 mode, so we must avoid using VSTR here
-				float new_value = (float)value;
-				memcpy(&buffer[*offset_impl], &new_value, 4);
-				#else
-				*(float*)(&buffer[*offset_impl]) = (float)value;
-				#endif
-				break;
-			}
-			case 0x28:
-			case 0x38:
-				#if defined(SWITCH32) || defined(OUNCE32)
-				//HOS requires from SIMD load/store instructions to have aligned pointers in A32 mode, so we must avoid using VSTR here
-				memcpy(&buffer[*offset_impl], &value, 8);
-				#else
-				*(double*)(&buffer[*offset_impl]) = (double)value;
-				#endif
+				if (size == 4) {
+					tmp.f = (float)value;
+					break;
+				}
+				//Fallthrough
+			case 3:
+				tmp.d = value;
 				break;
 			default:
 				return 4;
 		}
-		*offset_impl += value_type % 0x10;
+
+		memcpy(&buffer[*offset_impl], &tmp, size); //HOS requires from SIMD load/store instructions to have aligned pointers in A32 mode, so we must avoid using VSTR here
+		*offset_impl += size;
 		return 0;
 	}
 	
@@ -578,54 +566,18 @@ namespace LOCK {
 				*/
 				uint8_t value_type = read<uint8_t>(buffer);
 				uint8_t loops = read<uint8_t>(buffer);
-				switch(value_type) {
-					case 1:
-					case 0x11: {
-						if (!address) return 0x3007;
-						for (uint8_t i = 0; i < loops; i++) {
-							*(uint8_t*)address = read<uint8_t>(buffer);
-							address += 1;
-						}
-						break;
-					}
-					case 2:
-					case 0x12: {
-						if (!address) return 0x3007;
-						for (uint8_t i = 0; i < loops; i++) {
-							*(uint16_t*)address = read<uint16_t>(buffer);
-							address += 2;
-						}
-						break;
-					}
-					case 4:
-					case 0x14:
-					case 0x24: {
-						if (!address) return 0x3007;
-						for (uint8_t i = 0; i < loops; i++) {
-							*(uint32_t*)address = read<uint32_t>(buffer);
-							address += 4;
-						}
-						break;
-					}
-					case 8:
-					case 0x18:
-					case 0x28: {
-						if (!address) return 0x3007;
-						for (uint8_t i = 0; i < loops; i++) {
-							*(uint64_t*)address = read<uint64_t>(buffer);
-							address += 8;
-						}
-						break;
-					}
-					case 0x38: {
-						for (uint8_t i = 0; i < loops; i++) {
-							overwriteRefreshRate = read<double>(buffer);
-							address += 8;
-						}
-						break;
-					}		
-					default:
+				if (value_type == 0x38) for (uint8_t i = 0; i < loops; i++) {
+					overwriteRefreshRate = read<double>(buffer);
+				}
+				else {
+					if (!address) return 0x3007;
+					uint8_t member_size = value_type % 0x10;
+					if (member_size > 8 || member_size == 0 || (member_size & (member_size - 1))) 
 						return 3;
+					size_t array_size = member_size * loops;
+					uintptr_t buffer_ptr = getBufferOffset(buffer, array_size);
+					memcpy((void*)address, (void*)buffer_ptr, array_size);
+					address += array_size;
 				}
 			}
 			else if (OPCODE == 2) {
@@ -717,57 +669,21 @@ namespace LOCK {
 					return 6;
 				value_type = read<uint8_t>(buffer);
 				uint8_t loops = read<uint8_t>(buffer);
-				switch(value_type) {
-					case 1:
-					case 0x11: {
-						if (!address) return 0x3007;
-						for (uint8_t i = 0; i < loops; i++) {
-							uint8_t value8 = read<uint8_t>(buffer);
-							if (passed) writeValue(value8, address);
-							address += 1;
-						}
-						break;
+				if (value_type == 0x38) {
+					for (uint8_t i = 0; i < loops; i++) {
+						uint64_t valueDouble = read<uint64_t>(buffer);
+						if (passed) writeValue(valueDouble, (uint64_t)&overwriteRefreshRate);
 					}
-					case 2:
-					case 0x12: {
-						if (!address) return 0x3007;
-						for (uint8_t i = 0; i < loops; i++) {
-							uint16_t value16 = read<uint16_t>(buffer);
-							if (passed) writeValue(value16, address);
-							address += 2;
-						}
-						break;
-					}
-					case 4:
-					case 0x14:
-					case 0x24: {
-						if (!address) return 0x3007;
-						for (uint8_t i = 0; i < loops; i++) {
-							uint32_t value32 = read<uint32_t>(buffer);
-							if (passed) writeValue(value32, address);
-							address += 4;
-						}
-						break;
-					}
-					case 8:
-					case 0x18:
-					case 0x28: {
-						if (!address) return 0x3007;
-						for (uint8_t i = 0; i < loops; i++) {
-							uint64_t value64 = read<uint64_t>(buffer);
-							if (passed) writeValue(value64, address);
-							address += 8;
-						}
-						break;
-					}
-					case 0x38:
-						for (uint8_t i = 0; i < loops; i++) {
-							uint64_t valueDouble = read<uint64_t>(buffer);
-							if (passed) writeValue(valueDouble, (uint64_t)&overwriteRefreshRate);
-						}
-						break;						
-					default:
+				}
+				else {
+					if (!address) return 0x3007;
+					uint8_t member_size = value_type % 0x10;
+					if (member_size > 8 || member_size == 0 || (member_size & (member_size - 1))) 
 						return 9;
+					size_t array_size = member_size * loops;
+					uintptr_t buffer_ptr = getBufferOffset(buffer, array_size);
+					if (passed) memcpy((void*)address, (void*)buffer_ptr, array_size);
+					address += array_size;
 				}
 			}
 			else if (OPCODE == 3) {
