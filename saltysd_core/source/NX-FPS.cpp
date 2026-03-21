@@ -340,7 +340,7 @@ namespace nn {
 		if (!bytesRead)
 			bytesRead = &bytesRead_impl;
 		Result ret = ((FileAccessorRead_0)(Address_weaks.FileAccessorRead))(fileHandle, bytesRead, position, buffer, readBytes, ReadOption);
-		if (__builtin_expect(R_SUCCEEDED(ret), 1)) fileBytesRead += *bytesRead;
+		if (__builtin_expect(R_SUCCEEDED(ret), true)) fileBytesRead += *bytesRead;
 		return ret;
 	}
 
@@ -349,7 +349,7 @@ namespace nn {
 		if (!bytesRead)
 			bytesRead = &bytesRead_impl;
 		Result ret = ((FileAccessorReadCache_0)(Address_weaks.FileAccessorReadCache))(fileHandle, bytesRead, position, buffer, readBytes, ReadOption, FileDataCacheAccessResult);
-		if (__builtin_expect(R_SUCCEEDED(ret), 1)) fileBytesRead += *bytesRead;
+		if (__builtin_expect(R_SUCCEEDED(ret), true)) fileBytesRead += *bytesRead;
 		return ret;
 	}
 
