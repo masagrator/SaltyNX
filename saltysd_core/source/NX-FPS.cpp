@@ -8,132 +8,6 @@
 #include <algorithm>
 #include "nanoprintf.h"
 
-struct NVNTexture {
-	char reserved[0x80];
-};
-
-struct NVNTextureView {
-	char reserved[0x40];
-};
-
-struct NVNTextureBuilder {
-	char reserved[0x80];
-};
-
-struct NVNWindow {
-	char reserved[0x180];
-};
-
-struct NVNDevice {
-	char reserved[0x3000];
-};
-
-struct nvnWindowBuilder {
-	const char reserved[16];
-	uint8_t numBufferedFrames;
-};
-
-typedef int NVNtextureFlags;
-typedef int NVNtextureTarget;
-typedef int NVNformat;
-typedef int NVNmemoryPoolFlags;
-
-struct NVNViewport {
-	float x;
-	float y;
-	float width;
-	float height;
-};
-
-struct NVNScissor {
-	int x;
-	int y;
-	int width;
-	int height;
-};
-
-struct VkViewport {
-	float    x;
-	float    y;
-	float    width;
-	float    height;
-	float    minDepth;
-	float    maxDepth;
-};
-
-struct VkRect2D {
-	int32_t    x;
-	int32_t    y;
-	uint32_t    width;
-	uint32_t    height;
-};
-
-struct glViewportArray {
-	float x;
-	float y;
-	float width;
-	float height;
-};
-
-typedef struct VkSwapchainCreateInfoKHR {
-	int          sType;
-	const void*  pNext;
-	int          flags;
-	void*        surface;
-	uint32_t     minImageCount;
-} VkSwapchainCreateInfoKHR;
-
-typedef uintptr_t (*nvnBootstrapLoader_0)(const char * nvnName);
-typedef u16 (*nvnTextureGetWidth_0)(const NVNTexture* texture);
-typedef u16 (*nvnTextureGetHeight_0)(const NVNTexture* texture);
-typedef u32 (*nvnTextureGetFormat_0)(const NVNTexture* texture);
-typedef void* (*nvnCommandBufferSetRenderTargets_0)(const void* cmdBuf, int numTextures, const NVNTexture** texture, const NVNTextureView** textureView, const NVNTexture* depth, const NVNTextureView* depthView);
-typedef void* (*nvnCommandBufferSetViewport_0)(const void* cmdBuf, int x, int y, int width, int height);
-typedef void* (*nvnCommandBufferSetViewports_0)(void* cmdBuf, int start, int count, const NVNViewport* viewports);
-typedef void* (*nvnCommandBufferSetScissor_0)(const void* cmdBuf, int x, int y, int width, int height);
-typedef void* (*nvnCommandBufferSetScissors_0)(void* cmdBuf, int start, int count, const NVNScissor* viewports);
-typedef void* (*nvnCommandBufferSetDepthRange_0)(void* cmdBuf, float s0, float s1);
-typedef void (*nvnQueuePresentTexture_0)(const void* _this, const void* unk2_1, int index);
-typedef uintptr_t (*GetProcAddress)(const void* unk1_a, const char * nvnFunction_a);
-typedef void (*nvnBuilderSetTextures_0)(const nvnWindowBuilder* nvnWindowBuilder, int buffers, const NVNTexture** texturesBuffer);
-typedef void (*nvnWindowSetNumActiveTextures_0)(const NVNWindow* nvnWindow, int buffers);
-typedef int (*nvnWindowGetNumActiveTextures_0)(const NVNWindow* nvnWindow);
-typedef bool (*nvnWindowInitialize_0)(const NVNWindow* nvnWindow, struct nvnWindowBuilder* windowBuilder);
-typedef void* (*nvnWindowAcquireTexture_0)(const NVNWindow* nvnWindow, const void* nvnSync, const void* index);
-typedef void (*nvnSetPresentInterval_0)(const NVNWindow* nvnWindow, int mode);
-typedef int (*nvnGetPresentInterval_0)(const NVNWindow* nvnWindow);
-typedef void* (*nvnSyncWait_0)(const void* _this, uint64_t timeout_ns);
-typedef void (*nvnQueueFinish_0)(const void* nvnQueue);
-
-typedef bool (*eglSwapBuffers_0)(const void* EGLDisplay, const void* EGLSurface);
-typedef bool (*eglSwapInterval_0)(const void* EGLDisplay, int interval);
-typedef void (*glViewport_0)(int x, int y, uint width, uint height);
-typedef void (*glViewportArrayv_0)(uint firstViewport, uint viewportCount, const glViewportArray* pViewports);
-typedef void (*glViewportIndexedf_0)(uint index, float x, float y, float width, float height);
-typedef void (*glViewportIndexedfv_0)(uint index, const glViewportArray* pViewports);
-typedef u64 (*eglGetProcAddress_0)(const char* eglName);
-
-typedef void* (*_vkGetInstanceProcAddr_0)(void* instance, const char* vkFunction);
-typedef void* (*vkGetDeviceProcAddr_0)(void* device, const char* vkFunction);
-typedef void (*vkCmdSetViewport_0)(void* commandBuffer, uint32_t firstViewport, uint32_t viewportCount, const VkViewport* pViewports);
-typedef void (*vkCmdSetViewportWithCount_0)(void* commandBuffer, uint32_t viewportCount, const VkViewport* pViewports);
-typedef void (*vkCmdSetScissor_0)(void* commandBuffer, uint32_t firstScissor, uint32_t scissorCount, const VkRect2D* pScissors);
-typedef void (*vkCmdSetScissorWithCount_0)(void* commandBuffer, uint32_t scissorCount, const VkRect2D* pScissors);
-typedef s32 (*vkCreateSwapchainKHR_0)(void* Device, const VkSwapchainCreateInfoKHR* pCreateInfo, const void* pAllocator, const void** pSwapchain);
-typedef s32 (*vkGetSwapchainImagesKHR_0)(void* Device, void* VkSwapchainKHR, uint32_t* pSwapchainImageCount, int** pSwapchainImages);
-typedef s32 (*vkQueuePresentKHR_0)(const void* vkQueue, const void* VkPresentInfoKHR);
-
-typedef void (*SetFocusHandlingMode_0)(AppletFocusHandlingMode mode);
-typedef u32 (*FileAccessorRead_0)(void* fileHandle, size_t* bytesRead, int64_t position, void* buffer, size_t readBytes, unsigned int* ReadOption);
-typedef u32 (*FileAccessorReadCache_0)(void* fileHandle, size_t* bytesRead, int64_t position, void* buffer, size_t readBytes, unsigned int* ReadOption, void* FileDataCacheAccessResult);
-typedef u64 (*_ZN2nn2os17ConvertToTimeSpanENS0_4TickE_0)(u64 tick);
-typedef u64 (*_ZN2nn2os13GetSystemTickEv_0)();
-typedef u32 (*nnroLookupSymbol_0)(uintptr_t* pOutAddress, const char* name);
-typedef void (*_ZN2nn2os13GetSystemTickEv_1)(u64* tick);
-typedef u64 (*_ZN2nn2os22GetSystemTickFrequencyEv_0)();
-typedef void (*_ZN2nn2os22GetSystemTickFrequencyEv_1)(u64* tickfrequency);
-typedef u32 (*SetUserInactivityDetectionTimeExtended_0)(bool isTrue);
-
 struct {
 	uintptr_t nvnBootstrapLoader;
 
@@ -204,38 +78,6 @@ size_t configSize = 0;
 Result configRC = 1;
 
 static uint32_t* sharedOperationMode = 0;
-
-Result readConfig(const char* path, uint8_t** output_buffer) {
-	FILE* patch_file = SaltySDCore_fopen(path, "rb");
-	SaltySDCore_fseek(patch_file, 0, 2);
-	configSize = SaltySDCore_ftell(patch_file);
-	SaltySDCore_fseek(patch_file, 8, 0);
-	uint32_t header_size = 0;
-	SaltySDCore_fread(&header_size, 0x4, 1, patch_file);
-	uint8_t* buffer = (uint8_t*)calloc(1, header_size);
-	SaltySDCore_fseek(patch_file, 0, 0);
-	SaltySDCore_fread(buffer, header_size, 1, patch_file);
-	if (SaltySDCore_ftell(patch_file) != header_size || !LOCK::isValid(buffer, header_size)) {
-		SaltySDCore_fclose(patch_file);
-		free(buffer);
-		return 0x1201;
-	}
-	if (LOCK::masterWrite) {
-		Result ret = LOCK::applyMasterWrite(patch_file, header_size - 4);
-		if (R_FAILED(ret))  {
-			SaltySDCore_fclose(patch_file);
-			return ret;
-		}
-		configSize = *(uint32_t*)(&(buffer[header_size - 4]));
-	}
-	free(buffer);
-	buffer = (uint8_t*)calloc(1, configSize);
-	SaltySDCore_fseek(patch_file, 0, 0);
-	SaltySDCore_fread(buffer, configSize, 1, patch_file);
-	SaltySDCore_fclose(patch_file);
-	*output_buffer = buffer;
-	return 0;
-}
 
 struct resolutionCalls {
 	uint16_t width;
@@ -318,23 +160,17 @@ enum {
 
 std::pair<int, int> last_viewport = {0, 0};
 
-inline uintptr_t getMainAddress() {
-	MemoryInfo memoryinfo = {0};
-	u32 pageinfo = 0;
-
-	uintptr_t base_address = SaltySDCore_getCodeStart() + 0x4000;
-	for (size_t i = 0; i < 3; i++) {
-		Result rc = svcQueryMemory(&memoryinfo, &pageinfo, base_address);
-		if (R_FAILED(rc)) return 0;
-		if ((memoryinfo.addr == base_address) && (memoryinfo.perm & Perm_X))
-			return base_address;
-		base_address = memoryinfo.addr+memoryinfo.size;
-	}
-
-	return 0;
-}
-
 namespace nn {
+
+	typedef void (*SetFocusHandlingMode_0)(AppletFocusHandlingMode mode);
+	typedef u32 (*FileAccessorRead_0)(void* fileHandle, size_t* bytesRead, int64_t position, void* buffer, size_t readBytes, unsigned int* ReadOption);
+	typedef u32 (*FileAccessorReadCache_0)(void* fileHandle, size_t* bytesRead, int64_t position, void* buffer, size_t readBytes, unsigned int* ReadOption, void* FileDataCacheAccessResult);
+	typedef u64 (*_ZN2nn2os17ConvertToTimeSpanENS0_4TickE_0)(u64 tick);
+	typedef u32 (*roLookupSymbol_0)(uintptr_t* pOutAddress, const char* name);
+	typedef u64 (*_ZN2nn2os22GetSystemTickFrequencyEv_0)();
+	typedef void (*_ZN2nn2os22GetSystemTickFrequencyEv_1)(u64* tickfrequency);
+	typedef u32 (*SetUserInactivityDetectionTimeExtended_0)(bool isTrue);
+
 	Result FileAccessorRead(void* fileHandle, size_t* bytesRead, int64_t position, void* buffer, size_t readBytes, unsigned int* ReadOption) {
 		size_t bytesRead_impl;
 		if (!bytesRead)
@@ -374,6 +210,10 @@ namespace nn {
 }
 
 namespace Utils {
+
+	typedef u64 (*_ZN2nn2os13GetSystemTickEv_0)();
+	typedef void (*_ZN2nn2os13GetSystemTickEv_1)(u64* tick);
+
 	inline uint64_t _getSystemTick() {
 		#if defined(SWITCH) || defined(OUNCE)
 			return armGetSystemTick();
@@ -394,6 +234,54 @@ namespace Utils {
 		#else
 			return uint64_t((double)tick / ((double)(systemtickfrequency) / 1000000000.d));
 		#endif
+	}
+
+	inline uintptr_t getMainAddress() {
+		MemoryInfo memoryinfo = {0};
+		u32 pageinfo = 0;
+
+		uintptr_t base_address = SaltySDCore_getCodeStart() + 0x4000;
+		for (size_t i = 0; i < 3; i++) {
+			Result rc = svcQueryMemory(&memoryinfo, &pageinfo, base_address);
+			if (R_FAILED(rc)) return 0;
+			if ((memoryinfo.addr == base_address) && (memoryinfo.perm & Perm_X))
+				return base_address;
+			base_address = memoryinfo.addr+memoryinfo.size;
+		}
+
+		return 0;
+	}
+
+	Result readConfig(const char* path, uint8_t** output_buffer) {
+		FILE* patch_file = SaltySDCore_fopen(path, "rb");
+		SaltySDCore_fseek(patch_file, 0, 2);
+		configSize = SaltySDCore_ftell(patch_file);
+		SaltySDCore_fseek(patch_file, 8, 0);
+		uint32_t header_size = 0;
+		SaltySDCore_fread(&header_size, 0x4, 1, patch_file);
+		uint8_t* buffer = (uint8_t*)calloc(1, header_size);
+		SaltySDCore_fseek(patch_file, 0, 0);
+		SaltySDCore_fread(buffer, header_size, 1, patch_file);
+		if (SaltySDCore_ftell(patch_file) != header_size || !LOCK::isValid(buffer, header_size)) {
+			SaltySDCore_fclose(patch_file);
+			free(buffer);
+			return 0x1201;
+		}
+		if (LOCK::masterWrite) {
+			Result ret = LOCK::applyMasterWrite(patch_file, header_size - 4);
+			if (R_FAILED(ret))  {
+				SaltySDCore_fclose(patch_file);
+				return ret;
+			}
+			configSize = *(uint32_t*)(&(buffer[header_size - 4]));
+		}
+		free(buffer);
+		buffer = (uint8_t*)calloc(1, configSize);
+		SaltySDCore_fseek(patch_file, 0, 0);
+		SaltySDCore_fread(buffer, configSize, 1, patch_file);
+		SaltySDCore_fclose(patch_file);
+		*output_buffer = buffer;
+		return 0;
 	}
 }
 
@@ -575,6 +463,40 @@ namespace NX_FPS_Math {
 }
 
 namespace vk {
+
+	struct VkViewport {
+		float    x;
+		float    y;
+		float    width;
+		float    height;
+		float    minDepth;
+		float    maxDepth;
+	};
+
+	struct VkRect2D {
+		int32_t    x;
+		int32_t    y;
+		uint32_t    width;
+		uint32_t    height;
+	};
+
+	typedef struct VkSwapchainCreateInfoKHR {
+		int          sType;
+		const void*  pNext;
+		int          flags;
+		void*        surface;
+		uint32_t     minImageCount;
+	} VkSwapchainCreateInfoKHR;
+
+	typedef void* (*_vkGetInstanceProcAddr_0)(void* instance, const char* vkFunction);
+	typedef void* (*vkGetDeviceProcAddr_0)(void* device, const char* vkFunction);
+	typedef void (*vkCmdSetViewport_0)(void* commandBuffer, uint32_t firstViewport, uint32_t viewportCount, const VkViewport* pViewports);
+	typedef void (*vkCmdSetViewportWithCount_0)(void* commandBuffer, uint32_t viewportCount, const VkViewport* pViewports);
+	typedef void (*vkCmdSetScissor_0)(void* commandBuffer, uint32_t firstScissor, uint32_t scissorCount, const VkRect2D* pScissors);
+	typedef void (*vkCmdSetScissorWithCount_0)(void* commandBuffer, uint32_t scissorCount, const VkRect2D* pScissors);
+	typedef s32 (*vkCreateSwapchainKHR_0)(void* Device, const VkSwapchainCreateInfoKHR* pCreateInfo, const void* pAllocator, const void** pSwapchain);
+	typedef s32 (*vkGetSwapchainImagesKHR_0)(void* Device, void* VkSwapchainKHR, uint32_t* pSwapchainImageCount, int** pSwapchainImages);
+	typedef s32 (*vkQueuePresentKHR_0)(const void* vkQueue, const void* VkPresentInfoKHR);
 
 	int32_t QueuePresent (const void* VkQueue, const void* VkPresentInfoKHR);
 	int32_t CreateSwapchain(void* Device, VkSwapchainCreateInfoKHR* pCreateInfo, const void* pAllocator, const void** pSwapchain);
@@ -772,17 +694,17 @@ namespace vk {
 	u32 LookupSymbol(uintptr_t* pOutAddress, const char* name) {
 		if (!strcmp("vkGetInstanceProcAddr", name)) {
 			if (!Address_weaks.vkGetInstanceProcAddr)
-				((nnroLookupSymbol_0)(Address_weaks.LookupSymbol))(&Address_weaks.vkGetInstanceProcAddr, name);
+				((nn::roLookupSymbol_0)(Address_weaks.LookupSymbol))(&Address_weaks.vkGetInstanceProcAddr, name);
 			*pOutAddress = (uintptr_t)&GetInstanceProcAddr;
 			return 0;
 		}
 		if (!strcmp("vkGetDeviceProcAddr", name)) {
 			if (!Address_weaks.vkGetDeviceProcAddr)
-				((nnroLookupSymbol_0)(Address_weaks.LookupSymbol))(&Address_weaks.vkGetDeviceProcAddr, name);
+				((nn::roLookupSymbol_0)(Address_weaks.LookupSymbol))(&Address_weaks.vkGetDeviceProcAddr, name);
 			*pOutAddress = (uintptr_t)&GetDeviceProcAddr;
 			return 0;
 		}
-		return ((nnroLookupSymbol_0)(Address_weaks.LookupSymbol))(pOutAddress, name);
+		return ((nn::roLookupSymbol_0)(Address_weaks.LookupSymbol))(pOutAddress, name);
 	}
 }
 
@@ -790,6 +712,21 @@ namespace EGL {
 
 	#define EGL_MIN_SWAP_INTERVAL 0
 	#define EGL_MAX_SWAP_INTERVAL 4
+
+	struct glViewportArray {
+		float x;
+		float y;
+		float width;
+		float height;
+	};
+
+	typedef bool (*eglSwapBuffers_0)(const void* EGLDisplay, const void* EGLSurface);
+	typedef bool (*eglSwapInterval_0)(const void* EGLDisplay, int interval);
+	typedef void (*glViewport_0)(int x, int y, uint width, uint height);
+	typedef void (*glViewportArrayv_0)(uint firstViewport, uint viewportCount, const glViewportArray* pViewports);
+	typedef void (*glViewportIndexedf_0)(uint index, float x, float y, float width, float height);
+	typedef void (*glViewportIndexedfv_0)(uint index, const glViewportArray* pViewports);
+	typedef u64 (*eglGetProcAddress_0)(const char* eglName);
 
 	bool Interval(const void* EGLDisplay, int interval) {
 		bool result = false;
@@ -838,38 +775,21 @@ namespace EGL {
 			auto currentRefreshRate = (Shared -> currentRefreshRate);
 			NX_FPS_Math::FPSlock = ((*sharedOperationMode == 1) ? (Shared -> FPSlockedDocked) : (Shared -> FPSlocked));
 			auto FPSmode = (Shared -> FPSmode);
-			if (new_fpslock <= (currentRefreshRate ? (currentRefreshRate / 4) : 15)) {
-				if (FPSmode != 4)
-					EGL::Interval(EGLDisplay, -4);
-				if (new_fpslock != (currentRefreshRate ? (currentRefreshRate / 4) : 15)) {
-					NX_FPS_Math::FPStiming = (systemtickfrequency/new_fpslock) - 6000;
-				}
-				else NX_FPS_Math::FPStiming = 0;			
+			const uint32_t rr = currentRefreshRate ? currentRefreshRate : 60;
+			uint32_t threshold;
+			int interval;
+			if      (new_fpslock <= rr / 4) {interval = 4; threshold = rr / 4;}
+			else if (new_fpslock <= rr / 3) {interval = 3; threshold = rr / 3;}
+			else if (new_fpslock <= rr / 2) {interval = 2; threshold = rr / 2;}
+			else                            {interval = 1; threshold = rr;    }
+
+			if (FPSmode != interval) {
+				EGL::Interval(EGLDisplay, interval * -1);
 			}
-			else if (new_fpslock <= (currentRefreshRate ? (currentRefreshRate / 3) : 20)) {
-				if (FPSmode != 3)
-					EGL::Interval(EGLDisplay, -3);
-				if (new_fpslock != (currentRefreshRate ? (currentRefreshRate / 3) : 20)) {
-					NX_FPS_Math::FPStiming = (systemtickfrequency/new_fpslock) - 6000;
-				}
-				else NX_FPS_Math::FPStiming = 0;			
+			if (new_fpslock != threshold) {
+				NX_FPS_Math::FPStiming = (systemtickfrequency/new_fpslock) - 6000;
 			}
-			else if (new_fpslock <= (currentRefreshRate ? (currentRefreshRate / 2) : 30)) {
-				if (FPSmode != 2)
-					EGL::Interval(EGLDisplay, -2);
-				if (new_fpslock != (currentRefreshRate ? (currentRefreshRate / 2) : 30)) {
-					NX_FPS_Math::FPStiming = (systemtickfrequency/new_fpslock) - 6000;
-				}
-				else NX_FPS_Math::FPStiming = 0;			
-			}
-			else if (new_fpslock > (currentRefreshRate ? (currentRefreshRate / 2) : 30)) {
-				if (FPSmode != 1)
-					EGL::Interval(EGLDisplay, -1);
-				if (new_fpslock != (currentRefreshRate ? currentRefreshRate : 60)) {
-					NX_FPS_Math::FPStiming = (systemtickfrequency/new_fpslock) - 6000;
-				}
-				else NX_FPS_Math::FPStiming = 0;
-			}
+			else NX_FPS_Math::FPStiming = 0;
 		}
 
 		return result;
@@ -1004,8 +924,71 @@ namespace NVN {
 
 	void* WindowSync = 0;
 
-	bool WindowInitialize(const NVNWindow* nvnWindow, struct nvnWindowBuilder* windowBuilder) {
-		if (!(Shared -> Buffers)) {
+	struct Texture {
+		char reserved[0x80];
+	};
+	struct TextureView {
+		char reserved[0x40];
+	};
+	struct TextureBuilder {
+		char reserved[0x80];
+	};
+	struct Window {
+		char reserved[0x180];
+	};
+	struct Device {
+		char reserved[0x3000];
+	};
+	struct CommandBuffer {
+		char reserved[0x80];
+	};
+
+	struct WindowBuilder {
+		const char reserved[16];
+		uint8_t numBufferedFrames;
+	};
+	struct Viewport {
+		float x;
+		float y;
+		float width;
+		float height;
+	};
+	struct Scissor {
+		int x;
+		int y;
+		int width;
+		int height;
+	};
+
+	typedef int textureFlags;
+	typedef int textureTarget;
+	typedef int textureFormat;
+	typedef int memoryPoolFlags;
+
+	typedef uintptr_t (*nvnBootstrapLoader_0)(const char * nvnName);
+	typedef u16 (*nvnTextureGetWidth_0)(const Texture* texture);
+	typedef u16 (*nvnTextureGetHeight_0)(const Texture* texture);
+	typedef u32 (*nvnTextureGetFormat_0)(const Texture* texture);
+	typedef void* (*nvnCommandBufferSetRenderTargets_0)(const void* cmdBuf, int numTextures, const Texture** texture, const TextureView** textureView, const Texture* depth, const TextureView* depthView);
+	typedef void* (*nvnCommandBufferSetViewport_0)(const void* cmdBuf, int x, int y, int width, int height);
+	typedef void* (*nvnCommandBufferSetViewports_0)(void* cmdBuf, int start, int count, const Viewport* viewports);
+	typedef void* (*nvnCommandBufferSetScissor_0)(const void* cmdBuf, int x, int y, int width, int height);
+	typedef void* (*nvnCommandBufferSetScissors_0)(void* cmdBuf, int start, int count, const Scissor* viewports);
+	typedef void* (*nvnCommandBufferSetDepthRange_0)(void* cmdBuf, float s0, float s1);
+	typedef void (*nvnQueuePresentTexture_0)(const void* _this, const void* unk2_1, int index);
+	typedef uintptr_t (*GetProcAddress)(const void* unk1_a, const char * nvnFunction_a);
+	typedef void (*nvnBuilderSetTextures_0)(const WindowBuilder* nvnWindowBuilder, int buffers, const Texture** texturesBuffer);
+	typedef void (*nvnWindowSetNumActiveTextures_0)(const Window* nvnWindow, int buffers);
+	typedef int (*nvnWindowGetNumActiveTextures_0)(const Window* nvnWindow);
+	typedef bool (*nvnWindowInitialize_0)(const Window* nvnWindow, struct WindowBuilder* windowBuilder);
+	typedef void* (*nvnWindowAcquireTexture_0)(const Window* nvnWindow, const void* nvnSync, const void* index);
+	typedef void (*nvnSetPresentInterval_0)(const Window* nvnWindow, int mode);
+	typedef int (*nvnGetPresentInterval_0)(const Window* nvnWindow);
+	typedef void* (*nvnSyncWait_0)(const void* _this, uint64_t timeout_ns);
+	typedef void (*nvnQueueFinish_0)(const void* nvnQueue);
+
+	bool WindowInitialize(const Window* nvnWindow, struct WindowBuilder* windowBuilder) {
+		if (Shared->Buffers == 0) {
 			(Shared -> Buffers) = windowBuilder -> numBufferedFrames;
 			if ((Shared -> SetBuffers) >= 2 && (Shared -> SetBuffers) <= windowBuilder -> numBufferedFrames) {
 				windowBuilder -> numBufferedFrames = (Shared -> SetBuffers);
@@ -1015,7 +998,7 @@ namespace NVN {
 		return ((nvnWindowInitialize_0)(Address_weaks.nvnWindowInitialize))(nvnWindow, windowBuilder);
 	}
 
-	void WindowBuilderSetTextures(const nvnWindowBuilder* nvnWindowBuilder, int numBufferedFrames, const NVNTexture** nvnTextures) {
+	void WindowBuilderSetTextures(const WindowBuilder* nvnWindowBuilder, int numBufferedFrames, const Texture** nvnTextures) {
 		(Shared -> Buffers) = numBufferedFrames;
 		amountOfAvailableBuffers = numBufferedFrames;
 		if ((Shared -> SetBuffers) >= 2 && (Shared -> SetBuffers) <= numBufferedFrames) {
@@ -1026,7 +1009,7 @@ namespace NVN {
 		return ((nvnBuilderSetTextures_0)(Address_weaks.nvnWindowBuilderSetTextures))(nvnWindowBuilder, numBufferedFrames, nvnTextures);
 	}
 
-	void WindowSetNumActiveTextures(const NVNWindow* nvnWindow, int numBufferedFrames) {
+	void WindowSetNumActiveTextures(const Window* nvnWindow, int numBufferedFrames) {
 		if (numBufferedFrames < 0) {
 			numBufferedFrames *= -1;
 			((nvnWindowSetNumActiveTextures_0)(Address_weaks.nvnWindowSetNumActiveTextures))(nvnWindow, numBufferedFrames);
@@ -1043,7 +1026,7 @@ namespace NVN {
 		return ((nvnWindowSetNumActiveTextures_0)(Address_weaks.nvnWindowSetNumActiveTextures))(nvnWindow, numBufferedFrames);
 	}
 
-	void SetPresentInterval(const NVNWindow* nvnWindow, int mode) {
+	void SetPresentInterval(const Window* nvnWindow, int mode) {
 		if (mode < 0) {
 			mode *= -1;
 			if ((Shared -> FPSmode) != mode) {
@@ -1061,9 +1044,9 @@ namespace NVN {
 	}
 
 	void* SyncWait0(const void* _this, uint64_t timeout_ns) {
-		uint64_t endFrameTick = Utils::_getSystemTick();
 		if (_this == WindowSync && (Shared -> ActiveBuffers) == 2) {
 			if ((Shared -> ZeroSync) == ZeroSyncType_Semi) {
+				uint64_t endFrameTick = Utils::_getSystemTick();
 				u64 FrameTarget = (systemtickfrequency/60) - 8000;
 				s64 new_timeout = (FrameTarget - (endFrameTick - startFrameTick)) - (systemtickfrequency / 1000);
 				if (((*sharedOperationMode == 1) ? (Shared -> FPSlockedDocked) : (Shared -> FPSlocked)) == 60) {
@@ -1080,7 +1063,7 @@ namespace NVN {
 		return ((nvnSyncWait_0)(Address_weaks.nvnSyncWait))(_this, timeout_ns);
 	}
 
-	void PresentTexture(const void* _this, const NVNWindow* nvnWindow, int index) {
+	void PresentTexture(const void* _this, const Window* nvnWindow, int index) {
 
 		//Initialize time calculation;
 		if (__builtin_expect(!NX_FPS_Math::starttick, 0)) {
@@ -1115,62 +1098,32 @@ namespace NVN {
 			changeFPS = true;
 			auto currentRefreshRate = (Shared -> currentRefreshRate);
 			NX_FPS_Math::FPSlock = ((*sharedOperationMode == 1) ? (Shared -> FPSlockedDocked) : (Shared -> FPSlocked));
-			if (new_fpslock <= (currentRefreshRate ? (currentRefreshRate / 4) : 15)) {
-				if (nvnInterval != 4)
-					NVN::SetPresentInterval(nvnWindow, -4);
-				if ((new_fpslock != (currentRefreshRate ? (currentRefreshRate / 4) : 15))
-				|| (Shared -> ZeroSync)) {
-					NX_FPS_Math::FPStiming = (systemtickfrequency/new_fpslock) - 6000;
-					if (new_fpslock == (currentRefreshRate ? (currentRefreshRate / 4) : 15)) {
-						NX_FPS_Math::FPStiming -= 2000;
-					}
-				}
-				else NX_FPS_Math::FPStiming = 0;			
-			}
-			else if (new_fpslock <= (currentRefreshRate ? (currentRefreshRate / 3) : 20)) {
-				if (nvnInterval != 3)
-					NVN::SetPresentInterval(nvnWindow, -3);
-				if ((new_fpslock != (currentRefreshRate ? (currentRefreshRate / 3) : 20))
-				|| (Shared -> ZeroSync)) {
-					NX_FPS_Math::FPStiming = (systemtickfrequency/new_fpslock) - 6000;
-					if (new_fpslock == (currentRefreshRate ? (currentRefreshRate / 3) : 20)) {
-						NX_FPS_Math::FPStiming -= 2000;
-					}
-				}
-				else NX_FPS_Math::FPStiming = 0;			
-			}
-			else if (new_fpslock <= (currentRefreshRate ? (currentRefreshRate / 2) : 30)) {
-				if (nvnInterval != 2)
-					NVN::SetPresentInterval(nvnWindow, -2);
-				if (new_fpslock != (currentRefreshRate ? (currentRefreshRate / 2) : 30)
-				|| (Shared -> ZeroSync)) {
-					NX_FPS_Math::FPStiming = (systemtickfrequency/new_fpslock) - 6000;
-					if (new_fpslock == (currentRefreshRate ? (currentRefreshRate / 2) : 30)) {
-						NX_FPS_Math::FPStiming -= 2000;
-					}
-				}
-				else NX_FPS_Math::FPStiming = 0;			
-			}
-			else if (new_fpslock > (currentRefreshRate ? (currentRefreshRate / 2) : 30)) {
-				if (nvnInterval != 1) {
+			const uint32_t rr = currentRefreshRate ? currentRefreshRate : 60;
+			uint32_t threshold;
+			int interval;
+			if      (new_fpslock <= rr / 4) {interval = 4; threshold = rr / 4;}
+			else if (new_fpslock <= rr / 3) {interval = 3; threshold = rr / 3;}
+			else if (new_fpslock <= rr / 2) {interval = 2; threshold = rr / 2;}
+			else                            {interval = 1; threshold = rr;    }
+
+			if (nvnInterval != interval) {
+				if (interval == 1)
 					NVN::SetPresentInterval(nvnWindow, -2); //This allows in game with glitched interval to unlock 60 FPS, f.e. WRC Generations
-					NVN::SetPresentInterval(nvnWindow, -1);
-				}
-				if ((new_fpslock != (currentRefreshRate ? currentRefreshRate : 60))
-				|| (Shared -> ZeroSync)) {
-					NX_FPS_Math::FPStiming = (systemtickfrequency/new_fpslock) - 6000;
-					if (new_fpslock == (currentRefreshRate ? currentRefreshRate : 60)) {
-						NX_FPS_Math::FPStiming -= 2000;
-					}
-				}
-				else NX_FPS_Math::FPStiming = 0;
+				NVN::SetPresentInterval(nvnWindow, interval * -1);
 			}
+
+			if (new_fpslock != threshold || Shared->ZeroSync) {
+				NX_FPS_Math::FPStiming = (systemtickfrequency / new_fpslock) - 6000;
+				if (new_fpslock == threshold)
+					NX_FPS_Math::FPStiming -= 2000;
+			} 
+			else NX_FPS_Math::FPStiming = 0;
 		}
 		
 		return;
 	}
 
-	void* AcquireTexture(const NVNWindow* nvnWindow, const void* nvnSync, const int* index) {
+	void* AcquireTexture(const Window* nvnWindow, const void* nvnSync, const int* index) {
 		if (WindowSync != nvnSync) {
 			WindowSync = (void*)nvnSync;
 		}
@@ -1179,11 +1132,7 @@ namespace NVN {
 		return ret;
 	}
 
-	struct nvnCommandBuffer {
-		char reserved[0x80];
-	};
-
-	void* CommandBufferSetViewports(nvnCommandBuffer* cmdBuf, int start, int count, const NVNViewport* viewports) {
+	void* CommandBufferSetViewports(CommandBuffer* cmdBuf, int start, int count, const Viewport* viewports) {
 		if (resolutionLookup) for (int i = start; i < start+count; i++) {
 			if (viewports[i].height > 1.f && viewports[i].width > 1.f && viewports[i].x == 0.f && viewports[i].y == 0.f) {
 				NX_FPS_Math::addResToViewports(viewports[i].width, viewports[i].height);
@@ -1193,15 +1142,15 @@ namespace NVN {
 		return ((nvnCommandBufferSetViewports_0)(Address_weaks.nvnCommandBufferSetViewports))(cmdBuf, start, count, viewports);
 	}
 
-	void* CommandBufferSetViewport(const nvnCommandBuffer* cmdBuf, int x, int y, int width, int height) {
-		if (resolutionLookup && height > 1 && width > 1 && !x && !y) {
+	void* CommandBufferSetViewport(const CommandBuffer* cmdBuf, int x, int y, int width, int height) {
+		if (!x && !y && height > 1 && width > 1 && resolutionLookup) {
 			NX_FPS_Math::addResToViewports(width, height);
 				last_viewport = {width, height};
 		}
 		return ((nvnCommandBufferSetViewport_0)(Address_weaks.nvnCommandBufferSetViewport))(cmdBuf, x, y, width, height);
 	}
 
-	void* CommandBufferSetScissors(nvnCommandBuffer* cmdBuf, int start, int count, const NVNScissor* viewports) {
+	void* CommandBufferSetScissors(CommandBuffer* cmdBuf, int start, int count, const Scissor* viewports) {
 		if (resolutionLookup) for (int i = start; i < start+count; i++) {
 			if (viewports[i].height > 1 && viewports[i].width > 1 && viewports[i].x == 0 && viewports[i].y == 0 && viewports[i].height != last_viewport.second && viewports[i].width != last_viewport.first) {
 				NX_FPS_Math::addResToViewports(viewports[i].width, viewports[i].height);
@@ -1210,28 +1159,26 @@ namespace NVN {
 		return ((nvnCommandBufferSetScissors_0)(Address_weaks.nvnCommandBufferSetScissors))(cmdBuf, start, count, viewports);
 	}
 
-	void* CommandBufferSetScissor(const nvnCommandBuffer* cmdBuf, int x, int y, int width, int height) {
-		if (resolutionLookup && height > 1 && width > 1 && !x && !y && width != last_viewport.first && height != last_viewport.second) {
+	void* CommandBufferSetScissor(const CommandBuffer* cmdBuf, int x, int y, int width, int height) {
+		if (!x && !y && height > 1 && width > 1 && resolutionLookup && width != last_viewport.first && height != last_viewport.second) {
 			NX_FPS_Math::addResToViewports(width, height);
 		}
 		return ((nvnCommandBufferSetScissor_0)(Address_weaks.nvnCommandBufferSetScissor))(cmdBuf, x, y, width, height);
 	}
 
-	void* CommandBufferSetRenderTargets(const nvnCommandBuffer* cmdBuf, int numTextures, const NVNTexture** texture, const NVNTextureView** textureView, const NVNTexture* depthTexture, const NVNTextureView* depthView) {
-		if (texture != NULL && depthTexture != NULL) {
-			if (resolutionLookup) {
-				uint16_t depth_width = ((nvnTextureGetWidth_0)(Address_weaks.nvnTextureGetWidth))(depthTexture);
-				uint16_t depth_height = ((nvnTextureGetHeight_0)(Address_weaks.nvnTextureGetHeight))(depthTexture);
-				int depth_format = ((nvnTextureGetFormat_0)(Address_weaks.nvnTextureGetFormat))(depthTexture);
-				if (depth_width > 1 && depth_height > 1 && (depth_format >= 51 && depth_format <= 54)) {
-					NX_FPS_Math::addResToRender(depth_width, depth_height);
-				}
+	void* CommandBufferSetRenderTargets(const CommandBuffer* cmdBuf, int numTextures, const Texture** texture, const TextureView** textureView, const Texture* depthTexture, const TextureView* depthView) {
+		if (texture != NULL && depthTexture != NULL && resolutionLookup) {
+			auto depth_width = ((nvnTextureGetWidth_0)(Address_weaks.nvnTextureGetWidth))(depthTexture);
+			auto depth_height = ((nvnTextureGetHeight_0)(Address_weaks.nvnTextureGetHeight))(depthTexture);
+			auto depth_format = ((nvnTextureGetFormat_0)(Address_weaks.nvnTextureGetFormat))(depthTexture);
+			if (depth_width > 1 && depth_height > 1 && (depth_format >= 51 && depth_format <= 54)) {
+				NX_FPS_Math::addResToRender(depth_width, depth_height);
 			}
 		}
 		return ((nvnCommandBufferSetRenderTargets_0)(Address_weaks.nvnCommandBufferSetRenderTargets))(cmdBuf, numTextures, texture, textureView, depthTexture, depthView);
 	}
 
-	uintptr_t GetProcAddress0 (NVNDevice* nvnDevice, const char* nvnFunction) {
+	uintptr_t GetProcAddress0 (Device* nvnDevice, const char* nvnFunction) {
 		uintptr_t address = ((GetProcAddress)(Address_weaks.nvnDeviceGetProcAddress))(nvnDevice, nvnFunction);
 		if (!strcmp("nvnDeviceGetProcAddress", nvnFunction))
 			return (uintptr_t)&GetProcAddress0;
@@ -1322,7 +1269,7 @@ extern "C" {
 	void NX_FPS(SharedMemory* _sharedmemory, uint32_t* _sharedOperationMode) {
 		sharedOperationMode = _sharedOperationMode;
 		SaltySDCore_printf("NX-FPS: alive\n");
-		LOCK::mappings.main_start = getMainAddress();
+		LOCK::mappings.main_start = Utils::getMainAddress();
 		#if defined(SWITCH) || defined(OUNCE)
 		LOCK::mappings.variables_start = (int64_t)&variables_buffer[0];
 		LOCK::mappings.codeCave_start = (int64_t)&codeCave;
@@ -1478,7 +1425,7 @@ extern "C" {
 				if (patch_file) {
 					SaltySDCore_fclose(patch_file);
 					SaltySDCore_printf("NX-FPS: FPSLocker: successfully opened: %s\n", path);
-					configRC = readConfig(path, &configBuffer);
+					configRC = Utils::readConfig(path, &configBuffer);
 					if (LOCK::MasterWriteApplied) {
 						(Shared -> patchApplied) = 2;
 					}
