@@ -8,6 +8,9 @@ endif
 
 TOPDIR ?= $(CURDIR)
 include $(DEVKITPRO)/devkitARM/base_rules
+LIBGCC_PATH   := $(shell $(DEVKITARM)/bin/arm-none-eabi-gcc -march=armv6k -mfloat-abi=hard -print-file-name=libgcc.a)
+ARMV6K_LIBDIR := $(dir $(LIBGCC_PATH))
+ARMV6K_SYSLIB := $(DEVKITARM)/arm-none-eabi/lib/armv6k/fpu
 
 #---------------------------------------------------------------------------------
 # TARGET is the name of the output
@@ -39,7 +42,7 @@ EXEFS_SRC	:=	exefs_src
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
-ARCH			:=	-march=armv6k -mfpu=vfpv4 -mtune=cortex-a57 -mtp=soft -fPIC
+ARCH			:=	-march=armv8-a+simd -mfpu=vfpv4 -mtune=cortex-a57 -mtp=soft -fPIC -mfloat-abi=hard
 
 CFLAGS				:=	-Wall -Wno-pointer-to-int-cast -O3 \
 					-ffast-math -ffunction-sections -fdata-sections \
@@ -50,8 +53,8 @@ CFLAGS				+=	$(INCLUDE) -DSWITCH32
 CXXFLAGS			:= $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++23
 
 ASFLAGS				:=	-g $(ARCH)
-LDFLAGS_3K			=	-specs=$(CURDIR)/switch_3k.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
-LDFLAGS_5K			=	-specs=$(CURDIR)/switch_5k.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map)
+LDFLAGS_3K			=	-specs=$(CURDIR)/switch_3k.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map) -B$(ARMV6K_LIBDIR) -L$(ARMV6K_SYSLIB) 
+LDFLAGS_5K			=	-specs=$(CURDIR)/switch_5k.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map) -B$(ARMV6K_LIBDIR) -L$(ARMV6K_SYSLIB) 
 
 LIBS				:= -lnx_min
 
