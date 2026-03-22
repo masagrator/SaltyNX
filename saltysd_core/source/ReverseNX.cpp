@@ -374,7 +374,7 @@ extern "C" {
 		if (!ret) {
 			SaltySDCore_printf("ReverseNX: SharedMemory MemoryOffset: %d\n", SharedMemoryOffset2);
 
-			ReverseNX_RT = (Shared*)((uintptr_t)shmemGetAddr(_sharedmemory) + SharedMemoryOffset2);
+			ReverseNX_RT = (Shared*)__builtin_assume_aligned((const void*)((uintptr_t)shmemGetAddr(_sharedmemory) + SharedMemoryOffset2), 4);
 			ReverseNX_RT->MAGIC = *(uint32_t*)&"NXRT";
 			ReverseNX_RT->pluginActive = false;
 			ReverseNX_state state = loadSave();
