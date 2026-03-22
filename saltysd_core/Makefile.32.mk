@@ -46,13 +46,15 @@ EXEFS_SRC	:=	exefs_src
 #---------------------------------------------------------------------------------
 ARCH			:=	-march=armv8-a+simd -mfpu=vfpv4 -mtune=cortex-a57 -mtp=soft -fPIE -mfloat-abi=hard -fno-plt
 
-CFLAGS			:=	-Wall -Wno-pointer-to-int-cast -O2 \
-					-ffast-math -ffunction-sections \
+CFLAGS			:=	-Wall -O2 \
+					-ffast-math -ffunction-sections -fdata-sections \
 					$(ARCH) $(DEFINES)
 
 CFLAGS			+=	$(INCLUDE) -DSWITCH32 -DAPP_VERSION=\"$(VERSION)\"
 
 CXXFLAGS		:=	$(CFLAGS) -fno-exceptions -fno-rtti -std=gnu++23
+
+CFLAGS          +=  -Wno-pointer-to-int-cast
 
 ASFLAGS			:=	-g $(ARCH)
 LDFLAGS			=	-specs=$(CURDIR)/../libnx32_min/nx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map) -B$(ARMV6K_LIBDIR) -L$(ARMV6K_SYSLIB)
