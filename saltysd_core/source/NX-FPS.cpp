@@ -330,15 +330,16 @@ namespace NX_FPS_Math {
 		if (FPStickItr >= 10) FPStickItr = 0;
 		
 		frameavg = ((9*frameavg) + framedelta) / 10;
-		Stats.FPSavg = systemtickfrequency / (float)frameavg;
+		float FPSavg = systemtickfrequency / (float)frameavg;
+		Stats.FPSavg = FPSavg;
 
 		if (FPSlock_delayed && FPStiming) {
-			if (Stats.FPSavg > ((float)new_fpslock)) {
+			if (FPSavg > ((float)new_fpslock)) {
 				if (range < 200) {
 					range++;
 				}
 			}
-			else if (((uint32_t)std::lroundf(Stats.FPSavg) == new_fpslock) && (Stats.FPSavg < (float)new_fpslock)) {
+			else if (((uint32_t)std::lroundf(FPSavg) == new_fpslock) && (FPSavg < (float)new_fpslock)) {
 				if (range > 0) {
 					range--;
 				}
