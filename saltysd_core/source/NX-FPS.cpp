@@ -1279,7 +1279,7 @@ extern "C" {
 		if (!ret) {
 			SaltySDCore_printf("NX-FPS: MemoryOffset: %d\n", SharedMemoryOffset);
 
-			Shared = (NxFpsSharedBlock*)((uintptr_t)shmemGetAddr(_sharedmemory) + SharedMemoryOffset);
+			Shared = (NxFpsSharedBlock*)__builtin_assume_aligned((const void*)((uintptr_t)shmemGetAddr(_sharedmemory) + SharedMemoryOffset), 4);
 			Shared -> MAGIC = 0x465053;
 			Shared->expectedSetBuffers = -1;
 			
