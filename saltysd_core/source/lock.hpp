@@ -390,7 +390,7 @@ namespace LOCK {
 	}
 	
 	double TruncDec(double value, double truncator) {
-		uint64_t factor = pow(10, truncator);
+		size_t factor = pow(10, truncator);
 		return trunc(value*factor) / factor;
 	}
 
