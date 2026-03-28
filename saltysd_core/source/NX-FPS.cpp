@@ -2,8 +2,6 @@
 #include "saltysd_ipc.h"
 #include "saltysd_dynamic.h"
 #include "saltysd_core.h"
-#include <cstdlib>
-#include <cmath>
 #include "lock.hpp"
 #include <algorithm>
 #include "nanoprintf.h"
@@ -158,7 +156,7 @@ enum {
 	ZeroSyncType_Semi
 };
 
-std::pair<int, int> last_viewport = {0, 0};
+std::pair<uint32_t, uint32_t> last_viewport = {0, 0};
 
 namespace nn {
 
@@ -406,17 +404,14 @@ namespace NX_FPS_Math {
 		if ((m_height <= (T)160) || (m_height > (T)1440)) return;
 		const T scaled = m_width * (T)10;
 		if ((scaled >= ((T)6 * m_height)) && (scaled <= ((T)18 * m_height))) {
-			union {
-				struct {
-					uint16_t width;
-					uint16_t height;
-				} values;
-				uint32_t value;
+			struct {
+				uint16_t width;
+				uint16_t height;
 			} value_to_compare;
 
 			static_assert(sizeof(value_to_compare) == sizeof(m_resolutionViewportCalls[0].width) + sizeof(m_resolutionViewportCalls[0].height));
 
-			value_to_compare.values = {(uint16_t)m_width, (uint16_t)m_height};
+			value_to_compare = {(uint16_t)m_width, (uint16_t)m_height};
 
 			for (size_t i = 0; i < 8; i++) {
 				if (!m_resolutionViewportCalls[i].calls) {
@@ -436,17 +431,14 @@ namespace NX_FPS_Math {
 		if ((m_height <= (T)160) || (m_height > (T)1440)) return;
 		const T scaled = m_width * (T)10;
 		if ((scaled >= ((T)6 * m_height)) && (scaled <= ((T)18 * m_height))) {
-			union {
-				struct {
-					uint16_t width;
-					uint16_t height;
-				} values;
-				uint32_t value;
+			struct {
+				uint16_t width;
+				uint16_t height;
 			} value_to_compare;
 
 			static_assert(sizeof(value_to_compare) == sizeof(m_resolutionRenderCalls[0].width) + sizeof(m_resolutionRenderCalls[0].height));
 
-			value_to_compare.values = {(uint16_t)m_width, (uint16_t)m_height};
+			value_to_compare = {(uint16_t)m_width, (uint16_t)m_height};
 
 			for (size_t i = 0; i < 8; i++) {
 				if (!m_resolutionRenderCalls[i].calls) {
@@ -454,7 +446,7 @@ namespace NX_FPS_Math {
 					m_resolutionRenderCalls[i].calls = 1;
 					break;
 				}
-				if (!memcmp(&value_to_compare.value, &m_resolutionRenderCalls[i], sizeof(value_to_compare))) {
+				if (!memcmp(&value_to_compare, &m_resolutionRenderCalls[i], sizeof(value_to_compare))) {
 					m_resolutionRenderCalls[i].calls++;
 					break;
 				}
@@ -477,8 +469,8 @@ namespace vk {
 	struct VkRect2D {
 		int32_t    x;
 		int32_t    y;
-		uint32_t    width;
-		uint32_t    height;
+		uint32_t   width;
+		uint32_t   height;
 	};
 
 	typedef struct VkSwapchainCreateInfoKHR {
@@ -507,8 +499,10 @@ namespace vk {
 	void CmdSetViewport(void* commandBuffer, uint32_t firstViewport, uint32_t viewportCount, const VkViewport* pViewports) {
 		if (resolutionLookup) for (uint i = firstViewport; i < firstViewport+viewportCount; i++) {
 			if (pViewports[i].height > 1.f && pViewports[i].width > 1.f && pViewports[i].x == 0.f && pViewports[i].y == 0.f) {
-				NX_FPS_Math::addResToViewports(pViewports[i].width, pViewports[i].height);
-				last_viewport = {(int)pViewports[i].width, (int)pViewports[i].height};
+				uint32_t width = (uint32_t)pViewports[i].width;
+				uint32_t height = (uint32_t)pViewports[i].height;
+				NX_FPS_Math::addResToViewports(width, height);
+				last_viewport = {width, height};
 			}
 		}
 		return ((vkCmdSetViewport_0)(Address_weaks.vkCmdSetViewport))(commandBuffer, firstViewport, viewportCount, pViewports);
@@ -517,8 +511,10 @@ namespace vk {
 	void CmdSetViewportWithCount(void* commandBuffer, uint32_t viewportCount, const VkViewport* pViewports) {
 		if (resolutionLookup) for (uint i = 0; i < viewportCount; i++) {
 			if (pViewports[i].height > 1.f && pViewports[i].width > 1.f && pViewports[i].x == 0.f && pViewports[i].y == 0.f) {
-				NX_FPS_Math::addResToViewports(pViewports[i].width, pViewports[i].height);
-				last_viewport = {(int)pViewports[i].width, (int)pViewports[i].height};
+				uint32_t width = (uint32_t)pViewports[i].width;
+				uint32_t height = (uint32_t)pViewports[i].height;
+				NX_FPS_Math::addResToViewports(width, height);
+				last_viewport = {width, height};
 			}
 		}
 		return ((vkCmdSetViewportWithCount_0)(Address_weaks.vkCmdSetViewportWithCount))(commandBuffer, viewportCount, pViewports);
@@ -526,7 +522,7 @@ namespace vk {
 
 	void CmdSetScissor(void* commandBuffer, uint32_t firstScissor, uint32_t ScissorCount, const VkRect2D* pScissors) {
 		if (resolutionLookup) for (uint i = firstScissor; i < firstScissor+ScissorCount; i++) {
-			if (pScissors[i].height > 1 && pScissors[i].width > 1 && pScissors[i].x == 0 && pScissors[i].y == 0 && pScissors[i].width != (uint32_t)last_viewport.first && pScissors[i].height != (uint32_t)last_viewport.second) {
+			if (pScissors[i].height > 1 && pScissors[i].width > 1 && pScissors[i].x == 0 && pScissors[i].y == 0 && pScissors[i].width != last_viewport.first && pScissors[i].height != last_viewport.second) {
 				NX_FPS_Math::addResToViewports(pScissors[i].width, pScissors[i].height);
 			}
 		}
@@ -535,7 +531,7 @@ namespace vk {
 
 	void CmdSetScissorWithCount(void* commandBuffer, uint32_t ScissorCount, const VkRect2D* pScissors) {
 		if (resolutionLookup) for (uint i = 0; i < ScissorCount; i++) {
-			if (pScissors[i].height > 1 && pScissors[i].width > 1 && pScissors[i].x == 0 && pScissors[i].y == 0 && pScissors[i].width != (uint32_t)last_viewport.first && pScissors[i].height != (uint32_t)last_viewport.second) {
+			if (pScissors[i].height > 1 && pScissors[i].width > 1 && pScissors[i].x == 0 && pScissors[i].y == 0 && pScissors[i].width != last_viewport.first && pScissors[i].height != last_viewport.second) {
 				NX_FPS_Math::addResToViewports(pScissors[i].width, pScissors[i].height);
 			}
 		}
@@ -800,7 +796,7 @@ namespace EGL {
 		NOINLINE void ViewportArrayv(uint firstViewport, uint viewportCount, const glViewportArray* pViewports, uintptr_t pointer) {
 			if (resolutionLookup) for (uint i = firstViewport; i < firstViewport+viewportCount; i++) {
 				if (pViewports[i].height > 1.f && pViewports[i].width > 1.f && pViewports[i].x == 0.f && pViewports[i].y == 0.f) {
-					NX_FPS_Math::addResToViewports(pViewports[i].width, pViewports[i].height);
+					NX_FPS_Math::addResToViewports((uint32_t)pViewports[i].width, (uint32_t)pViewports[i].height);
 				}
 			}
 			return ((glViewportArrayv_0)(pointer))(firstViewport, viewportCount, pViewports);
@@ -808,7 +804,7 @@ namespace EGL {
 
 		NOINLINE void ViewportIndexedf(uint index, float x, float y, float width, float height, uintptr_t pointer) {
 			if (resolutionLookup && height > 1.f && width > 1.f && !x && !y) {
-				NX_FPS_Math::addResToViewports(width, height);
+				NX_FPS_Math::addResToViewports((uint32_t)width, (uint32_t)height);
 			}
 			return ((glViewportIndexedf_0)(pointer))(index, x, y, width, height);
 		}
@@ -816,7 +812,7 @@ namespace EGL {
 		NOINLINE void ViewportIndexedfv(uint i, const glViewportArray* pViewports, uintptr_t pointer) {
 			if (resolutionLookup) {
 				if (pViewports[i].height > 1.f && pViewports[i].width > 1.f && pViewports[i].x == 0.f && pViewports[i].y == 0.f) {
-					NX_FPS_Math::addResToViewports(pViewports[i].width, pViewports[i].height);
+					NX_FPS_Math::addResToViewports((uint32_t)pViewports[i].width, (uint32_t)pViewports[i].height);
 				}
 			}
 			return ((glViewportIndexedfv_0)(pointer))(i, pViewports);
@@ -1136,8 +1132,10 @@ namespace NVN {
 	void* CommandBufferSetViewports(CommandBuffer* cmdBuf, int start, int count, const Viewport* viewports) {
 		if (resolutionLookup) for (int i = start; i < start+count; i++) {
 			if (viewports[i].height > 1.f && viewports[i].width > 1.f && viewports[i].x == 0.f && viewports[i].y == 0.f) {
-				NX_FPS_Math::addResToViewports(viewports[i].width, viewports[i].height);
-				last_viewport = {(int)viewports[i].width, (int)viewports[i].height};
+				uint32_t width = (uint32_t)viewports[i].width;
+				uint32_t height = (uint32_t)viewports[i].height;
+				NX_FPS_Math::addResToViewports(width, height);
+				last_viewport = {width, height};
 			}
 		}
 		return ((nvnCommandBufferSetViewports_0)(Address_weaks.nvnCommandBufferSetViewports))(cmdBuf, start, count, viewports);
@@ -1145,24 +1143,24 @@ namespace NVN {
 
 	void* CommandBufferSetViewport(const CommandBuffer* cmdBuf, int x, int y, int width, int height) {
 		if (!x && !y && height > 1 && width > 1 && resolutionLookup) {
-			NX_FPS_Math::addResToViewports(width, height);
-				last_viewport = {width, height};
+			NX_FPS_Math::addResToViewports((uint32_t)width, (uint32_t)height);
+				last_viewport = {(uint32_t)width, (uint32_t)height};
 		}
 		return ((nvnCommandBufferSetViewport_0)(Address_weaks.nvnCommandBufferSetViewport))(cmdBuf, x, y, width, height);
 	}
 
 	void* CommandBufferSetScissors(CommandBuffer* cmdBuf, int start, int count, const Scissor* viewports) {
 		if (resolutionLookup) for (int i = start; i < start+count; i++) {
-			if (viewports[i].height > 1 && viewports[i].width > 1 && viewports[i].x == 0 && viewports[i].y == 0 && viewports[i].height != last_viewport.second && viewports[i].width != last_viewport.first) {
-				NX_FPS_Math::addResToViewports(viewports[i].width, viewports[i].height);
+			if (viewports[i].height > 1 && viewports[i].width > 1 && viewports[i].x == 0 && viewports[i].y == 0 && (uint32_t)viewports[i].height != last_viewport.second && (uint32_t)viewports[i].width != last_viewport.first) {
+				NX_FPS_Math::addResToViewports((uint32_t)viewports[i].width, (uint32_t)viewports[i].height);
 			}
 		}
 		return ((nvnCommandBufferSetScissors_0)(Address_weaks.nvnCommandBufferSetScissors))(cmdBuf, start, count, viewports);
 	}
 
 	void* CommandBufferSetScissor(const CommandBuffer* cmdBuf, int x, int y, int width, int height) {
-		if (!x && !y && height > 1 && width > 1 && resolutionLookup && width != last_viewport.first && height != last_viewport.second) {
-			NX_FPS_Math::addResToViewports(width, height);
+		if (!x && !y && height > 1 && width > 1 && resolutionLookup && (uint32_t)width != last_viewport.first && (uint32_t)height != last_viewport.second) {
+			NX_FPS_Math::addResToViewports((uint32_t)width, (uint32_t)height);
 		}
 		return ((nvnCommandBufferSetScissor_0)(Address_weaks.nvnCommandBufferSetScissor))(cmdBuf, x, y, width, height);
 	}
@@ -1173,7 +1171,7 @@ namespace NVN {
 			auto depth_height = ((nvnTextureGetHeight_0)(Address_weaks.nvnTextureGetHeight))(depthTexture);
 			auto depth_format = ((nvnTextureGetFormat_0)(Address_weaks.nvnTextureGetFormat))(depthTexture);
 			if (depth_width > 1 && depth_height > 1 && (depth_format >= 51 && depth_format <= 54)) {
-				NX_FPS_Math::addResToRender(depth_width, depth_height);
+				NX_FPS_Math::addResToRender((uint32_t)depth_width, (uint32_t)depth_height);
 			}
 		}
 		return ((nvnCommandBufferSetRenderTargets_0)(Address_weaks.nvnCommandBufferSetRenderTargets))(cmdBuf, numTextures, texture, textureView, depthTexture, depthView);
