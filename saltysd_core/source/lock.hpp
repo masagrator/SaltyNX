@@ -2,6 +2,7 @@
 #define NOINLINE __attribute__ ((noinline))
 #include "tinyexpr/tinyexpr.h"
 #include <array>
+#include <cmath>
 
 #if defined(SWITCH) || defined(OUNCE)
 //We need to define something in that section and reference its pointer to not get whole section discarded by garbage collector
