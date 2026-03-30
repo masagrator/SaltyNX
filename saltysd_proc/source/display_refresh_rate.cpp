@@ -924,7 +924,7 @@ extern "C" bool GetDisplayRefreshRate(uint32_t* out_refreshRate, bool internal) 
 
                 My math formula allows avoiding decimals whenever possible
             */
-            uint32_t pixelClock = (9375 * ((4096 * ((2 * temp.PLLD_DIVN) + 1)) + misc.PLLD_SDM_DIN)) / (8 * temp.PLLD_DIVM);
+            uint32_t pixelClock = (9375llu * ((4096 * ((2 * temp.PLLD_DIVN) + 1)) + misc.PLLD_SDM_DIN)) / (8 * temp.PLLD_DIVM);
             value = pixelClock / (DSI_CLOCK_HZ / 60);
         }
         else return false;
