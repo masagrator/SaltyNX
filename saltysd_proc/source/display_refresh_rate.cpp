@@ -569,7 +569,7 @@ bool setPLLDHandheldRefreshRate(uint32_t new_refreshRate) {
         }
         if (!skip) new_refreshRate = 60;
     }
-    uint32_t pixelClock = (9375 * ((4096 * ((2 * base.PLLD_DIVN) + 1)) + misc.PLLD_SDM_DIN)) / (8 * base.PLLD_DIVM);
+    uint32_t pixelClock = (9375llu * ((4096 * ((2 * base.PLLD_DIVN) + 1)) + misc.PLLD_SDM_DIN)) / (8 * base.PLLD_DIVM);
     uint16_t refreshRateNow = pixelClock / (DSI_CLOCK_HZ / 60);
 
     if (refreshRateNow == new_refreshRate) {
