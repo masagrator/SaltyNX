@@ -60,9 +60,9 @@ ThreadExceptionDump __nx_exceptiondump;
 
 void __attribute__((weak)) __libnx_initheap(void)
 {
-    void*  addr;
+    void*  addr = 0;
     size_t size = 0;
-    size_t mem_available = 0, mem_used = 0;
+    //size_t mem_available = 0, mem_used = 0;
 
     // Newlib
     extern char* fake_heap_start;
