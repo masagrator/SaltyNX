@@ -91,7 +91,7 @@ void argvSetup(void)
     argstart = NULL;
 
     for(argi=0; argi<argdata_strsize; argi++) {
-        if (argstart == NULL && isspace(args[argi])) continue;
+        if (argstart == NULL && isspace((int)args[argi])) continue;
 
         if (argstart == NULL) {
             if (args[argi] == '"') {
@@ -109,7 +109,7 @@ void argvSetup(void)
             if (quote_flag) {
                 if (args[argi] == '"') end_flag = 1;
             }
-            else if (isspace(args[argi])) {
+            else if (isspace((int)args[argi])) {
                 end_flag = 1;
             }
 
