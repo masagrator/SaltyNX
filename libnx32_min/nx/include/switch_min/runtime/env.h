@@ -11,7 +11,7 @@
 typedef struct {
     u32 Key;      ///< Type of entry
     u32 Flags;    ///< Entry flags
-    u64 Value[2]; ///< Entry arguments (type-specific)
+    u32 Value[2]; ///< Entry arguments (type-specific)
 } ConfigEntry;
 
 /// Entry flags
