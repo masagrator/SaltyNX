@@ -395,7 +395,8 @@ void newlibSetup(void)
     ThreadVars* tv = getThreadVars();
     tv->magic      = THREADVARS_MAGIC;
     tv->thread_ptr = NULL;
-    tv->tls_tp     = __tls_start-2*sizeof(void*); // subtract size of Thread Control Block (TCB)
+    volatile uintptr_t tls_start = (uintptr_t)__tls_start;
+    tv->tls_tp = (u8*)(tls_start - 2*sizeof(void*)); // subtract size of Thread Control Block (TCB)
     tv->handle     = envGetMainThreadHandle();
 
     u32 tls_size = __tdata_lma_end - __tdata_lma;

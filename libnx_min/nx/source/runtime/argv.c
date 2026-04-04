@@ -25,7 +25,9 @@ void argvSetup(void)
     u32 pageinfo=0;
 
     u8 *argdata = (u8*)&__argdata__;
-    u32 *arg32 = (u32*)argdata;
+    volatile uintptr_t addr = (uintptr_t)&__argdata__;
+    u32 arg32[2];
+    memcpy(arg32, (void*)addr, 8);
     u64 argdata_allocsize=0;
     u64 argdata_strsize=0;
     u32 argvptr_pos=0;
@@ -91,7 +93,7 @@ void argvSetup(void)
     argstart = NULL;
 
     for(argi=0; argi<argdata_strsize; argi++) {
-        if (argstart == NULL && isspace(args[argi])) continue;
+        if (argstart == NULL && isspace((int)args[argi])) continue;
 
         if (argstart == NULL) {
             if (args[argi] == '"') {
@@ -109,7 +111,7 @@ void argvSetup(void)
             if (quote_flag) {
                 if (args[argi] == '"') end_flag = 1;
             }
-            else if (isspace(args[argi])) {
+            else if (isspace((int)args[argi])) {
                 end_flag = 1;
             }
 

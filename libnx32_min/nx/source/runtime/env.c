@@ -11,7 +11,7 @@ static bool   g_isNso = false;
 static Handle g_mainThreadHandle = INVALID_HANDLE;
 static LoaderReturnFn g_loaderRetAddr = NULL;
 static void*  g_overrideHeapAddr = NULL;
-static u64    g_overrideHeapSize = 0;
+static u32    g_overrideHeapSize = 0;
 static void*  g_overrideArgv = NULL;
 static u64    g_syscallHints[2];
 static Handle g_processHandle = INVALID_HANDLE;
@@ -19,7 +19,7 @@ static char*  g_nextLoadPath = NULL;
 static char*  g_nextLoadArgv = NULL;
 static Result g_lastLoadResult = 0;
 static bool   g_hasRandomSeed = false;
-static u64    g_randomSeed[2] = { 0, 0 };
+static u32    g_randomSeed[2] = { 0, 0 };
 
 extern __attribute__((weak)) u32 __nx_applet_type;
 
