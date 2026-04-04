@@ -33,7 +33,7 @@ INCLUDES	:=	include external/bsd/include
 #---------------------------------------------------------------------------------
 ARCH	:=	-march=armv8-a+simd -mfpu=vfpv4 -mtune=cortex-a57 -mtp=soft -mfloat-abi=hard -fPIC -ftls-model=local-exec
 
-CFLAGS	:=	-g -Wall -Wno-pointer-to-int-cast \
+CFLAGS	:=	-g -Wall -Wno-pointer-to-int-cast -Wno-address-of-packed-member \
 			-ffunction-sections \
 			-fdata-sections \
 			$(ARCH) \
