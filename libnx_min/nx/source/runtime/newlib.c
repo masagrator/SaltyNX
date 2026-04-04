@@ -76,6 +76,21 @@ void __syscall_lock_release(_LOCK_T *lock)
     mutexUnlock(lock);
 }
 
+void __syscall_lock_acquire_recursive(_LOCK_RECURSIVE_T *lock)
+{
+    rmutexLock(lock);
+}
+
+int __syscall_lock_try_acquire_recursive(_LOCK_RECURSIVE_T *lock)
+{
+    return rmutexTryLock(lock) ? 0 : 1;
+}
+
+void __syscall_lock_release_recursive(_LOCK_RECURSIVE_T *lock)
+{
+    rmutexUnlock(lock);
+}
+
 int __syscall_cond_signal(_COND_T *cond)
 {
     return errno_from_result(condvarWakeOne(cond));
@@ -89,6 +104,24 @@ int __syscall_cond_broadcast(_COND_T *cond)
 int __syscall_cond_wait(_COND_T *cond, _LOCK_T *lock, uint64_t timeout_ns)
 {
     return errno_from_result(condvarWaitTimeout(cond, lock, timeout_ns));
+}
+
+int __syscall_cond_wait_recursive(_COND_T *cond, _LOCK_RECURSIVE_T *lock, uint64_t timeout_ns)
+{
+    uint32_t thread_tag_backup = 0;
+    if (lock->counter != 1)
+        return EBADF;
+
+    thread_tag_backup = lock->thread_tag;
+    lock->thread_tag = 0;
+    lock->counter = 0;
+
+    int errcode = errno_from_result(condvarWaitTimeout(cond, &lock->lock, timeout_ns));
+
+    lock->thread_tag = thread_tag_backup;
+    lock->counter = 1;
+
+    return errcode;
 }
 
 struct __pthread_t *__syscall_thread_self(void)
@@ -395,7 +428,8 @@ void newlibSetup(void)
     ThreadVars* tv = getThreadVars();
     tv->magic      = THREADVARS_MAGIC;
     tv->thread_ptr = NULL;
-    tv->tls_tp     = __tls_start-2*sizeof(void*); // subtract size of Thread Control Block (TCB)
+    volatile uintptr_t tls_start = (uintptr_t)__tls_start;
+    tv->tls_tp = (u8*)(tls_start - 2*sizeof(void*)); // subtract size of Thread Control Block (TCB)
     tv->handle     = envGetMainThreadHandle();
 
     u32 tls_size = __tdata_lma_end - __tdata_lma;
