@@ -210,11 +210,12 @@ __attribute__((noinline)) Result isApplicationOutOfFocus(bool* outOfFocus) {
     }
     last_total_entries = total_entries;
 
-    PdmPlayEvent events[16];
+    #define EVENT_COUNT 16
+    PdmPlayEvent events[EVENT_COUNT];
     s32 out = 0;
-    s32 start_entry = end_entry_index - 15;
+    s32 start_entry = end_entry_index - (EVENT_COUNT-1);
     if (start_entry < 0) start_entry = 0;
-    rc = pdmqryQueryPlayEvent(start_entry, events, sizeof(events) / sizeof(events[0]), &out);
+    rc = pdmqryQueryPlayEvent(start_entry, events, EVENT_COUNT, &out);
     if (R_FAILED(rc)) return rc;
     if (out == 0) return 1;
 
@@ -231,8 +232,6 @@ __attribute__((noinline)) Result isApplicationOutOfFocus(bool* outOfFocus) {
         } TID;
         TID.parts[0] = event->event_data.applet.program_id[1];
         TID.parts[1] = event->event_data.applet.program_id[0];
-
-
 
         if (TID.full != (TIDnow & ~0xFFF))
             continue;
