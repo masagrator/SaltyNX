@@ -22,8 +22,6 @@ struct NxFpsSharedBlock* nx_fps = 0;
 
 u32 __nx_applet_type = AppletType_None;
 
-void serviceThread(void* buf);
-
 struct MinMax {
     u8 min;
     u8 max;
@@ -1013,7 +1011,7 @@ Result handleServiceCmd(int cmd)
     return ret;
 }
 
-void serviceThread(void* buf)
+void serviceThread()
 {
     Result ret;
     SaltySD_printf("SaltySD: accepting service calls\n");
@@ -1334,7 +1332,7 @@ int main(int argc, char *argv[])
         // If someone is waiting for us, handle them.
         if (R_SUCCEEDED(svcWaitSynchronizationSingle(saltyport, 9000000)))
         {
-            serviceThread(NULL);
+            serviceThread();
         }
         if (R_SUCCEEDED(svcWaitSynchronizationSingle(injectserv, 1000000))) {
             Handle sesja;
