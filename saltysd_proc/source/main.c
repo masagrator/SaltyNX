@@ -220,18 +220,17 @@ __attribute__((noinline)) Result isApplicationOutOfFocus(bool* outOfFocus) {
 
     int itr = -1;
     for (int i = out-1; i >= 0; i--) {
-        if (events[i].play_event_type != PdmPlayEventType_Applet)
+        PdmPlayEvent* event = &events[i];
+        if (event->play_event_type != PdmPlayEventType_Applet)
             continue;
-        if (events[i].event_data.applet.applet_id != AppletId_application)
+        if (event->event_data.applet.applet_id != AppletId_application)
             continue;
         union {
-            struct {
-                uint32_t part[2];
-            } parts;
+            uint32_t parts[2];
             uint64_t full;
         } TID;
-        TID.parts.part[0] = events[i].event_data.applet.program_id[1];
-        TID.parts.part[1] = events[i].event_data.applet.program_id[0];
+        TID.parts[0] = event->event_data.applet.program_id[1];
+        TID.parts[1] = event->event_data.applet.program_id[0];
 
 
 
