@@ -1332,11 +1332,11 @@ int main(int argc, char *argv[])
         }
         
         // If someone is waiting for us, handle them.
-        if (!svcWaitSynchronizationSingle(saltyport, 9000000))
+        if (R_SUCCEEDED(svcWaitSynchronizationSingle(saltyport, 9000000)))
         {
             serviceThread(NULL);
         }
-        if (!svcWaitSynchronizationSingle(injectserv, 1000000)) {
+        if (R_SUCCEEDED(svcWaitSynchronizationSingle(injectserv, 1000000))) {
             Handle sesja;
             svcAcceptSession(&sesja, injectserv);
             svcCloseHandle(sesja);
