@@ -214,10 +214,10 @@ extern "C" __attribute__((noinline)) void correctOledGamma(uint32_t refresh_rate
         return;
     }
     i = 0;
-    #define loop_amount 5
     
-    uint32_t offsets[] = {0x1A, 0x24, 0x25};
-    std::array<uint32_t, 3> values_set = {2, 0, 0x83};
+    const std::array<uint32_t, 3> offsets = {0x1A, 0x24, 0x25};
+    auto values_set = std::to_array<uint32_t>({2, 0, 0x83});
+    static_assert(offsets.size() == values_set.size());
     if (refresh_rate == 60) {
         if (last_refresh_rate == 60) return;
     }
@@ -236,8 +236,9 @@ extern "C" __attribute__((noinline)) void correctOledGamma(uint32_t refresh_rate
         values_set = {3, 1, 0};
     }
     else return;
+    #define loop_amount 5
     for (size_t i = 0; i < loop_amount; i++) {
-        changeOledElvssSettings(&offsets[0], &values_set[0], sizeof(offsets) / sizeof(offsets[0]), 0);
+        changeOledElvssSettings(&offsets[0], &values_set[0], offsets.size(), 0);
     }
     last_refresh_rate = refresh_rate;
 }
