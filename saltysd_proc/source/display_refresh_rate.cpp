@@ -215,7 +215,7 @@ extern "C" __attribute__((noinline)) void correctOledGamma(uint32_t refresh_rate
     }
     i = 0;
     
-    const std::array<uint32_t, 3> offsets = {0x1A, 0x24, 0x25};
+    const auto offsets = std::to_array<uint32_t>({0x1A, 0x24, 0x25});
     auto values_set = std::to_array<uint32_t>({2, 0, 0x83});
     static_assert(offsets.size() == values_set.size());
     if (refresh_rate == 60) {
@@ -931,5 +931,4 @@ extern "C" bool GetDisplayRefreshRate(uint32_t* out_refreshRate, bool internal) 
     if (nx_fps)
         nx_fps -> currentRefreshRate = (uint8_t)value;
     return true;
-
 }
