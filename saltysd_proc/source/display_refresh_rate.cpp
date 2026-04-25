@@ -2,6 +2,7 @@
 #include <cstring>
 #include "useful.h"
 #include <math.h>
+#include <array>
 
 #define	NVDISP_GET_MODE2 0x803C021B
 #define	NVDISP_SET_MODE2 0x403C021C
@@ -216,29 +217,23 @@ extern "C" __attribute__((noinline)) void correctOledGamma(uint32_t refresh_rate
     #define loop_amount 5
     
     uint32_t offsets[] = {0x1A, 0x24, 0x25};
-    uint32_t values_set[] = {2, 0, 0x83};
+    std::array<uint32_t, 3> values_set = {2, 0, 0x83};
     if (refresh_rate == 60) {
         if (last_refresh_rate == 60) return;
     }
     else if (refresh_rate == 45) {
         if (last_refresh_rate == 45) return;
-        uint32_t values[] = {4, 1, 0};
-        static_assert(sizeof(values) == sizeof(values_set));
-        memcpy(values_set, values, sizeof(values));
+        values_set = {4, 1, 0};
 
     }
     else if (refresh_rate == 50) {
         if (last_refresh_rate == 50) return;
-        uint32_t values[] = {3, 1, 0};
-        static_assert(sizeof(values) == sizeof(values_set));
-        memcpy(values_set, values, sizeof(values));
+        values_set = {3, 1, 0};
   
     }
     else if (refresh_rate == 55) {
         if (last_refresh_rate == 55) return;
-        uint32_t values[] = {3, 1, 0};
-        static_assert(sizeof(values) == sizeof(values_set));
-        memcpy(values_set, values, sizeof(values));
+        values_set = {3, 1, 0};
     }
     else return;
     for (size_t i = 0; i < loop_amount; i++) {
@@ -937,5 +932,3 @@ extern "C" bool GetDisplayRefreshRate(uint32_t* out_refreshRate, bool internal) 
     return true;
 
 }
-
-
