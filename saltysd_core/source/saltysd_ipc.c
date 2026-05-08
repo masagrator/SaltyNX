@@ -303,44 +303,6 @@ Result SaltySD_GetSDCard(Handle *retrieve)
 	return ret;
 }
 
-Result SaltySD_print(char* out)
-{
-	Result ret;
-	IpcCommand c;
-
-	ipcInitialize(&c);
-	ipcSendPid(&c);
-
-	struct 
-	{
-		u64 magic;
-		u64 cmd_id;
-	} *raw;
-
-	raw = ipcPrepareHeader(&c, sizeof(*raw));
-
-	raw->magic = SFCI_MAGIC;
-	raw->cmd_id = 5;
-    ipcAddSendBuffer(&c, out, strlen(out) + 1, BufferType_Normal);
-
-	ret = ipcDispatch(saltysd);
-
-	if (R_SUCCEEDED(ret)) 
-	{
-		IpcParsedCommand r;
-		ipcParse(&r);
-
-		struct respond {
-			u64 magic;
-			u64 result;
-		} *resp = (struct respond*)r.Raw;
-
-		ret = resp->result;
-	}
-
-	return ret;
-}
-
 Result SaltySD_CheckIfSharedMemoryAvailable(ptrdiff_t *new_offset, size_t new_size)
 {
 	Result ret = 0;
@@ -442,24 +404,36 @@ Result SaltySD_printf(const char* format, ...)
 	npf_vsnprintf(tmp, 256, format, args);
 	va_end(args);
 	
-	int i = 0;
-	while(i < strlen(tmp)) {
-		ret = SaltySD_print(tmp + i);
-		i += 64;
+	IpcCommand c;
 
-		if (ret) {
-			i = 0;
-			break;
-		}
-	}
+	ipcInitialize(&c);
+	ipcSendPid(&c);
 
-	if (ret)
-	{	
-		#if defined(SWITCH32) || defined(OUNCE32)
-		debug_log("SaltySD Core: failed w/ error %lx, msg: %s", ret, tmp);
-		#else
-		debug_log("SaltySD Core: failed w/ error %x, msg: %s", ret, tmp);
-		#endif
+	struct 
+	{
+		u64 magic;
+		u64 cmd_id;
+	} *raw;
+
+	raw = ipcPrepareHeader(&c, sizeof(*raw));
+
+	raw->magic = SFCI_MAGIC;
+	raw->cmd_id = 5;
+    ipcAddSendBuffer(&c, tmp, strlen(tmp) + 1, BufferType_Normal);
+
+	ret = ipcDispatch(saltysd);
+
+	if (R_SUCCEEDED(ret)) 
+	{
+		IpcParsedCommand r;
+		ipcParse(&r);
+
+		struct respond {
+			u64 magic;
+			u64 result;
+		} *resp = (struct respond*)r.Raw;
+
+		ret = resp->result;
 	}
 
 	return ret;
