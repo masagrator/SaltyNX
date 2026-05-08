@@ -309,20 +309,19 @@ Result SaltySD_print(char* out)
 	IpcCommand c;
 
 	ipcInitialize(&c);
+	ipcSendPid(&c);
 
 	struct 
 	{
 		u64 magic;
 		u64 cmd_id;
-		char log[65];
-		u64 reserved[2];
 	} *raw;
 
 	raw = ipcPrepareHeader(&c, sizeof(*raw));
 
 	raw->magic = SFCI_MAGIC;
 	raw->cmd_id = 5;
-	strncpy(raw->log, out, 64);
+    ipcAddSendBuffer(&c, out, strlen(out) + 1, BufferType_Normal);
 
 	ret = ipcDispatch(saltysd);
 

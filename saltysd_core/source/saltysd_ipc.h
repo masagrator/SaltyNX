@@ -3,7 +3,7 @@
 
 #include <switch_min.h>
 
-#include "useful.h"
+#define LINKABLE __attribute__ ((weak))
 
 #ifdef __cplusplus
 extern "C" {
