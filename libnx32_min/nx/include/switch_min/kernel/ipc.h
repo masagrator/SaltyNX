@@ -382,20 +382,20 @@ typedef struct {
     u32    OutObjectIds[IPC_MAX_OBJECTS];     ///< Object IDs (for domain responses).
 
     size_t NumBuffers;                        ///< Number of buffers in the response.
-    u32  Buffers[IPC_MAX_BUFFERS];          ///< Pointers to the buffers.
+    void*  Buffers[IPC_MAX_BUFFERS];          ///< Pointers to the buffers.
     size_t BufferSizes[IPC_MAX_BUFFERS];      ///< Sizes of the buffers.
     BufferType BufferTypes[IPC_MAX_BUFFERS];  ///< Types of the buffers.
     BufferDirection BufferDirections[IPC_MAX_BUFFERS]; ///< Direction of each buffer.
 
     size_t NumStatics;                        ///< Number of statics in the response.
-    u32  Statics[IPC_MAX_BUFFERS];          ///< Pointers to the statics.
+    void*  Statics[IPC_MAX_BUFFERS];          ///< Pointers to the statics.
     size_t StaticSizes[IPC_MAX_BUFFERS];      ///< Sizes of the statics.
     u8     StaticIndices[IPC_MAX_BUFFERS];    ///< Indices of the statics.
     
     size_t NumStaticsOut;                     ///< Number of output statics available in the response.
 
-    u32*  Raw;                               ///< Pointer to the raw embedded data structure in the response.
-    u32*  RawWithoutPadding;                 ///< Pointer to the raw embedded data structure, without padding.
+    void*  Raw;                               ///< Pointer to the raw embedded data structure in the response.
+    void*  RawWithoutPadding;                 ///< Pointer to the raw embedded data structure, without padding.
     size_t RawSize;                           ///< Size of the raw embedded data.
 } IpcParsedCommand;
 
