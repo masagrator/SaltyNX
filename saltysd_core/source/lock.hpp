@@ -339,7 +339,7 @@ namespace LOCK {
 		Result rc = 0;
 		while(true) {
 			SaltySDCore_fread(&OPCODE, 1, 1, file);
-			SaltySDCore_printf("processes opcode: %d, offset: 0x%x\n", OPCODE, ftell(file));
+			SaltySDCore_printf("processes opcode: %d, offset: 0x%x\n", OPCODE, SaltySDCore_ftell(file));
 			switch(OPCODE) {
 				case 1: {rc = processBytes(file); break;}
 				#if defined(SWITCH) || defined(OUNCE)

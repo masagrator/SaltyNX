@@ -9,7 +9,7 @@
 extern "C" {
 #endif
 
-extern void SaltySD_Init() LINKABLE;
+extern Result SaltySD_Init() LINKABLE;
 extern Result SaltySD_Deinit() LINKABLE;
 extern Result SaltySD_Term() LINKABLE;
 extern Result SaltySD_Restore() LINKABLE;

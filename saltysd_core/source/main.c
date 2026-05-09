@@ -28,7 +28,6 @@ void* __stack_tmp;
 Handle orig_main_thread;
 void* orig_ctx;
 
-Handle sdcard;
 #if defined(SWITCH32) || defined(OUNCE32)
 const size_t elf_area_size = 0x200000; //We assume that Core itself won't take more than 0x200000 bytes;
 #else
@@ -92,10 +91,10 @@ void SaltySDCore_LoadPatches() {
 	
 	npf_snprintf(tmp4, 0x100, "sdmc:/SaltySD/patches/");
 
-	d = opendir(tmp4);
+	d = SaltySDCore_opendir(tmp4);
 	if (d)
 	{
-		while ((dir = readdir(d)) != NULL)
+		while ((dir = SaltySDCore_readdir(d)) != NULL)
 		{
 			char *dot = strrchr(dir->d_name, '.');
 			#if defined(SWITCH32) || defined(OUNCE32)
@@ -106,18 +105,18 @@ void SaltySDCore_LoadPatches() {
 			{
 				npf_snprintf(tmp2, 0x100, "%s%s", tmp4, dir->d_name);
 				SaltySDCore_printf("SaltySD Patcher: Found %s\n", dir->d_name);
-				FILE* patch = fopen(tmp2, "rb");
-				fseek(patch, 0, SEEK_END);
-				uint32_t size = ftell(patch);
-				fseek(patch, 0, SEEK_SET);
+				FILE* patch = SaltySDCore_fopen(tmp2, "rb");
+				SaltySDCore_fseek(patch, 0, SEEK_END);
+				uint32_t size = SaltySDCore_ftell(patch);
+				SaltySDCore_fseek(patch, 0, SEEK_SET);
 				//Test if filesize is valid
 				if (size % 4 != 0) {
-					fclose(patch);
+					SaltySDCore_fclose(patch);
 					SaltySDCore_printf("%s doesn't have valid filesize...\n", tmp2);
 					break;
 				}
-				fread(&instr, 1, size, patch);
-				fclose(patch);
+				SaltySDCore_fread(&instr, 1, size, patch);
+				SaltySDCore_fclose(patch);
 				char* filename = dir->d_name;
 				uint8_t namelen = strlen(filename);
 				filename[namelen - 6] = 0;
@@ -131,7 +130,7 @@ void SaltySDCore_LoadPatches() {
 				}
 			}
 		}
-		closedir(d);
+		SaltySDCore_closedir(d);
 	}
 
 	svcGetInfo(&tid, 18, CUR_PROCESS_HANDLE, 0);
@@ -144,10 +143,10 @@ void SaltySDCore_LoadPatches() {
 	SaltySDCore_printf("SaltySD Patcher: Searching patches in dir '/%016lX'...\n", tid);
 	#endif
 
-	d = opendir(tmp4);
+	d = SaltySDCore_opendir(tmp4);
 	if (d)
 	{
-		while ((dir = readdir(d)) != NULL)
+		while ((dir = SaltySDCore_readdir(d)) != NULL)
 		{
 			char *dot = strrchr(dir->d_name, '.');
 			#if defined(SWITCH32) || defined(OUNCE32)
@@ -158,18 +157,18 @@ void SaltySDCore_LoadPatches() {
 			{
 				npf_snprintf(tmp2, 0x100, "%s%s", tmp4, dir->d_name);
 				SaltySDCore_printf("SaltySD Patcher: Found %s\n", dir->d_name);
-				FILE* patch = fopen(tmp2, "rb");
-				fseek(patch, 0, SEEK_END);
-				uint32_t size = ftell(patch);
-				fseek(patch, 0, SEEK_SET);
+				FILE* patch = SaltySDCore_fopen(tmp2, "rb");
+				SaltySDCore_fseek(patch, 0, SEEK_END);
+				uint32_t size = SaltySDCore_ftell(patch);
+				SaltySDCore_fseek(patch, 0, SEEK_SET);
 				//Test if filesize is valid
 				if (size % 4 != 0) {
-					fclose(patch);
+					SaltySDCore_fclose(patch);
 					SaltySDCore_printf("%s doesn't have valid filesize...\n", tmp2);
 					break;
 				}
-				fread(&instr, 1, size, patch);
-				fclose(patch);
+				SaltySDCore_fread(&instr, 1, size, patch);
+				SaltySDCore_fclose(patch);
 				char* filename = dir->d_name;
 				uint8_t namelen = strlen(filename);
 				filename[namelen - 6] = 0;
@@ -183,7 +182,7 @@ void SaltySDCore_LoadPatches() {
 				}
 			}
 		}
-		closedir(d);
+		SaltySDCore_closedir(d);
 	}
 	
 	return;
@@ -356,10 +355,10 @@ void** SaltySDCore_LoadPluginsInDir(char* path, void** entries, size_t* num_elfs
 	
 	npf_snprintf(tmp, 0x100, "sdmc:/SaltySD/plugins/%s", path);
 
-	d = opendir(tmp);
+	d = SaltySDCore_opendir(tmp);
 	if (d)
 	{
-		while ((dir = readdir(d)) != NULL)
+		while ((dir = SaltySDCore_readdir(d)) != NULL)
 		{
 			char *dot = strrchr(dir->d_name, '.');
 			if (dot && !strcmp(dot, ".elf"))
@@ -376,7 +375,7 @@ void** SaltySDCore_LoadPluginsInDir(char* path, void** entries, size_t* num_elfs
 				elf_area_size += elf_size;
 			}
 		}
-		closedir(d);
+		SaltySDCore_closedir(d);
 	}
 	free(tmp);
 	
@@ -449,9 +448,7 @@ int main(int argc, char *argv[])
 
 	SaltySDCore_RegisterExistingModules();
 	strtod_ptr = SaltySDCore_FindSymbolBuiltin("strtod");
-	SaltySD_Init();
-	
-	ret = SaltySD_GetSDCard(&sdcard);
+	ret = SaltySD_Init();
 	if (ret) goto fail;
 
 	#if defined(SWITCH32) || defined(OUNCE32)

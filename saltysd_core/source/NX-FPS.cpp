@@ -260,7 +260,17 @@ namespace Utils {
 		uint8_t* buffer = (uint8_t*)calloc(1, header_size);
 		SaltySDCore_fseek(patch_file, 0, 0);
 		SaltySDCore_fread(buffer, header_size, 1, patch_file);
-		if (SaltySDCore_ftell(patch_file) != header_size || !LOCK::isValid(buffer, header_size)) {
+		bool error = false;
+		size_t tell = SaltySDCore_ftell(patch_file);
+		if (tell != header_size) {
+			SaltySDCore_printf("NX-FPS: FPSLocker, wrong header! Expected: 0x%lx, got: 0x%lx\n", header_size, tell);
+			error = true;
+		}
+		else if (!LOCK::isValid(buffer, header_size)) {
+			SaltySDCore_printf("NX-FPS: FPSLocker, LOCK file is invalid!\n");
+			error = true;			
+		}
+		if (error == true) {
 			SaltySDCore_fclose(patch_file);
 			free(buffer);
 			return 0x1201;

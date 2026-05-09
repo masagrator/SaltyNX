@@ -1,7 +1,6 @@
 #include "saltysd_core.h"
 
 #include "bm.h"
-#include <errno.h>
 
 extern void _start();
 uintptr_t code_start = 0;
@@ -117,61 +116,4 @@ uintptr_t SaltySDCore_findCodeEx(u8* code, size_t size)
 	}
 
 	return 0;
-}
-
-FILE* SaltySDCore_fopen(const char* filename, const char* mode)
-{
-	return fopen(filename, mode);
-}
-
-size_t SaltySDCore_fread(void* ptr, size_t size, size_t count, FILE* stream)
-{
-	return fread(ptr, size, count, stream);
-}
-
-int SaltySDCore_fclose(FILE* stream)
-{
-	return fclose(stream);
-}
-
-int SaltySDCore_fseek(FILE* stream, int64_t offset, int origin)
-{
-	int ret = fseek(stream, offset, origin);
-	if (ret)
-		return errno;
-	
-	return 0;
-}
-
-size_t SaltySDCore_ftell(FILE* stream) {
-	return ftell(stream);
-}
-
-int SaltySDCore_remove(const char* filename) {
-	return remove(filename);
-}
-
-size_t SaltySDCore_fwrite(const void* ptr, size_t size, size_t count, FILE* stream) 
-{
-	return fwrite(ptr, size, count, stream);
-}
-
-DIR* SaltySDCore_opendir(const char* dirname)
-{
-	return opendir(dirname);
-}
-
-int SaltySDCore_mkdir(const char* dirname, mode_t mode)
-{
-	return mkdir(dirname, mode);
-}
-
-struct dirent* SaltySDCore_readdir(DIR* dirp)
-{
-	return readdir(dirp);
-}
-
-int SaltySDCore_closedir(DIR *dirp) 
-{
-	return closedir(dirp);
 }
