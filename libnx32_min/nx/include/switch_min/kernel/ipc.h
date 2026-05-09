@@ -460,7 +460,7 @@ static inline Result ipcParse(IpcParsedCommand* r) {
         IpcStaticSendDescriptor* desc = (IpcStaticSendDescriptor*) buf;
         u64 packed = (u64) desc->Packed;
 
-        r->Statics[i] = (desc->Addr | (((packed >> 12) & 15) << 32) | (((packed >> 6) & 15) << 36));
+        r->Statics[i] = (void*)(uintptr_t)(desc->Addr | (((packed >> 12) & 15) << 32) | (((packed >> 6) & 15) << 36));
         r->StaticSizes[i]   = packed >> 16;
         r->StaticIndices[i] = packed & 63;
     }
@@ -483,7 +483,7 @@ static inline Result ipcParse(IpcParsedCommand* r) {
         IpcBufferDescriptor* desc = (IpcBufferDescriptor*) buf;
         u64 packed = (u64) desc->Packed;
 
-        r->Buffers[i] = (desc->Addr | ((packed >> 28) << 32) | (((packed >> 2) & 15) << 36));
+        r->Buffers[i] = (void*)(uintptr_t)(desc->Addr | ((packed >> 28) << 32) | (((packed >> 2) & 15) << 36));
         r->BufferSizes[i] = desc->Size;
         r->BufferTypes[i] = (BufferType) (packed & 3);
 
