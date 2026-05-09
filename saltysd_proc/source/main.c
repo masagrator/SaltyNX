@@ -1,7 +1,6 @@
 #include <switch.h>
+#include "ipc.h"
 #include "display_refresh_rate.h"
-#include "legacy_libnx.h"
-#include "fs_dev.h"
 
 #include <stdlib.h>
 #include <dirent.h>
@@ -92,7 +91,7 @@ void __appInit(void)
 void __appExit(void)
 {
     already_hijacking = false;
-    fsdevUnmountAll_old();
+    fsdevUnmountAll();
     smExit();
     setsysExit();
     nvExit();
@@ -215,21 +214,12 @@ int main(int argc, char *argv[])
     #if !defined(SWITCH) && !defined(OUNCE)
 	    systemtickfrequency = armGetSystemTickFreq();
     #endif
-    ABORT_IF_FAILED(smInitialize_old(), 0);
-    Service_old toget;
-    ABORT_IF_FAILED(smGetService_old(&toget, "fsp-srv"), 1);
-    ABORT_IF_FAILED(fsp_init(toget), 2);
-    ABORT_IF_FAILED(fsp_getSdCard(toget, &sdcard), 3);
-    FsFileSystem_old sdcardfs;
-    sdcardfs.s.handle = sdcard;
-    if (fsdevMountDevice_old("sdmc", sdcardfs) == -1) {
-        ABORT_IF_FAILED(0xDEADBEEF, 4);
-    }
-    serviceClose_old(&toget);
-    smExit_old();
+    ABORT_IF_FAILED(smInitialize(), 1);
+    ABORT_IF_FAILED(fsInitialize(), 2);
+    ABORT_IF_FAILED(fsdevMountSdmc(), 3);
     SaltySD_printf("SaltySD " APP_VERSION ": got SD card.\n");
 
-    ABORT_IF_FAILED(smInitialize(), 5);
+    
     ABORT_IF_FAILED(setsysInitialize(), 10);
 
     SetSysFirmwareVersion fw;
@@ -403,6 +393,20 @@ int main(int argc, char *argv[])
                     if (GetDisplayRefreshRate(&temp_refreshRate, true) && temp_refreshRate != 60)
                         SetDisplayRefreshRate(60);
                     refreshRate = 0;
+                }
+                if (openedFilesAmount) {
+                    for (size_t i = 0; i < openedFilesAmount; i++) {
+                        fclose(openedFilesArray[i]);
+                    }
+                    memset(openedFilesArray, 0, sizeof(openedFilesArray));
+                    openedFilesAmount = 0;
+                }
+                if (openedDirsAmount) {
+                    for (size_t i = 0; i < openedDirsAmount; i++) {
+                        closedir(openedDirsArray[i]);
+                    }
+                    memset(openedDirsArray, 0, sizeof(openedDirsArray));
+                    openedDirsAmount = 0;
                 }
             }
             else {
