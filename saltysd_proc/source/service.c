@@ -630,11 +630,11 @@ static Result serviceSdcardFopen(IpcCommand* c) {
     } *raw;
 
     if (openedFilesAmount >= FOPEN_MAX-1) {
+        SERVICE_LOG("Too much files opened at once.");
         raw = ipcPrepareHeader(c, sizeof(*raw));
         raw->magic = SFCO_MAGIC;
         raw->result = SALTYSD_RESULT(handleService_SdcardFopen, 1);
         raw->id = 0;
-        SERVICE_LOG("Too much files opened at once.");
         return 0;
     }
 
@@ -953,11 +953,11 @@ static Result serviceSdcardOpendir(IpcCommand* c) {
     } *raw;
 
     if (openedDirsAmount >= OPEN_MAX-1) {
+        SERVICE_LOG("Too much dirs opened at once.");
         raw = ipcPrepareHeader(c, sizeof(*raw));
         raw->magic = SFCO_MAGIC;
         raw->result = SALTYSD_RESULT(handleService_SdcardOpendir, 1);
         raw->id = 0;
-        SERVICE_LOG("Too much dirs opened at once.");
         return 0;
     }
 
