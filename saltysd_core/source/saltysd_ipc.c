@@ -972,6 +972,7 @@ struct dirent* SaltySDCore_readdir(DIR* dirp)
 	IpcCommand c;
 	ipcInitialize(&c);
 	ipcSendPid(&c);
+	ipcAddRecvBuffer(&c, &output, sizeof(output), BufferType_Normal);
 
 	struct input {
 		u64 magic;
@@ -998,12 +999,9 @@ struct dirent* SaltySDCore_readdir(DIR* dirp)
 
 		u64 ret = resp->result;
 		if (!ret) {
-			if (r.NumBuffers != 1) return nullptr;
-			memcpy(&output, r.Buffers[0], sizeof(output));
 			return &output;
 		}
 	}
-
 	return nullptr;
 }
 
