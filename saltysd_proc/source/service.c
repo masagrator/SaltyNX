@@ -597,12 +597,10 @@ static Result serviceSetDisplaySyncRefreshRate60WhenOutOfFocus() {
     return 0;
 }
 
-#define arraySize 16
-
 size_t openedFilesAmount = 0;
-FILE* openedFilesArray[arraySize] = {0};
+FILE* openedFilesArray[FOPEN_MAX] = {0};
 size_t openedDirsAmount = 0;
-DIR* openedDirsArray[arraySize] = {0};
+DIR* openedDirsArray[OPEN_MAX] = {0};
 uint64_t msb = 0;
 
 static Result serviceSdcardFopen(IpcCommand* c) {
@@ -631,7 +629,7 @@ static Result serviceSdcardFopen(IpcCommand* c) {
         u64 id;
     } *raw;
 
-    if (openedFilesAmount >= arraySize) {
+    if (openedFilesAmount >= FOPEN_MAX) {
         raw = ipcPrepareHeader(c, sizeof(*raw));
         raw->magic = SFCO_MAGIC;
         raw->result = SALTYSD_RESULT(handleService_SdcardFopen, 1);
@@ -755,7 +753,7 @@ static Result serviceSdcardFclose(IpcCommand* c) {
     if (!result) for (size_t i = 0; i < openedFilesAmount; i++) {
         if (file == openedFilesArray[i]) {
             memmove(&openedFilesArray[i], openedFilesArray[i+1], sizeof(openedFilesArray[0]) * (openedFilesAmount - (i+1)));
-            openedFilesArray[arraySize-1] = 0;
+            openedFilesArray[FOPEN_MAX-1] = 0;
             openedFilesAmount--;
             break;
         }
@@ -1087,7 +1085,7 @@ static Result serviceSdcardClosedir(IpcCommand* c) {
     if (!result) for (size_t i = 0; i < openedDirsAmount; i++) {
         if (dir == openedDirsArray[i]) {
             memmove(&openedDirsArray[i], openedDirsArray[i+1], sizeof(openedDirsArray[0]) * (openedDirsAmount - (i+1)));
-            openedDirsArray[arraySize-1] = 0;
+            openedDirsArray[OPEN_MAX-1] = 0;
             openedDirsAmount--;
             break;
         }
