@@ -1002,9 +1002,13 @@ static Result serviceSdcardReaddir(IpcCommand* c) {
     IpcParsedCommand r = {0};
     ipcParse(&r);
 
+    if (r.NumBuffers != 1) {
+        SERVICE_LOG("Buffers received: %d.", r.NumBuffers);
+        return SALTYSD_RESULT(handleService_SdcardReaddir, 4); // Buffer not received
+    }
     if (r.HasPid != true || r.Pid != PIDnow) {
         SERVICE_LOG("This call is reserved only for Core.");
-        return SALTYSD_RESULT(handleService_SdcardMkdir, 3); // This call is reserved only for Core
+        return SALTYSD_RESULT(handleService_SdcardReaddir, 3); // This call is reserved only for Core
     }
 
     struct {
@@ -1017,7 +1021,7 @@ static Result serviceSdcardReaddir(IpcCommand* c) {
 
     if (!dir) {
         SERVICE_LOG("No valid dir detected.");
-        return SALTYSD_RESULT(handleService_SdcardMkdir, 2);
+        return SALTYSD_RESULT(handleService_SdcardReaddir, 2);
     }
 
     dir = (DIR*)((uintptr_t)dir | msb);
@@ -1025,12 +1029,12 @@ static Result serviceSdcardReaddir(IpcCommand* c) {
     struct dirent* data = readdir(dir);
 
     if (!data) {
-        SERVICE_LOG("DidId: 0x%lx, errno: %d", dir, errno);
-        return SALTYSD_RESULT(handleService_SdcardMkdir, 1); // Received nullptr
+        SERVICE_LOG("DirId: 0x%lx, errno: %d", dir, errno);
+        return SALTYSD_RESULT(handleService_SdcardReaddir, 1); // Received nullptr
     }
-    else SERVICE_LOG("DidId: 0x%lx, no error", dir);
+    else SERVICE_LOG("DirId: 0x%lx, no error", dir);
 
-    ipcAddSendBuffer(c, data, sizeof(struct dirent), BufferType_Normal);
+    memcpy(r.Buffers[0], data, sizeof(struct dirent));
 
     struct {
         u64 magic;
