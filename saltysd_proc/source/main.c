@@ -209,8 +209,130 @@ __attribute__((noinline)) static Result isApplicationOutOfFocus(bool* outOfFocus
     return 0;
 }
 
-int main(int argc, char *argv[])
-{
+void updateNxFpsPointer() {
+    uintptr_t sharedAddress = (uintptr_t)shmemGetAddr(&_sharedMemory);
+    if (sharedAddress) {
+        ptrdiff_t offset = searchNxFpsSharedMemoryBlock(sharedAddress);
+        if (offset != -1) {
+            nx_fps = (struct NxFpsSharedBlock*)(sharedAddress + offset);
+        }
+    }
+}
+
+void checkIfDmntChtNeedsToBeActive() {
+    static bool dmntchtActive = false;
+    if (!dmntchtActive) dmntchtActive = isServiceRunning("dmnt:cht");
+    if (!dmntchtActive || !isCheatsFolderInstalled())
+        cheatCheck = true;
+    else {
+        Handle debug_handle;
+        if (R_SUCCEEDED(svcDebugActiveProcess(&debug_handle, lastAppPID))) {
+            s32 thread_count;
+            u64 threads[2];
+            svcGetThreadList(&thread_count, threads, 2, debug_handle);
+            svcCloseHandle(debug_handle);
+            if (thread_count > 1) {
+                cheatCheck = true;
+                if (R_SUCCEEDED(dmntchtInitialize())) {
+                    dmntchtForceOpenCheatProcess();
+                    dmntchtExit();
+                }
+            }
+        }
+        else cheatCheck = true;
+    }
+}
+
+void cleanAppData() {
+    lastAppPID = -1;
+    nx_fps = 0;
+    cheatCheck = false;
+    uintptr_t shmem = (uintptr_t)shmemGetAddr(&_sharedMemory);
+    if (shmem) {
+        memset((void*)(shmem+4), 0, shmem_size-4);
+    }
+    if ((!isDocked && displaySync) || (isDocked && displaySyncDocked)) {
+        uint32_t temp_refreshRate = 0;
+        if (GetDisplayRefreshRate(&temp_refreshRate, true) && temp_refreshRate != 60)
+            SetDisplayRefreshRate(60);
+        refreshRate = 0;
+    }
+    if (openedFilesAmount) {
+        for (size_t i = 0; i < openedFilesAmount; i++) {
+            fclose(openedFilesArray[i].file);
+        }
+        memset(openedFilesArray, 0, sizeof(openedFilesArray));
+        openedFilesAmount = 0;
+    }
+    if (openedDirsAmount) {
+        for (size_t i = 0; i < openedDirsAmount; i++) {
+            closedir(openedDirsArray[i].dir);
+        }
+        memset(openedDirsArray, 0, sizeof(openedDirsArray));
+        openedDirsAmount = 0;
+    }
+}
+
+void updateRefreshRateForApp() {
+    if ((!isDocked && displaySync) || (isDocked && displaySyncDocked)) {
+        uint32_t temp_refreshRate = 0;
+        GetDisplayRefreshRate(&temp_refreshRate, true);
+        uint32_t check_refresh_rate = refreshRate;
+        if (nx_fps && (isDocked ? nx_fps->FPSlockedDocked : nx_fps->FPSlocked)) check_refresh_rate = (isDocked ? nx_fps->FPSlockedDocked : nx_fps->FPSlocked);
+        if (check_refresh_rate == 0)
+            check_refresh_rate = 60;
+        if (check_refresh_rate != 60 && nx_fps && nx_fps->forceOriginalRefreshRate && (!isDocked || (isDocked && !dontForce60InDocked))) {
+            check_refresh_rate = 60;
+        }
+        if (check_refresh_rate != 60 && ((isDocked && displaySyncDockedOutOfFocus60) || (!isDocked && displaySyncOutOfFocus60))) {
+            bool isOutOfFocus = true;
+            if (R_SUCCEEDED(isApplicationOutOfFocus(&isOutOfFocus)) && isOutOfFocus) {
+                check_refresh_rate = 60;
+            }
+        }
+        if (temp_refreshRate != check_refresh_rate)
+            SetDisplayRefreshRate(check_refresh_rate);
+    }
+    if (!isDocked && nx_fps && nx_fps->FPSlocked > HandheldModeRefreshRateAllowed.max) {
+        nx_fps->FPSlocked = HandheldModeRefreshRateAllowed.max;
+        refreshRate = HandheldModeRefreshRateAllowed.max;
+    }
+    else if (isDocked && nx_fps) {
+        uint8_t highestrr = getDockedHighestRefreshRateAllowed();
+        if (nx_fps->FPSlockedDocked > highestrr) {
+            nx_fps->FPSlockedDocked = highestrr;
+            refreshRate = highestrr;
+        }
+    }
+}
+
+void updateRefreshRate() {
+    static bool wasLastDocked = false;
+    if ((wasLastDocked && !isDocked && !displaySync) || (!wasLastDocked && isDocked && !displaySyncDocked)) {
+        uint32_t temp_refreshRate = 0;
+        if (GetDisplayRefreshRate(&temp_refreshRate, true) && temp_refreshRate != 60) {
+            SetDisplayRefreshRate(60);
+            refreshRate = 0;
+        }
+    }
+    wasLastDocked = isDocked;
+
+    if (isDocked && !displaySyncDocked && nx_fps && nx_fps->FPSlockedDocked > 60) {
+        uint32_t temp_refreshRate = 0;
+        GetDisplayRefreshRate(&temp_refreshRate, true);
+        if (temp_refreshRate <= 60) {
+            nx_fps->FPSlockedDocked = 60;
+        }
+    }
+    
+    uint32_t crr = 0;
+    GetDisplayRefreshRate(&crr, true);
+    if (isOLED) correctOledGamma(crr);
+
+    if (nx_fps) nx_fps -> dontForce60InDocked = dontForce60InDocked;
+}
+
+void Initialize() {
     #if !defined(SWITCH) && !defined(OUNCE)
 	    systemtickfrequency = armGetSystemTickFreq();
     #endif
@@ -319,7 +441,13 @@ int main(int argc, char *argv[])
     shmemCreate(&_sharedMemory, shmem_size, Perm_Rw, Perm_Rw);
     shmemMap(&_sharedMemory);
     memset(shmemGetAddr(&_sharedMemory), 0, shmem_size);
+}
 
+int main(int argc, char *argv[])
+{   
+
+    Initialize();
+    
     // Main service loop
     u64* pids = malloc(0x200 * sizeof(u64));
     u64 max = 0;
@@ -339,38 +467,8 @@ int main(int argc, char *argv[])
         }
         
         if (lastAppPID != -1) {
-            if (!nx_fps)  {
-                uintptr_t sharedAddress = (uintptr_t)shmemGetAddr(&_sharedMemory);
-                if (sharedAddress) {
-                    ptrdiff_t offset = searchNxFpsSharedMemoryBlock(sharedAddress);
-                    if (offset != -1) {
-                        nx_fps = (struct NxFpsSharedBlock*)(sharedAddress + offset);
-                    }
-                }
-            }
-            if (!cheatCheck) {
-                static bool dmntchtActive = false;
-                if (!dmntchtActive) dmntchtActive = isServiceRunning("dmnt:cht");
-                if (!dmntchtActive || !isCheatsFolderInstalled())
-                    cheatCheck = true;
-                else {
-                    Handle debug_handle;
-                    if (R_SUCCEEDED(svcDebugActiveProcess(&debug_handle, lastAppPID))) {
-                        s32 thread_count;
-                        u64 threads[2];
-                        svcGetThreadList(&thread_count, threads, 2, debug_handle);
-                        svcCloseHandle(debug_handle);
-                        if (thread_count > 1) {
-                            cheatCheck = true;
-                            if (R_SUCCEEDED(dmntchtInitialize())) {
-                                dmntchtForceOpenCheatProcess();
-                                dmntchtExit();
-                            }
-                        }
-                    }
-                    else cheatCheck = true;
-                }
-            }
+            if (!nx_fps) updateNxFpsPointer();
+            if (!cheatCheck) checkIfDmntChtNeedsToBeActive();
             bool found = false;
             for (int i = num - 1; lastAppPID <= pids[i]; i--)
             {
@@ -380,91 +478,11 @@ int main(int argc, char *argv[])
                     break;
                 }
             }
-            if (!found) {
-                lastAppPID = -1;
-                nx_fps = 0;
-                cheatCheck = false;
-                uintptr_t shmem = (uintptr_t)shmemGetAddr(&_sharedMemory);
-                if (shmem) {
-                    memset((void*)(shmem+4), 0, shmem_size-4);
-                }
-                if ((!isDocked && displaySync) || (isDocked && displaySyncDocked)) {
-                    uint32_t temp_refreshRate = 0;
-                    if (GetDisplayRefreshRate(&temp_refreshRate, true) && temp_refreshRate != 60)
-                        SetDisplayRefreshRate(60);
-                    refreshRate = 0;
-                }
-                if (openedFilesAmount) {
-                    for (size_t i = 0; i < openedFilesAmount; i++) {
-                        fclose(openedFilesArray[i]);
-                    }
-                    memset(openedFilesArray, 0, sizeof(openedFilesArray));
-                    openedFilesAmount = 0;
-                }
-                if (openedDirsAmount) {
-                    for (size_t i = 0; i < openedDirsAmount; i++) {
-                        closedir(openedDirsArray[i]);
-                    }
-                    memset(openedDirsArray, 0, sizeof(openedDirsArray));
-                    openedDirsAmount = 0;
-                }
-            }
-            else {
-                if ((!isDocked && displaySync) || (isDocked && displaySyncDocked)) {
-                    uint32_t temp_refreshRate = 0;
-                    GetDisplayRefreshRate(&temp_refreshRate, true);
-                    uint32_t check_refresh_rate = refreshRate;
-                    if (nx_fps && (isDocked ? nx_fps->FPSlockedDocked : nx_fps->FPSlocked)) check_refresh_rate = (isDocked ? nx_fps->FPSlockedDocked : nx_fps->FPSlocked);
-                    if (check_refresh_rate == 0)
-                        check_refresh_rate = 60;
-                    if (check_refresh_rate != 60 && nx_fps && nx_fps->forceOriginalRefreshRate && (!isDocked || (isDocked && !dontForce60InDocked))) {
-                        check_refresh_rate = 60;
-                    }
-                    if (check_refresh_rate != 60 && ((isDocked && displaySyncDockedOutOfFocus60) || (!isDocked && displaySyncOutOfFocus60))) {
-                        bool isOutOfFocus = true;
-                        if (R_SUCCEEDED(isApplicationOutOfFocus(&isOutOfFocus)) && isOutOfFocus) {
-                            check_refresh_rate = 60;
-                        }
-                    }
-                    if (temp_refreshRate != check_refresh_rate)
-                        SetDisplayRefreshRate(check_refresh_rate);
-                }
-                if (!isDocked && nx_fps && nx_fps->FPSlocked > HandheldModeRefreshRateAllowed.max) {
-                    nx_fps->FPSlocked = HandheldModeRefreshRateAllowed.max;
-                    refreshRate = HandheldModeRefreshRateAllowed.max;
-                }
-                else if (isDocked && nx_fps) {
-                    uint8_t highestrr = getDockedHighestRefreshRateAllowed();
-                    if (nx_fps->FPSlockedDocked > highestrr) {
-                        nx_fps->FPSlockedDocked = highestrr;
-                        refreshRate = highestrr;
-                    }
-                }
-            }
+            if (!found) cleanAppData();
+            else updateRefreshRateForApp();
         }
-        static bool wasLastDocked = false;
-        if ((wasLastDocked && !isDocked && !displaySync) || (!wasLastDocked && isDocked && !displaySyncDocked)) {
-            uint32_t temp_refreshRate = 0;
-            if (GetDisplayRefreshRate(&temp_refreshRate, true) && temp_refreshRate != 60) {
-                SetDisplayRefreshRate(60);
-                refreshRate = 0;
-            }
-        }
-        wasLastDocked = isDocked;
 
-        if (isDocked && !displaySyncDocked && nx_fps && nx_fps->FPSlockedDocked > 60) {
-            uint32_t temp_refreshRate = 0;
-            GetDisplayRefreshRate(&temp_refreshRate, true);
-            if (temp_refreshRate <= 60) {
-                nx_fps->FPSlockedDocked = 60;
-            }
-        }
-        
-        uint32_t crr = 0;
-        GetDisplayRefreshRate(&crr, true);
-        if (isOLED) correctOledGamma(crr);
-
-        if (nx_fps) nx_fps -> dontForce60InDocked = dontForce60InDocked;
+        updateRefreshRate();
 
         // Detected new PID
         if (max != old_max && max > 0x80)

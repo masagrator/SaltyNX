@@ -20,6 +20,22 @@
 #if !defined(_DIRENT_HAVE_D_TYPE)
 #error "Wrong DIR structure detected!"
 #endif
+static_assert(sizeof(ino_t) == 2);
+
+struct FileId {
+    int id;
+    FILE* file;
+};
+
+struct DirId {
+    int id;
+    DIR* dir;
+};
+
+size_t openedFilesAmount = 0;
+struct FileId openedFilesArray[FOPEN_MAX-1] = {0};
+size_t openedDirsAmount = 0;
+struct DirId openedDirsArray[OPEN_MAX-1] = {0};
 
 typedef enum {
     handleService_EndSession,
@@ -597,12 +613,6 @@ static Result serviceSetDisplaySyncRefreshRate60WhenOutOfFocus() {
     return 0;
 }
 
-size_t openedFilesAmount = 0;
-FILE* openedFilesArray[FOPEN_MAX-1] = {0};
-size_t openedDirsAmount = 0;
-DIR* openedDirsArray[OPEN_MAX-1] = {0};
-uint64_t msb = 0;
-
 static Result serviceSdcardFopen(IpcCommand* c) {
 
     IpcParsedCommand r = {0};
@@ -626,7 +636,7 @@ static Result serviceSdcardFopen(IpcCommand* c) {
     struct {
         u64 magic;
         u64 result;
-        u64 id;
+        u32 id;
     } *raw;
 
     if (openedFilesAmount >= FOPEN_MAX-1) {
@@ -638,18 +648,17 @@ static Result serviceSdcardFopen(IpcCommand* c) {
         return 0;
     }
 
-    char filepath[FS_MAX_PATH] = "";
-    strncat(filepath, r.Buffers[0], FS_MAX_PATH-1);
-    filepath[FS_MAX_PATH-1] = 0;
-    char filemode[4];
-    memcpy(filemode, resp->mode, 4);
-    filemode[3] = 0;
+    const char* filepath = r.Buffers[0];
+    char filemode[4] = {0};
+    strncpy(filemode, resp->mode, 3);
 
     FILE* file = fopen(filepath, filemode);
+    int id = 0;
     if (file) {
-        openedFilesArray[openedFilesAmount++] = file;
-        if (msb == 0) msb = (uintptr_t)file & ~0xFFFFFFFFlu;
-        SERVICE_LOG("Opened file: %s, FileId: 0x%lx.", filepath, file);
+        id = rand();
+        if (!id) id = rand();
+        openedFilesArray[openedFilesAmount++] = (struct FileId){id, file};
+        SERVICE_LOG("Opened file: %s, FileId: 0x%x.", filepath, id);
     }
     else {
         SERVICE_LOG("Bad file: %s, errno: %d.", filepath, errno);
@@ -660,7 +669,7 @@ static Result serviceSdcardFopen(IpcCommand* c) {
 
     raw->magic = SFCO_MAGIC;
     raw->result = 0;
-    raw->id = (u64)file;
+    raw->id = id;
 
     return 0;
 }
@@ -685,22 +694,33 @@ static Result serviceSdcardFread(IpcCommand* c) {
     struct {
         u64 magic;
         u64 command;
-        u64 id;
         u64 size;
         u64 count;
+        u32 id;
     } *resp = r.Raw;
 
-    FILE* file = (FILE*)resp->id;
+    s32 id = resp->id;
+
+    if (id == 0) {
+        SERVICE_LOG("File not found.");
+        return SALTYSD_RESULT(handleService_SdcardFread, 1); //File not found
+    }
+
+    FILE* file = 0;
     size_t size = resp->size;
     size_t count = resp->count;
     void* addr = r.Buffers[0];
+    for (size_t i = 0; i < openedFilesAmount; i++) {
+        if (openedFilesArray[i].id == id) {
+            file = openedFilesArray[i].file;
+            break;
+        }
+    }
 
     if (!file) {
         SERVICE_LOG("File not found.");
         return SALTYSD_RESULT(handleService_SdcardFread, 1); //File not found
     }
-
-    file = (FILE*)((uintptr_t)file | msb);
 
     size_t read = fread(addr, size, count, file);
 
@@ -737,26 +757,35 @@ static Result serviceSdcardFclose(IpcCommand* c) {
     struct {
         u64 magic;
         u64 command;
-        u64 id;
+        u32 id;
     } *resp = r.Raw;
+    
+    s32 id = resp->id;
 
-    FILE* file = (FILE*)resp->id;
+    if (id == 0) {
+        SERVICE_LOG("File not found.");
+        return SALTYSD_RESULT(handleService_SdcardFclose, 1); //File not found
+    }
+
+    FILE* file = 0;
+    size_t i = 0;
+    for (; i < openedFilesAmount; i++) {
+        if (openedFilesArray[i].id == id) {
+            file = openedFilesArray[i].file;
+            break;
+        }
+    }
 
     if (!file) {
         SERVICE_LOG("File not found.");
         return SALTYSD_RESULT(handleService_SdcardFclose, 1); //File not found
     }
 
-    file = (FILE*)((uintptr_t)file | msb);
-
     int result = fclose(file);
-    if (!result) for (size_t i = 0; i < openedFilesAmount; i++) {
-        if (file == openedFilesArray[i]) {
-            memmove(&openedFilesArray[i], openedFilesArray[i+1], sizeof(openedFilesArray[0]) * (openedFilesAmount - (i+1)));
-            openedFilesArray[FOPEN_MAX-1] = 0;
-            openedFilesAmount--;
-            break;
-        }
+    if (!result) {
+        memmove(&openedFilesArray[i], &openedFilesArray[i+1], sizeof(openedFilesArray[0]) * (openedFilesAmount - (i+1)));
+        memset(&openedFilesArray[FOPEN_MAX-2], 0, sizeof(openedFilesArray[0]));
+        openedFilesAmount--;
     }
 
     SERVICE_LOG("FileId: 0x%lx, res: %d", file, result);
@@ -782,20 +811,31 @@ static Result serviceSdcardFseek(IpcCommand* c) {
         u64 command;
         s64 offset;
         int origin;
-        u64 id;
-
+        u32 id;
     } *resp = r.Raw;
 
-    FILE* file = (FILE*)resp->id;
+    u32 id = resp->id;
+
+    if (id == 0) {
+        SERVICE_LOG("File not found.");
+        return SALTYSD_RESULT(handleService_SdcardFseek, 1); //File not found
+    }
+
+    FILE* file = 0;
     int origin = resp->origin;
     long offset = resp->offset;
+
+    for (size_t i = 0; i < openedFilesAmount; i++) {
+        if (openedFilesArray[i].id == id) {
+            file = openedFilesArray[i].file;
+            break;
+        }
+    }
 
     if (!file) {
         SERVICE_LOG("File not found.");
         return SALTYSD_RESULT(handleService_SdcardFseek, 1); //File not found
     }
-
-    file = (FILE*)((uintptr_t)file | msb);
 
     int ret = fseek(file, offset, origin);
 
@@ -820,18 +860,29 @@ static Result serviceSdcardFtell(IpcCommand* c) {
     struct {
         u64 magic;
         u64 command;
-        u64 id;
+        s32 id;
 
     } *resp = r.Raw;
 
-    FILE* file = (FILE*)resp->id;
+    u32 id = resp->id;
+
+    if (id == 0) {
+        SERVICE_LOG("File not found.");
+        return SALTYSD_RESULT(handleService_SdcardFtell, 1); //File not found
+    }
+
+    FILE* file = 0;
+    for (size_t i = 0; i < openedFilesAmount; i++) {
+        if (openedFilesArray[i].id == id) {
+            file = openedFilesArray[i].file;
+            break;
+        }
+    }
 
     if (!file) {
         SERVICE_LOG("File not found.");
         return SALTYSD_RESULT(handleService_SdcardFtell, 1); //File not found
     }
-
-    file = (FILE*)((uintptr_t)file | msb);
 
     size_t offset = ftell(file);
 
@@ -865,9 +916,7 @@ static Result serviceSdcardRemove(IpcCommand* c) {
         return SALTYSD_RESULT(handleService_SdcardRemove, 3); // This call is reserved only for Core
     }
 
-    char filepath[FS_MAX_PATH] = "";
-    strncat(filepath, r.Buffers[0], FS_MAX_PATH-1);
-    filepath[FS_MAX_PATH-1] = 0;
+    const char* filepath = r.Buffers[0];
 
     int ret = remove(filepath);
 
@@ -896,22 +945,34 @@ static Result serviceSdcardFwrite(IpcCommand* c) {
     struct {
         u64 magic;
         u64 command;
-        u64 id;
         u64 size;
         u64 count;
+        u32 id;
     } *resp = r.Raw;
 
-    FILE* file = (FILE*)resp->id;
+    s32 id = resp->id;
+
+    if (id == 0) {
+        SERVICE_LOG("File not found.");
+        return SALTYSD_RESULT(handleService_SdcardFwrite, 1); //File not found
+    }
+
+    FILE* file = 0;
     size_t size = resp->size;
     size_t count = resp->count;
     void* addr = r.Buffers[0];
+
+    for (size_t i = 0; i < openedFilesAmount; i++) {
+        if (openedFilesArray[i].id == id) {
+            file = openedFilesArray[i].file;
+            break;
+        }
+    }
 
     if (!file) {
         SERVICE_LOG("File not found.");
         return SALTYSD_RESULT(handleService_SdcardFwrite, 1); //File not found
     }
-
-    file = (FILE*)((uintptr_t)file | msb);
 
     size_t written = fwrite(addr, size, count, file);
 
@@ -949,7 +1010,7 @@ static Result serviceSdcardOpendir(IpcCommand* c) {
     struct {
         u64 magic;
         u64 result;
-        u64 id;
+        u32 id;
     } *raw;
 
     if (openedDirsAmount >= OPEN_MAX-1) {
@@ -961,16 +1022,16 @@ static Result serviceSdcardOpendir(IpcCommand* c) {
         return 0;
     }
 
-    char filepath[FS_MAX_PATH] = "";
-    strncat(filepath, r.Buffers[0], FS_MAX_PATH-1);
-    filepath[FS_MAX_PATH-1] = 0;
+    const char* filepath = r.Buffers[0];
 
     DIR* dir = opendir(filepath);
 
+    int id = 0;
     if (dir) {
-        openedDirsArray[openedDirsAmount++] = dir;
-        if (msb == 0) msb = (uintptr_t)dir & ~0xFFFFFFFFlu;
-        SERVICE_LOG("Opened dir: %s, DirId: 0x%lx", filepath, dir);
+        id = rand();
+        if (!id) id = rand();
+        openedDirsArray[openedDirsAmount++] = (struct DirId){id, dir};
+        SERVICE_LOG("Opened dir: %s, DirId: 0x%x", filepath, id);
     }
     else {
         SERVICE_LOG("Bad dir: %s, errno: %d.", filepath, errno);
@@ -981,7 +1042,7 @@ static Result serviceSdcardOpendir(IpcCommand* c) {
 
     raw->magic = SFCO_MAGIC;
     raw->result = 0;
-    raw->id = (u64)dir;
+    raw->id = id;
 
     return 0;
 }
@@ -1000,9 +1061,7 @@ static Result serviceSdcardMkdir(IpcCommand* c) {
         return SALTYSD_RESULT(handleService_SdcardMkdir, 3); // This call is reserved only for Core
     }
 
-    char filepath[FS_MAX_PATH] = "";
-    strncat(filepath, r.Buffers[0], FS_MAX_PATH-1);
-    filepath[FS_MAX_PATH-1] = 0;
+    const char* filepath = r.Buffers[0];
 
     int ret = mkdir(filepath, 420);
 
@@ -1028,17 +1087,28 @@ static Result serviceSdcardReaddir(IpcCommand* c) {
     struct {
         u64 magic;
         u64 command;
-        u64 id;
+        u32 id;
     } *resp = r.Raw;
 
-    DIR* dir = (DIR*)resp->id;
+    u32 id = resp->id;
+
+    if (id == 0) {
+        SERVICE_LOG("No valid dir detected.");
+        return SALTYSD_RESULT(handleService_SdcardReaddir, 2);        
+    }
+
+    DIR* dir = 0;
+    for (size_t i = 0; i < openedDirsAmount; i++) {
+        if (openedDirsArray[i].id == id) {
+            dir = openedDirsArray[i].dir;
+            break;
+        }
+    }
 
     if (!dir) {
         SERVICE_LOG("No valid dir detected.");
         return SALTYSD_RESULT(handleService_SdcardReaddir, 2);
     }
-
-    dir = (DIR*)((uintptr_t)dir | msb);
 
     struct dirent* data = readdir(dir);
 
@@ -1078,32 +1148,38 @@ static Result serviceSdcardClosedir(IpcCommand* c) {
     struct {
         u64 magic;
         u64 command;
-        u64 id;
+        u32 id;
     } *resp = r.Raw;
 
-    DIR* dir = (DIR*)resp->id;
+    u32 id = resp->id;
+
+    DIR* dir = 0;
+    size_t i = 0;
+    for (; i < openedDirsAmount; i++) {
+        if (openedDirsArray[i].id == id) {
+            dir = openedDirsArray[i].dir;
+            break;
+        }
+    }
 
     if (!dir) {
         SERVICE_LOG("Wrong dir.");
         return SALTYSD_RESULT(handleService_SdcardClosedir, 1); //Dir not found
     }
 
-    dir = (DIR*)((uintptr_t)dir | msb);
-
     int result = closedir(dir);
-    if (!result) for (size_t i = 0; i < openedDirsAmount; i++) {
-        if (dir == openedDirsArray[i]) {
-            memmove(&openedDirsArray[i], openedDirsArray[i+1], sizeof(openedDirsArray[0]) * (openedDirsAmount - (i+1)));
-            openedDirsArray[OPEN_MAX-1] = 0;
-            openedDirsAmount--;
-            break;
-        }
+    if (!result) {
+        memmove(&openedDirsArray[i], &openedDirsArray[i+1], sizeof(openedDirsArray[0]) * (openedDirsAmount - (i+1)));
+        memset(&openedDirsArray[OPEN_MAX-2], 0, sizeof(openedDirsArray[0]));
+        openedDirsAmount--;
     }
 
     SERVICE_LOG("DirId: 0x%lx, res: %d", dir, result);
 
     return result;
 }
+
+static_assert(sizeof(ino_t) == 2);
 
 static Result handleServiceCmd(int cmd)
 {
