@@ -663,6 +663,8 @@ size_t SaltySDCore_fread(void* ptr, size_t size, size_t count, FILE* stream)
 		u64 magic;
 		u64 cmd_id;
 		u64 id;
+		u64 size;
+		u64 count;
 	} *raw;
 
 	raw = ipcPrepareHeader(&c, sizeof(*raw));
@@ -670,6 +672,8 @@ size_t SaltySDCore_fread(void* ptr, size_t size, size_t count, FILE* stream)
 	raw->magic = SFCI_MAGIC;
 	raw->cmd_id = handleService_SdcardFread;
 	raw->id = (u64)stream;
+	raw->size = size;
+	raw->count = count;
 
 	Result ret = ipcDispatch(saltysd);
 
@@ -680,12 +684,12 @@ size_t SaltySDCore_fread(void* ptr, size_t size, size_t count, FILE* stream)
 		struct output {
 			u64 magic;
 			u64 result;
-			u64 bytes_read;
+			u64 count_read;
 		} *resp = (struct output*)r.Raw;
 
 		u64 ret = resp->result;
-		size_t bytes_read = (size_t)resp->bytes_read;
-		if (!ret) return bytes_read;
+		size_t count_read = (size_t)resp->count_read;
+		if (!ret) return count_read;
 	}
 
 	return 0;
@@ -851,6 +855,8 @@ size_t SaltySDCore_fwrite(const void* ptr, size_t size, size_t count, FILE* stre
 		u64 magic;
 		u64 cmd_id;
 		u64 id;
+		u64 size;
+		u64 count;
 	} *raw;
 
 	raw = ipcPrepareHeader(&c, sizeof(*raw));
@@ -858,6 +864,8 @@ size_t SaltySDCore_fwrite(const void* ptr, size_t size, size_t count, FILE* stre
 	raw->magic = SFCI_MAGIC;
 	raw->cmd_id = handleService_SdcardFwrite;
 	raw->id = (u64)stream;
+	raw->size = size;
+	raw->count = count;
 
 	Result ret = ipcDispatch(saltysd);
 
@@ -868,12 +876,12 @@ size_t SaltySDCore_fwrite(const void* ptr, size_t size, size_t count, FILE* stre
 		struct output {
 			u64 magic;
 			u64 result;
-			u64 bytes_write;
+			u64 count_write;
 		} *resp = (struct output*)r.Raw;
 
 		u64 ret = resp->result;
-		size_t bytes_write = (size_t)resp->bytes_write;
-		if (!ret) return bytes_write;
+		size_t count_write = (size_t)resp->count_write;
+		if (!ret) return count_write;
 	}
 
 	return 0;
