@@ -598,9 +598,9 @@ static Result serviceSetDisplaySyncRefreshRate60WhenOutOfFocus() {
 }
 
 size_t openedFilesAmount = 0;
-FILE* openedFilesArray[FOPEN_MAX] = {0};
+FILE* openedFilesArray[FOPEN_MAX-1] = {0};
 size_t openedDirsAmount = 0;
-DIR* openedDirsArray[OPEN_MAX] = {0};
+DIR* openedDirsArray[OPEN_MAX-1] = {0};
 uint64_t msb = 0;
 
 static Result serviceSdcardFopen(IpcCommand* c) {
@@ -629,7 +629,7 @@ static Result serviceSdcardFopen(IpcCommand* c) {
         u64 id;
     } *raw;
 
-    if (openedFilesAmount >= FOPEN_MAX) {
+    if (openedFilesAmount >= FOPEN_MAX-1) {
         raw = ipcPrepareHeader(c, sizeof(*raw));
         raw->magic = SFCO_MAGIC;
         raw->result = SALTYSD_RESULT(handleService_SdcardFopen, 1);
@@ -946,6 +946,21 @@ static Result serviceSdcardOpendir(IpcCommand* c) {
         return SALTYSD_RESULT(handleService_SdcardOpendir, 3); // This call is reserved only for Core
     }
 
+    struct {
+        u64 magic;
+        u64 result;
+        u64 id;
+    } *raw;
+
+    if (openedDirsAmount >= OPEN_MAX-1) {
+        raw = ipcPrepareHeader(c, sizeof(*raw));
+        raw->magic = SFCO_MAGIC;
+        raw->result = SALTYSD_RESULT(handleService_SdcardOpendir, 1);
+        raw->id = 0;
+        SERVICE_LOG("Too much dirs opened at once.");
+        return 0;
+    }
+
     char filepath[FS_MAX_PATH] = "";
     strncat(filepath, r.Buffers[0], FS_MAX_PATH-1);
     filepath[FS_MAX_PATH-1] = 0;
@@ -961,12 +976,6 @@ static Result serviceSdcardOpendir(IpcCommand* c) {
         SERVICE_LOG("Bad dir: %s, errno: %d.", filepath, errno);
         return SALTYSD_RESULT(handleService_SdcardOpendir, 2); // Bad dir
     }
-
-    struct {
-        u64 magic;
-        u64 result;
-        u64 id;
-    } *raw;
 
     raw = ipcPrepareHeader(c, sizeof(*raw));
 
