@@ -10,6 +10,13 @@
 
 Handle saltysd;
 
+#if defined(_DIRENT_HAVE_D_NAMLEN) || defined(_DIRENT_HAVE_D_RECLEN) || defined(_DIRENT_HAVE_D_OFF)
+#error "Wrong DIR structure detected!"
+#endif
+#if !defined(_DIRENT_HAVE_D_TYPE)
+#error "Wrong DIR structure detected!"
+#endif
+
 typedef enum {
     handleService_EndSession,
     handleService_LoadELF,
