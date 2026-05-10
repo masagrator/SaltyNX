@@ -681,11 +681,14 @@ static Result serviceSdcardFread(IpcCommand* c) {
         u64 magic;
         u64 command;
         u64 id;
+        u64 size;
+        u64 count;
     } *resp = r.Raw;
 
     FILE* file = (FILE*)resp->id;
+    size_t size = resp->size;
+    size_t count = resp->count;
     void* addr = r.Buffers[0];
-    size_t size = r.BufferSizes[0];
 
     if (!file) {
         SERVICE_LOG("File not found.");
@@ -694,21 +697,21 @@ static Result serviceSdcardFread(IpcCommand* c) {
 
     file = (FILE*)((uintptr_t)file | msb);
 
-    size_t read = fread(addr, 1, size, file);
+    size_t read = fread(addr, size, count, file);
 
-    SERVICE_LOG("FileId: 0x%lx, read: %ld B.", file, read);
+    SERVICE_LOG("FileId: 0x%lx, read: %ld B.", file, read * size);
 
     struct {
         u64 magic;
         u64 result;
-        u64 bytes_read;
+        u64 count_read;
     } *raw;
 
     raw = ipcPrepareHeader(c, sizeof(*raw));
 
     raw->magic = SFCO_MAGIC;
     raw->result = 0;
-    raw->bytes_read = read;
+    raw->count_read = read;
 
     return 0;
 }
@@ -889,11 +892,14 @@ static Result serviceSdcardFwrite(IpcCommand* c) {
         u64 magic;
         u64 command;
         u64 id;
+        u64 size;
+        u64 count;
     } *resp = r.Raw;
 
     FILE* file = (FILE*)resp->id;
+    size_t size = resp->size;
+    size_t count = resp->count;
     void* addr = r.Buffers[0];
-    size_t size = r.BufferSizes[0];
 
     if (!file) {
         SERVICE_LOG("File not found.");
@@ -902,21 +908,21 @@ static Result serviceSdcardFwrite(IpcCommand* c) {
 
     file = (FILE*)((uintptr_t)file | msb);
 
-    size_t written = fwrite(addr, 1, size, file);
+    size_t written = fwrite(addr, size, count, file);
 
-    SERVICE_LOG("FileId: 0x%lx, written: %ld B.", file, written);
+    SERVICE_LOG("FileId: 0x%lx, written: %ld B.", file, written * size);
 
     struct {
         u64 magic;
         u64 result;
-        u64 bytes_write;
+        u64 count_write;
     } *raw;
 
     raw = ipcPrepareHeader(c, sizeof(*raw));
 
     raw->magic = SFCO_MAGIC;
     raw->result = 0;
-    raw->bytes_write = written;
+    raw->count_write = written;
 
     return 0;
 }
