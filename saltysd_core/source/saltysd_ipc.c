@@ -51,6 +51,8 @@ typedef enum {
     handleService_SdcardClosedir
 } handleService;
 
+uint64_t msb = 0;
+
 Result SaltySD_Init()
 {
 	Result ret;
@@ -631,8 +633,8 @@ FILE* SaltySDCore_fopen(const char* filename, const char* mode)
 
 	raw->magic = SFCI_MAGIC;
 	raw->cmd_id = handleService_SdcardFopen;
+	memset(raw->mode, 0, 4);
 	strncpy(raw->mode, mode, 3);
-	raw->mode[3] = 0;
 
 	Result ret = ipcDispatch(saltysd);
 
@@ -643,16 +645,11 @@ FILE* SaltySDCore_fopen(const char* filename, const char* mode)
 		struct output {
 			u64 magic;
 			u64 result;
-			u64 id;
+			u32 id;
 		} *resp = (struct output*)r.Raw;
 
 		u64 ret = resp->result;
-		#if defined(SWITCH32) || defined(OUNCE32)
-		FILE* file = (FILE*)(u32)resp->id;
-		#else
-		FILE* file = (FILE*)resp->id;
-		#endif
-		if (!ret) return file;
+		if (!ret) return (FILE*)(uintptr_t)resp->id;
 	}
 
 	return nullptr;
@@ -669,9 +666,9 @@ size_t SaltySDCore_fread(void* ptr, size_t size, size_t count, FILE* stream)
 	struct input {
 		u64 magic;
 		u64 cmd_id;
-		u64 id;
 		u64 size;
 		u64 count;
+		u32 id;
 	} *raw;
 
 	raw = ipcPrepareHeader(&c, sizeof(*raw));
@@ -712,14 +709,14 @@ int SaltySDCore_fclose(FILE* stream)
 	struct input {
 		u64 magic;
 		u64 cmd_id;
-		u64 id;
+		u32 id;
 	} *raw;
 
 	raw = ipcPrepareHeader(&c, sizeof(*raw));
 
 	raw->magic = SFCI_MAGIC;
 	raw->cmd_id = handleService_SdcardFclose;
-	raw->id = (u64)stream;
+	raw->id = (u32)(uintptr_t)stream;
 
 	Result ret = ipcDispatch(saltysd);
 
@@ -750,7 +747,7 @@ int SaltySDCore_fseek(FILE* stream, int64_t offset, int origin)
 		u64 cmd_id;
         s64 offset;
         int origin;
-        u64 id;
+        u32 id;
 	} *raw;
 
 	raw = ipcPrepareHeader(&c, sizeof(*raw));
@@ -759,7 +756,7 @@ int SaltySDCore_fseek(FILE* stream, int64_t offset, int origin)
 	raw->cmd_id = handleService_SdcardFseek;
 	raw->offset = offset;
 	raw->origin = origin;
-	raw->id = (u64)stream;
+	raw->id = (u32)(uintptr_t)stream;
 
 	Result ret = ipcDispatch(saltysd);
 
@@ -787,14 +784,14 @@ size_t SaltySDCore_ftell(FILE* stream) {
 	struct input {
 		u64 magic;
 		u64 cmd_id;
-        u64 id;
+        u32 id;
 	} *raw;
 
 	raw = ipcPrepareHeader(&c, sizeof(*raw));
 
 	raw->magic = SFCI_MAGIC;
 	raw->cmd_id = handleService_SdcardFtell;
-	raw->id = (u64)stream;
+	raw->id = (u32)(uintptr_t)stream;
 
 	Result ret = ipcDispatch(saltysd);
 
@@ -861,16 +858,16 @@ size_t SaltySDCore_fwrite(const void* ptr, size_t size, size_t count, FILE* stre
 	struct input {
 		u64 magic;
 		u64 cmd_id;
-		u64 id;
 		u64 size;
 		u64 count;
+		u32 id;
 	} *raw;
 
 	raw = ipcPrepareHeader(&c, sizeof(*raw));
 
 	raw->magic = SFCI_MAGIC;
 	raw->cmd_id = handleService_SdcardFwrite;
-	raw->id = (u64)stream;
+	raw->id = (u32)(uintptr_t)stream;
 	raw->size = size;
 	raw->count = count;
 
@@ -921,16 +918,11 @@ DIR* SaltySDCore_opendir(const char* dirname)
 		struct output {
 			u64 magic;
 			u64 result;
-			u64 id;
+			u32 id;
 		} *resp = (struct output*)r.Raw;
 
 		u64 ret = resp->result;
-		#if defined(SWITCH32) || defined(OUNCE32)
-		DIR* dir = (DIR*)(u32)resp->id;
-		#else
-		DIR* dir = (DIR*)resp->id;
-		#endif
-		if (!ret) return dir;
+		if (!ret) return (DIR*)(uintptr_t)resp->id;
 	}
 
 	return nullptr;
@@ -971,10 +963,15 @@ int SaltySDCore_mkdir(const char* dirname, mode_t mode)
 	return 1;
 }
 
+#if defined(SWITCH) || defined(OUNCE)
+static_assert(sizeof(ino_t) == 2);
+#endif
+
 struct dirent output = {0};
 
 struct dirent* SaltySDCore_readdir(DIR* dirp)
 {
+
 	// Send a command
 	IpcCommand c;
 	ipcInitialize(&c);
@@ -984,14 +981,14 @@ struct dirent* SaltySDCore_readdir(DIR* dirp)
 	struct input {
 		u64 magic;
 		u64 cmd_id;
-		u64 id;
+		u32 id;
 	} *raw;
 
 	raw = ipcPrepareHeader(&c, sizeof(*raw));
 
 	raw->magic = SFCI_MAGIC;
 	raw->cmd_id = handleService_SdcardReaddir;
-	raw->id = (u64)dirp;
+	raw->id = (u32)(uintptr_t)dirp;
 
 	Result ret = ipcDispatch(saltysd);
 
@@ -1006,6 +1003,17 @@ struct dirent* SaltySDCore_readdir(DIR* dirp)
 
 		u64 ret = resp->result;
 		if (!ret) {
+			#if defined(SWITCH32) || defined(OUNCE32)
+			struct direntSalty {
+				uint16_t	   d_ino;
+				unsigned char  d_type;
+				char	       d_name[NAME_MAX+1];
+			};
+			struct direntSalty* dir = (struct direntSalty*)&output;
+			memmove(&output.d_name, dir->d_name, NAME_MAX+1);
+			output.d_type = dir->d_type;
+			output.d_ino = dir->d_ino;
+			#endif
 			return &output;
 		}
 	}
@@ -1022,14 +1030,14 @@ int SaltySDCore_closedir(DIR *dirp)
 	struct input {
 		u64 magic;
 		u64 cmd_id;
-		u64 id;
+		u32 id;
 	} *raw;
 
 	raw = ipcPrepareHeader(&c, sizeof(*raw));
 
 	raw->magic = SFCI_MAGIC;
 	raw->cmd_id = handleService_SdcardClosedir;
-	raw->id = (u64)dirp;
+	raw->id = (u32)(uintptr_t)dirp;
 
 	Result ret = ipcDispatch(saltysd);
 
