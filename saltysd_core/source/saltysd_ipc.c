@@ -51,8 +51,6 @@ typedef enum {
     handleService_SdcardClosedir
 } handleService;
 
-uint64_t msb = 0;
-
 Result SaltySD_Init()
 {
 	Result ret;
