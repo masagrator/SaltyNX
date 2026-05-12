@@ -54,13 +54,13 @@ CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++23
 ASFLAGS	:=	-g $(ARCH)
 LDFLAGS	=	-z max-page-size=0x1000 -T $(TOPDIR)/rel.ld -z text -z nodynamic-undefined-weak --build-id=sha1 -g --emit-relocs
 
-LIBS	:= -lnx_min
+LIBS	:= -lnx
 
 #---------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level containing
 # include and lib
 #---------------------------------------------------------------------------------
-LIBDIRS	:= $(PORTLIBS) $(LIBNX) $(CURDIR)/../libnx_min/nx/
+LIBDIRS	:= $(PORTLIBS) $(LIBNX)
 
 
 #---------------------------------------------------------------------------------

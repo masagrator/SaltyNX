@@ -1,4 +1,11 @@
+#ifdef SWITCH
+#include <switch.h>
+#define NORETURN NX_NORETURN
+#elif SWITCH32
 #include <switch_min.h>
+#else
+#error "Unsupported base architecture!"
+#endif
 #include <sys/iosupport.h>
 
 int __system_argc;

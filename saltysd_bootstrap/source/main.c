@@ -1,4 +1,11 @@
+#ifdef SWITCH
+#include <switch.h>
+#include "ipc.h"
+#elif SWITCH32
 #include <switch_min.h>
+#else
+#error "Unsupported base architecture!"
+#endif
 
 #include <string.h>
 #include <stdio.h>
