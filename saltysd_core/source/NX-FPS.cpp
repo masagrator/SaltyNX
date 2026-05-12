@@ -1,4 +1,11 @@
+#if defined(SWITCH32)
 #include <switch_min.h>
+#elif defined(SWITCH)
+#include <switch.h>
+#define InfoType_TitleId InfoType_ProgramId
+#else
+#error "Unsupported base architecture!"
+#endif
 #include "saltysd_ipc.h"
 #include "saltysd_dynamic.h"
 #include "saltysd_core.h"
@@ -1006,6 +1013,10 @@ namespace NVN {
 	}
 
 	void WindowBuilderSetTextures(const WindowBuilder* nvnWindowBuilder, int numBufferedFrames, const Texture** nvnTextures) {
+		if (R_SUCCEEDED(SaltySD_Init())) {
+			SaltySDCore_printf("TEST FROM CORE!!!!!!!!!!!!!!!!!\n");
+			SaltySD_Deinit();
+		}
 		(Shared -> Buffers) = numBufferedFrames;
 		amountOfAvailableBuffers = numBufferedFrames;
 		if ((Shared -> SetBuffers) >= 2 && (Shared -> SetBuffers) <= numBufferedFrames) {

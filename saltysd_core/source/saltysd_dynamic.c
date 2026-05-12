@@ -5,7 +5,13 @@
 typedef Elf64_Xword Elf64_Relr;
 #endif
 
+#if defined(SWITCH32)
 #include <switch_min.h>
+#elif defined(SWITCH)
+#include <switch.h>
+#else
+#error "Unsupported base architecture!"
+#endif
 #include <stdlib.h>
 #include "saltysd_ipc.h"
 

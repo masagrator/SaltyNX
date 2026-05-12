@@ -1,6 +1,11 @@
-#include "saltysd_ipc.h"
-
+#if defined(SWITCH32)
 #include <switch_min.h>
+#elif defined(SWITCH)
+#include <switch.h>
+#include "ipc.h"
+#else
+#error "Unsupported base architecture!"
+#endif
 #include <stdarg.h>
 
 #include "saltysd_core.h"
@@ -68,18 +73,6 @@ Result SaltySD_Init()
 	//debug_log("SaltySD Core: Got handle %x\n", saltysd);
 }
 
-Result SaltySD_Deinit()
-{
-	Result ret;
-
-	//debug_log("SaltySD Core: terminating\n");
-	ret = SaltySD_Term();
-	if (ret) return ret;
-
-	svcCloseHandle(saltysd);
-	return ret;
-}
-
 Result SaltySD_Term()
 {
 	Result ret;
@@ -120,6 +113,18 @@ Result SaltySD_Term()
 	// Session terminated works too.
 	if (ret == 0xf601) return 0;
 
+	return ret;
+}
+
+Result SaltySD_Deinit()
+{
+	Result ret;
+
+	//debug_log("SaltySD Core: terminating\n");
+	ret = SaltySD_Term();
+	if (ret) return ret;
+
+	svcCloseHandle(saltysd);
 	return ret;
 }
 
@@ -336,7 +341,11 @@ Result SaltySD_GetSDCard(Handle *retrieve)
 			
 			// Init fs stuff
 			FsFileSystem sdcardfs;
+			#if defined(SWITCH32) || defined(OUNCE32)
 			sdcardfs.s.handle = *retrieve;
+			#else
+			sdcardfs.s.own_handle = *retrieve;
+			#endif
 			int dev = fsdevMountDevice("sdmc", sdcardfs);
 			setDefaultDevice(dev);
 

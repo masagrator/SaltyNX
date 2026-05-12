@@ -8,6 +8,10 @@
 //We need to define something in that section and reference its pointer to not get whole section discarded by garbage collector
 void __attribute__ ((section(".codecave"))) codeCave() {}
 
+#if defined(SWITCH)
+#define PACKED NX_PACKED
+#endif
+
 size_t codeCave_buffer_reserved = 0;
 
 alignas(0x1000) uint8_t variables_buffer[0x1000];

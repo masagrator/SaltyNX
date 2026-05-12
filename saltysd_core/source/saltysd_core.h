@@ -1,7 +1,13 @@
 #ifndef SALTYSD_CORE_H
 #define SALTYSD_CORE_H
 
+#if defined(SWITCH32)
 #include <switch_min.h>
+#elif defined(SWITCH)
+#include <switch.h>
+#else
+#error "Unsupported base architecture!"
+#endif
 #include <dirent.h>
 #include <stdio.h>
 

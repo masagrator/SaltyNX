@@ -7,7 +7,7 @@ $(error "Please set DEVKITPRO in your environment. export DEVKITPRO=<path to>/de
 endif
 
 TOPDIR ?= $(CURDIR)
-include $(TOPDIR)/../libnx_min/nx/switch_rules
+include $(DEVKITPRO)/libnx/switch_rules
 
 #---------------------------------------------------------------------------------
 # TARGET is the name of the output
@@ -41,7 +41,7 @@ EXEFS_SRC	:=	exefs_src
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
-ARCH	    :=	-march=armv8-a -mtune=cortex-a57 -mtp=soft -fPIE -fno-plt
+ARCH	    :=	-march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE -fno-plt
 
 CFLAGS	:=	-Wall -O2 \
 			-ffast-math -ffunction-sections -fdata-sections \
@@ -53,15 +53,15 @@ CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++23
 
 ASFLAGS	     :=	-g $(ARCH)
 
-LDFLAGS	=	-z max-page-size=0x1000 -specs=$(TOPDIR)/../libnx_min/nx/switch.specs -g $(ARCH) -Wl,--dynamic-list=$(CURDIR)/../dynamic_symbols.txt -Wl,-Map,$(notdir $*.map)
+LDFLAGS	=	-specs=$(DEVKITPRO)/libnx/switch.specs -z max-page-size=0x1000 -g $(ARCH) -Wl,--dynamic-list=$(CURDIR)/../dynamic_symbols.txt -Wl,-Map,$(notdir $*.map) -Wl,-wrap,__syscall_getreent
 
-LIBS	:= -lnx_min
+LIBS	:= -lnx
 
 #---------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level containing
 # include and lib
 #---------------------------------------------------------------------------------
-LIBDIRS	:= $(PORTLIBS) $(CURDIR)/../libnx_min/nx/
+LIBDIRS	:= $(PORTLIBS) $(LIBNX)
 
 
 #---------------------------------------------------------------------------------

@@ -1,4 +1,14 @@
+#if defined(SWITCH32)
 #include <switch_min.h>
+#elif defined(SWITCH)
+#include <switch.h>
+#define PACKED NX_PACKED
+#define InfoType_TitleId InfoType_ProgramId
+#define AppletNotificationMessage_OperationModeChanged AppletMessage_OperationModeChanged
+#define AppletNotificationMessage_PerformanceModeChanged AppletMessage_PerformanceModeChanged
+#else
+#error "Unsupported base architecture!"
+#endif
 
 #include "saltysd_core.h"
 #include "saltysd_ipc.h"

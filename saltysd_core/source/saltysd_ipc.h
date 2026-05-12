@@ -1,7 +1,13 @@
 #ifndef SALTYSD_IPC_H
 #define SALTYSD_IPC_H
 
+#if defined(SWITCH32)
 #include <switch_min.h>
+#elif defined(SWITCH)
+#include <switch.h>
+#else
+#error "Unsupported base architecture!"
+#endif
 
 #define LINKABLE __attribute__ ((weak))
 

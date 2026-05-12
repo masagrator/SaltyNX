@@ -1,7 +1,13 @@
 #ifndef USEFUL_H
 #define USEFUL_H
 
+#if defined(SWITCH32)
 #include <switch_min.h>
+#elif defined(SWITCH)
+#include <switch.h>
+#else
+#error "Unsupported base architecture!"
+#endif
 #include <string.h>
 #include <stdio.h>
 #include <stdarg.h>

@@ -1,11 +1,20 @@
+#if defined(SWITCH32)
 #include <switch_min.h>
+#include <switch_min/kernel/ipc.h>
+#include <switch_min/runtime/threadvars.h>
+#elif defined(SWITCH)
+#include <switch.h>
+#include "ipc.h"
+#include "internal.h"
+void virtmemSetup(void);
+#else
+#error "Unsupported base architecture!"
+#endif
 
 #include "NX-FPS.h"
 #include "ReverseNX.h"
 
 #include <dirent.h>
-#include <switch_min/kernel/ipc.h>
-#include <switch_min/runtime/threadvars.h>
 #include <stdlib.h>
 
 #include "useful.h"
@@ -42,7 +51,7 @@ uint64_t tid = 0;
 static uint32_t sharedOperationMode = 0;
 
 void __libnx_init(void* ctx, Handle main_thread, void* saved_lr)
-{
+{	
 	extern char* fake_heap_start;
 	extern char* fake_heap_end;
 
@@ -52,29 +61,24 @@ void __libnx_init(void* ctx, Handle main_thread, void* saved_lr)
 	orig_ctx = ctx;
 	orig_main_thread = main_thread;
 	
-	// Hacky TLS stuff, TODO: just stop using libnx t b h
-	vars_mine.magic = 0x21545624;
-	vars_mine.handle = main_thread;
-	vars_mine.thread_ptr = NULL;
-	vars_mine.reent = _impure_ptr;
-	vars_mine.tls_tp = (void*)malloc(0x100);
-	vars_orig = *getThreadVars();
-	*getThreadVars() = vars_mine;
 	virtmemSetup();
 }
 
 void __attribute__((weak)) __libnx_exit(int rc)
 {
 	fsdevUnmountAll();
-	
-	// Restore TLS stuff
-	*getThreadVars() = vars_orig;
 
-	free(vars_mine.tls_tp);
-	
 	uintptr_t addr = SaltySDCore_getCodeStart();
 
 	__nx_exit_clear(orig_ctx, orig_main_thread, (void*)addr);
+}
+
+struct _reent* _real___syscall_getreent(void);
+
+struct _reent* _wrap___syscall_getreent(void)
+{
+    ThreadVars* tv = getThreadVars();
+    return tv->reent;
 }
 
 uintptr_t g_heapAddr;

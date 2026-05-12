@@ -57,7 +57,7 @@ CXXFLAGS		:=	$(CFLAGS) -fno-exceptions -fno-rtti -std=gnu++23
 CFLAGS          +=  -Wno-pointer-to-int-cast
 
 ASFLAGS			:=	-g $(ARCH)
-LDFLAGS			=	-specs=$(CURDIR)/../libnx32_min/nx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map) -B$(ARMV6K_LIBDIR) -L$(ARMV6K_SYSLIB)
+LDFLAGS			=	-specs=$(CURDIR)/../libnx32_min/nx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map) -B$(ARMV6K_LIBDIR) -L$(ARMV6K_SYSLIB) -Wl,-wrap,__syscall_getreent
 
 LIBS			:=	-lnx_min
 
