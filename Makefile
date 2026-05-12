@@ -10,16 +10,13 @@ TOPDIR ?= $(CURDIR)
 
 all: sdcard_out/atmosphere/contents/0000000000534C56/exefs.nsp
 
-libnx_min/nx/lib/libnx_min.a:
-	@cd libnx_min && make
-
 libnx32_min/nx/lib/libnx_min.a:
 	@cd libnx32_min && make
 
 saltysd_proc/saltysd_proc.nsp:
 	@cd saltysd_proc && make
 
-saltysd_bootstrap/saltysd_bootstrap.elf: libnx_min/nx/lib/libnx_min.a
+saltysd_bootstrap/saltysd_bootstrap.elf:
 	@cd saltysd_bootstrap && make -f ./Makefile.64.mk
 
 saltysd_bootstrap/saltysd_bootstrap32.elf: libnx32_min/nx/lib/libnx_min.a
@@ -59,7 +56,6 @@ sdcard_out/atmosphere/contents/0000000000534C56/exefs.nsp: saltysd_core/saltysd_
 clean:
 	@rm -f saltysd_proc/data/*
 	@rm -r -f sdcard_out
-	@cd libnx_min && make clean
 	@cd libnx32_min && make clean
 	@cd saltysd_core && make -f Makefile.64.mk clean && make -f Makefile.32.mk clean
 	@cd saltysd_bootstrap && make -f Makefile.64.mk clean && make -f Makefile.32.mk clean
