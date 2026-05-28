@@ -54,7 +54,7 @@ CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++23
 
 ASFLAGS	     :=	-g $(ARCH)
 
-LDFLAGS	=	-specs=$(DEVKITPRO)/libnx/switch.specs -z max-page-size=0x1000 -g $(ARCH) -Wl,--dynamic-list=$(CURDIR)/../dynamic_symbols.txt -Wl,-Map,$(notdir $*.map) -Wl,-wrap,__syscall_getreent
+LDFLAGS	=	-specs=$(CURDIR)/../switch64.specs -z max-page-size=0x1000 -g $(ARCH) -Wl,--dynamic-list=$(CURDIR)/../dynamic_symbols.txt -Wl,-Map,$(notdir $*.map) -Wl,-wrap,__syscall_getreent
 
 LIBS	:= -lnx
 
