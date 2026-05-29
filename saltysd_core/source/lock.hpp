@@ -6,7 +6,20 @@
 
 #if defined(SWITCH) || defined(OUNCE)
 //We need to define something in that section and reference its pointer to not get whole section discarded by garbage collector
-void __attribute__ ((section(".codecave"))) codeCave() {}
+//Trick to get section page aligned to 0x1000 with size 0x1000 without using linker script
+extern "C" void codeCave();
+__asm__(
+    ".section .codecave, \"ax\", %progbits\n"
+    ".global codeCave\n"
+    ".type codeCave, %function\n"
+    ".align 12\n"
+    
+    "codeCave:\n"
+    "    nop\n"
+    "    ret\n"
+    
+    ".align 12\n"
+);
 
 #if defined(SWITCH)
 #define PACKED NX_PACKED
