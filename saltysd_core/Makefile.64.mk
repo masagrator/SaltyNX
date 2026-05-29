@@ -42,21 +42,21 @@ EXEFS_SRC	:=	exefs_src
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
-ARCH	    :=	-march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE -fno-plt
+ARCH	 :=	-march=armv8-a+crc+crypto -mtune=cortex-a57 -mtp=soft -fPIE -fno-plt
 
-CFLAGS	:=	-Wall -Werror -O2 \
+CFLAGS	 :=	-Wall -Werror -O2 \
 			-ffast-math -ffunction-sections -fdata-sections \
 			$(ARCH) $(DEFINES)
 
-CFLAGS	+=	$(INCLUDE) -DSWITCH -DAPP_VERSION=\"$(VERSION)\" -DMODULE_NAME=\"$(MODULE_NAME)\"
+CFLAGS	 +=	$(INCLUDE) -DSWITCH -DAPP_VERSION=\"$(VERSION)\" -DMODULE_NAME=\"$(MODULE_NAME)\"
 
-CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++23
+CXXFLAGS := $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++23
 
-ASFLAGS	     :=	-g $(ARCH)
+ASFLAGS	 :=	-g $(ARCH)
 
-LDFLAGS	=	-specs=$(CURDIR)/../switch64.specs -z max-page-size=0x1000 -g $(ARCH) -Wl,--dynamic-list=$(CURDIR)/../dynamic_symbols.txt -Wl,-Map,$(notdir $*.map) -Wl,-wrap,__syscall_getreent
+LDFLAGS   =	-specs=$(DEVKITPRO)/libnx/switch.specs -z max-page-size=0x1000 -g $(ARCH) -Wl,--dynamic-list=$(CURDIR)/../dynamic_symbols.txt -Wl,-Map,$(notdir $*.map) -Wl,-wrap,__syscall_getreent
 
-LIBS	:= -lnx
+LIBS	 := -lnx
 
 #---------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level containing
