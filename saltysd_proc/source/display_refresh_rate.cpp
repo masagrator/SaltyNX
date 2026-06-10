@@ -562,12 +562,17 @@ bool setPLLDHandheldRefreshRate(uint32_t new_refreshRate) {
 
     uint8_t base_refreshRate = new_refreshRate - (new_refreshRate % 5);
 
-    base.PLLD_DIVN = (4 * base_refreshRate) / 10;
     base.PLLD_DIVM = 1;
+    uint32_t DIVN = (4 * base_refreshRate) / 10;
+    if (DIVN > 31) {
+        base.PLLD_DIVM = 0;
+        DIVN /= 2;
+    }
+    base.PLLD_DIVN = DIVN;
 
     uint64_t expected_pixel_clock = (DSI_CLOCK_HZ * new_refreshRate) / 60;
 
-    misc.PLLD_SDM_DIN = ((8 * base.PLLD_DIVM * expected_pixel_clock) / 9375) - (4096 * ((2 * base.PLLD_DIVN)+1));
+    misc.PLLD_SDM_DIN = (((uint64_t)4 * (1 << base.PLLD_DIVM) * expected_pixel_clock) / 9375) - (4096 * ((2 * base.PLLD_DIVN) + 1));
 
     memcpy((void*)(clkVirtAddr + 0xD0), &base, 4);
     memcpy((void*)(clkVirtAddr + 0xDC), &misc, 4);
