@@ -527,7 +527,7 @@ bool setPLLDHandheldRefreshRate(uint32_t new_refreshRate) {
     struct PLLD_MISC misc = {0};
     memcpy(&base, (void*)(clkVirtAddr + 0xD0), 4);
     memcpy(&misc, (void*)(clkVirtAddr + 0xDC), 4);
-    uint32_t value = ((base.PLLD_DIVN / (1 << base.PLLD_DIVM)) * 10) / 4;
+    uint32_t value = ((base.PLLD_DIVN / base.PLLD_DIVM) * 10) / 4;
     if (value == 0 || value == 80) return false;
     //We are in handheld mode
     
@@ -552,7 +552,7 @@ bool setPLLDHandheldRefreshRate(uint32_t new_refreshRate) {
         }
         if (!skip) new_refreshRate = 60;
     }
-    uint32_t pixelClock = (9375llu * ((4096 * ((2 * base.PLLD_DIVN) + 1)) + misc.PLLD_SDM_DIN)) / (4 * (1 << base.PLLD_DIVM));
+    uint32_t pixelClock = (9375llu * ((4096 * ((2 * base.PLLD_DIVN) + 1)) + misc.PLLD_SDM_DIN)) / (8 * base.PLLD_DIVM);
     uint16_t refreshRateNow = pixelClock / (DSI_CLOCK_HZ / 60);
 
     if (refreshRateNow == new_refreshRate) {
@@ -562,17 +562,12 @@ bool setPLLDHandheldRefreshRate(uint32_t new_refreshRate) {
 
     uint8_t base_refreshRate = new_refreshRate - (new_refreshRate % 5);
 
+    base.PLLD_DIVN = (4 * base_refreshRate) / 10;
     base.PLLD_DIVM = 1;
-    uint32_t DIVN = (4 * base_refreshRate) / 10;
-    if (DIVN > 31) {
-        base.PLLD_DIVM = 0;
-        DIVN /= 2;
-    }
-    base.PLLD_DIVN = DIVN;
 
     uint64_t expected_pixel_clock = (DSI_CLOCK_HZ * new_refreshRate) / 60;
 
-    misc.PLLD_SDM_DIN = (((uint64_t)4 * (1 << base.PLLD_DIVM) * expected_pixel_clock) / 9375) - (4096 * ((2 * base.PLLD_DIVN) + 1));
+    misc.PLLD_SDM_DIN = ((8 * base.PLLD_DIVM * expected_pixel_clock) / 9375) - (4096 * ((2 * base.PLLD_DIVN)+1));
 
     memcpy((void*)(clkVirtAddr + 0xD0), &base, 4);
     memcpy((void*)(clkVirtAddr + 0xDC), &misc, 4);
@@ -832,7 +827,7 @@ extern "C" bool GetDisplayRefreshRate(uint32_t* out_refreshRate, bool internal) 
         struct PLLD_MISC misc = {0};
         memcpy(&temp, (void*)(clkVirtAddr + 0xD0), 4);
         memcpy(&misc, (void*)(clkVirtAddr + 0xDC), 4);
-        value = ((temp.PLLD_DIVN / (1 << temp.PLLD_DIVM)) * 10) / 4;
+        value = ((temp.PLLD_DIVN / temp.PLLD_DIVM) * 10) / 4;
         if (value != 0 && value != 80) {
             if (R_SUCCEEDED(nvOpen(&fd, "/dev/nvdisp-disp0"))) {
                 struct nvdcMode2 DISPLAY_B = {0};
@@ -853,7 +848,7 @@ extern "C" bool GetDisplayRefreshRate(uint32_t* out_refreshRate, bool internal) 
         struct PLLD_MISC misc = {0};
         memcpy(&temp, (void*)(clkVirtAddr + 0xD0), 4);
         memcpy(&misc, (void*)(clkVirtAddr + 0xDC), 4);
-        value = ((temp.PLLD_DIVN / (1 << temp.PLLD_DIVM)) * 10) / 4;
+        value = ((temp.PLLD_DIVN / temp.PLLD_DIVM) * 10) / 4;
         if (value == 0 || value == 80) { //We are in docked mode
             if (isLite)
                 return false;
@@ -906,13 +901,13 @@ extern "C" bool GetDisplayRefreshRate(uint32_t* out_refreshRate, bool internal) 
             //We are in handheld mode
             /*
                 Official formula:
-                Fvco = Fref / (2^DIVM) * (DIVN + 0.5 + (SDM_DIN / 8192))
-                Fref = CNTFRQ_EL0
+                Fvco = Fref / DIVM * (DIVN + 0.5 + (SDM_DIN / 8192))
+                Fref = CNTFRQ_EL0 / 2
                 Defaults: DIVM = 1, DIVN = 24, SDM_DIN = -1024
 
                 My math formula allows avoiding decimals whenever possible
             */
-            uint32_t pixelClock = (9375llu * ((4096 * ((2 * temp.PLLD_DIVN) + 1)) + misc.PLLD_SDM_DIN)) / (4 * (1 << temp.PLLD_DIVM));
+            uint32_t pixelClock = (9375llu * ((4096 * ((2 * temp.PLLD_DIVN) + 1)) + misc.PLLD_SDM_DIN)) / (8 * temp.PLLD_DIVM);
             value = pixelClock / (DSI_CLOCK_HZ / 60);
         }
         else return false;
