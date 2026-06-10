@@ -901,8 +901,8 @@ extern "C" bool GetDisplayRefreshRate(uint32_t* out_refreshRate, bool internal) 
             //We are in handheld mode
             /*
                 Official formula:
-                Fvco = Fref / DIVM * (DIVN + 0.5 + (SDM_DIN / 8192))
-                Fref = CNTFRQ_EL0 / 2
+                Fvco = Fref / (2^DIVM) * (DIVN + 0.5 + (SDM_DIN / 8192))
+                Fref = CNTFRQ_EL0
                 Defaults: DIVM = 1, DIVN = 24, SDM_DIN = -1024
 
                 My math formula allows avoiding decimals whenever possible
