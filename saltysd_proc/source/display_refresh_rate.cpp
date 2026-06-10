@@ -72,7 +72,7 @@ struct MinMax {
     u8 max;
 };
 
-struct MinMax HandheldModeRefreshRateAllowed = {40, 90};
+struct MinMax HandheldModeRefreshRateAllowed = {40, 60};
 
 static_assert((sizeof(handheldTimingsRETRO) / sizeof(handheldTimingsRETRO[0])) == (((60 - 40) / 5) + 1));
 
