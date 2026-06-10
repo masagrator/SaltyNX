@@ -527,7 +527,7 @@ bool setPLLDHandheldRefreshRate(uint32_t new_refreshRate) {
     struct PLLD_MISC misc = {0};
     memcpy(&base, (void*)(clkVirtAddr + 0xD0), 4);
     memcpy(&misc, (void*)(clkVirtAddr + 0xDC), 4);
-    uint32_t value = ((base.PLLD_DIVN / base.PLLD_DIVM) * 10) / 4;
+    uint32_t value = ((base.PLLD_DIVN / (1 << base.PLLD_DIVM)) * 10) / 4;
     if (value == 0 || value == 80) return false;
     //We are in handheld mode
     
@@ -832,7 +832,7 @@ extern "C" bool GetDisplayRefreshRate(uint32_t* out_refreshRate, bool internal) 
         struct PLLD_MISC misc = {0};
         memcpy(&temp, (void*)(clkVirtAddr + 0xD0), 4);
         memcpy(&misc, (void*)(clkVirtAddr + 0xDC), 4);
-        value = ((temp.PLLD_DIVN / temp.PLLD_DIVM) * 10) / 4;
+        value = ((temp.PLLD_DIVN / (1 << temp.PLLD_DIVM)) * 10) / 4;
         if (value != 0 && value != 80) {
             if (R_SUCCEEDED(nvOpen(&fd, "/dev/nvdisp-disp0"))) {
                 struct nvdcMode2 DISPLAY_B = {0};
@@ -853,7 +853,7 @@ extern "C" bool GetDisplayRefreshRate(uint32_t* out_refreshRate, bool internal) 
         struct PLLD_MISC misc = {0};
         memcpy(&temp, (void*)(clkVirtAddr + 0xD0), 4);
         memcpy(&misc, (void*)(clkVirtAddr + 0xDC), 4);
-        value = ((temp.PLLD_DIVN / temp.PLLD_DIVM) * 10) / 4;
+        value = ((temp.PLLD_DIVN / (1 << temp.PLLD_DIVM)) * 10) / 4;
         if (value == 0 || value == 80) { //We are in docked mode
             if (isLite)
                 return false;
