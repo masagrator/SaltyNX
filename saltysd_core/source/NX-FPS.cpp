@@ -1074,8 +1074,6 @@ namespace NVN {
 	typedef BufferAddress (*nvnMemoryPoolGetBufferAddress_0)(const MemoryPool* nvnMemPool);
 	typedef void (*nvnDeviceGetInteger_0)(const Device* nvnDevice, int info, int* out);
 
-	constexpr size_t MAX_FRAMES = 4;
-	int FRAMES = 4;
 	constexpr size_t COMMAND_MEMORY_PER_BUF = 0x1000; 
 	constexpr size_t CONTROL_MEMORY_PER_BUF = 0x1000;
 	int COUNTER_ALIGNMENT = 0x10; //Default value for 64-bit
@@ -1120,12 +1118,12 @@ namespace NVN {
 	MemoryPool timestampDataPool{};
 	nvnCounterData* timestampDataCPU = 0;
 	MemoryPool profilingCmdMemoryPool{};
-	alignas(0x1000) char controlMemoryStorage[MAX_FRAMES][0x1000]{};
-	Sync timestampSync[MAX_FRAMES]{};
-	CommandBuffer tsCmdBuf[MAX_FRAMES]{};
+	alignas(0x1000) char controlMemoryStorage[0x1000]{};
+	Sync timestampSync{};
+	CommandBuffer tsCmdBuf{};
 	alignas(0x1000) char dataPoolHostPtr[0x1000]{};
-	alignas(0x1000) char cmdPoolHostPtr[MAX_FRAMES][0x1000]{};
-	CommandHandle cmdHandles[MAX_FRAMES]{};
+	alignas(0x1000) char cmdPoolHostPtr[0x1000]{};
+	CommandHandle cmdHandles{};
 
 	bool WindowInitialize(const Window* nvnWindow, struct WindowBuilder* windowBuilder) {
 		if (Shared->Buffers == 0) {
@@ -1146,7 +1144,6 @@ namespace NVN {
 			else Shared->expectedSetBuffers = (Shared -> SetBuffers);
 		}
 		(Shared -> ActiveBuffers) = numBufferedFrames;
-		FRAMES = numBufferedFrames;
 		return ((nvnBuilderSetTextures_0)(Address_weaks.nvnWindowBuilderSetTextures))(nvnWindowBuilder, numBufferedFrames, nvnTextures);
 	}
 
@@ -1164,7 +1161,6 @@ namespace NVN {
 			}
 			(Shared -> ActiveBuffers) = numBufferedFrames;
 		}
-		FRAMES = numBufferedFrames;
 		return ((nvnWindowSetNumActiveTextures_0)(Address_weaks.nvnWindowSetNumActiveTextures))(nvnWindow, numBufferedFrames);
 	}
 
@@ -1230,23 +1226,20 @@ namespace NVN {
 
 			((nvnDeviceGetInteger_0)(Address_weaks.nvnDeviceGetInteger))(mainDevice, 10, &COUNTER_ALIGNMENT);
 
-			for (size_t i = 0; i < MAX_FRAMES; i++) {
-				((nvnCommandBufferInitialize_0)(Address_weaks.nvnCommandBufferInitialize))(&tsCmdBuf[i], mainDevice);
-				
-				size_t cmdPoolOffset = i * COMMAND_MEMORY_PER_BUF;
-				((nvnCommandBufferAddCommandMemory_0)(Address_weaks.nvnCommandBufferAddCommandMemory))(&tsCmdBuf[i], &profilingCmdMemoryPool, cmdPoolOffset, COMMAND_MEMORY_PER_BUF);
-				((nvnCommandBufferAddControlMemory_0)(Address_weaks.nvnCommandBufferAddControlMemory))(&tsCmdBuf[i], controlMemoryStorage[i], CONTROL_MEMORY_PER_BUF);
+			((nvnCommandBufferInitialize_0)(Address_weaks.nvnCommandBufferInitialize))(&tsCmdBuf, mainDevice);
+			
+			((nvnCommandBufferAddCommandMemory_0)(Address_weaks.nvnCommandBufferAddCommandMemory))(&tsCmdBuf, &profilingCmdMemoryPool, 0, COMMAND_MEMORY_PER_BUF);
+			((nvnCommandBufferAddControlMemory_0)(Address_weaks.nvnCommandBufferAddControlMemory))(&tsCmdBuf, controlMemoryStorage, CONTROL_MEMORY_PER_BUF);
 
-				((nvnCommandBufferBeginRecording_0)(Address_weaks.nvnCommandBufferBeginRecording))(&tsCmdBuf[i]);
+			((nvnCommandBufferBeginRecording_0)(Address_weaks.nvnCommandBufferBeginRecording))(&tsCmdBuf);
 
-				for (size_t counter = 0; counter < 0x10; counter++) {
-					BufferAddress currentFrameOffset = dataGpuAddress + (counter * COUNTER_ALIGNMENT);
-					((nvnCommandBufferReportCounter_0)(Address_weaks.nvnCommandBufferReportCounter))(&tsCmdBuf[i], counter, currentFrameOffset);
-					((nvnCommandBufferResetCounter_0)(Address_weaks.nvnCommandBufferResetCounter))(&tsCmdBuf[i], counter);			
-				}
-				
-				cmdHandles[i] = ((nvnCommandBufferEndRecording_0)(Address_weaks.nvnCommandBufferEndRecording))(&tsCmdBuf[i]);
+			for (size_t counter = 0; counter < 0x10; counter++) {
+				BufferAddress currentFrameOffset = dataGpuAddress + (counter * COUNTER_ALIGNMENT);
+				((nvnCommandBufferReportCounter_0)(Address_weaks.nvnCommandBufferReportCounter))(&tsCmdBuf, counter, currentFrameOffset);
+				((nvnCommandBufferResetCounter_0)(Address_weaks.nvnCommandBufferResetCounter))(&tsCmdBuf, counter);			
 			}
+			
+			cmdHandles = ((nvnCommandBufferEndRecording_0)(Address_weaks.nvnCommandBufferEndRecording))(&tsCmdBuf);
 		}
 		NX_FPS_Math::PreFrame();
 		((nvnQueuePresentTexture_0)(Address_weaks.nvnQueuePresentTexture))(queue, nvnWindow, index);
@@ -1268,7 +1261,7 @@ namespace NVN {
 		Shared->NVN.pixelBlocksBehindPrimitivesAndCulled = timestampDataCPU->pixelBlocksBehindPrimitivesAndCulled;
 		Shared->NVN.pixelBlocksInFrontOfPrimitivesCulled = timestampDataCPU->pixelBlocksInFrontOfPrimitivesCulled;
 		Shared->NVN.pixelBlocksFailedStencilTestAndCulled = timestampDataCPU->pixelBlocksFailedStencilTestAndCulled;
-		((nvnQueueSubmitCommands_0)(Address_weaks.nvnQueueSubmitCommands))(queue, 1, &cmdHandles[index]);
+		((nvnQueueSubmitCommands_0)(Address_weaks.nvnQueueSubmitCommands))(queue, 1, &cmdHandles);
 		NX_FPS_Math::PostFrame();
 
 		if (setNumActiveTexturesDetected) {
