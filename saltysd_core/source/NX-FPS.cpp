@@ -34,7 +34,6 @@ struct {
 	uintptr_t nvnTextureGetWidth;
 	uintptr_t nvnTextureGetHeight;
 	uintptr_t nvnTextureGetFormat;
-	uintptr_t nvnTextureReadTexels;
 	uintptr_t nvnCommandBufferSetRenderTargets;
 	uintptr_t nvnCommandBufferSetViewport;
 	uintptr_t nvnCommandBufferSetViewports;
@@ -1509,9 +1508,6 @@ namespace NVN {
 		}
 		else if (!strcmp("nvnCommandBufferResetCounter", nvnFunction)) {
 			Address_weaks.nvnCommandBufferResetCounter = address;
-		}
-		else if (!strcmp("nvnTextureReadTexels", nvnFunction)) {
-			Address_weaks.nvnTextureReadTexels = address;
 		}
 		return address;
 	}
