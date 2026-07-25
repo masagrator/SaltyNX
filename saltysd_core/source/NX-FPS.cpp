@@ -1013,10 +1013,6 @@ namespace NVN {
 	}
 
 	void WindowBuilderSetTextures(const WindowBuilder* nvnWindowBuilder, int numBufferedFrames, const Texture** nvnTextures) {
-		if (R_SUCCEEDED(SaltySD_Init())) {
-			SaltySDCore_printf("TEST FROM CORE!!!!!!!!!!!!!!!!!\n");
-			SaltySD_Deinit();
-		}
 		(Shared -> Buffers) = numBufferedFrames;
 		amountOfAvailableBuffers = numBufferedFrames;
 		if ((Shared -> SetBuffers) >= 2 && (Shared -> SetBuffers) <= numBufferedFrames) {
