@@ -151,7 +151,7 @@ struct NxFpsSharedBlock {
 	uint64_t frameNumber;
 	int8_t expectedSetBuffers;
 	struct {
-		uint64_t timestamp; //NX 1 tick = 1.625 ns / (x * 13 / 8) ns
+		uint64_t timestamp; //NX 1 tick = 1.625 ns | (x * 13 / 8) ns
 		uint64_t samplesPassed;
 		uint64_t inputVertices;
 		uint64_t inputPrimitives;
