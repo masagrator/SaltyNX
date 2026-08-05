@@ -238,17 +238,17 @@ namespace LOCK {
 		SaltySDCore_fread(&value_type, 1, 1, file);
 		uint8_t elements = 0;
 		SaltySDCore_fread(&elements, 1, 1, file);
-		struct codeCave {
+		struct codeCaveData {
 			uint8_t adjustment_type;
 			uint32_t instruction;
 		} PACKED;
-		static_assert(sizeof(codeCave) == 5);
-		codeCave* temp_buffer = (codeCave*)calloc(elements, sizeof(codeCave));
+		static_assert(sizeof(codeCaveData) == 5);
+		codeCaveData* temp_buffer = (codeCaveData*)calloc(elements, sizeof(codeCaveData));
 		uint32_t* output = 0;
 		if (address_region == 5) output = (uint32_t*)(LOCK::mappings.codeCave_start + main_offset);
 		else if (address_region == 1) output = (uint32_t*)(LOCK::mappings.main_start + main_offset);
 		else return 0x321;
-		SaltySDCore_fread(temp_buffer, sizeof(codeCave), elements, file);
+		SaltySDCore_fread(temp_buffer, sizeof(codeCaveData), elements, file);
 		for (size_t i = 0; i < elements; i++) {
 			switch(temp_buffer[i].adjustment_type) {
 				case 0:
