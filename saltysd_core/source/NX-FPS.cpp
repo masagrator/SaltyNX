@@ -150,27 +150,37 @@ struct NxFpsSharedBlock {
 	uint8_t FPSlockedDocked;
 	uint64_t frameNumber;
 	int8_t expectedSetBuffers;
-	struct {
-		uint64_t timestamp; //NX 1 tick = 1.625 ns | (x * 13 / 8) ns
-		uint64_t samplesPassed;
-		uint64_t inputVertices;
-		uint64_t inputPrimitives;
-		uint64_t vertexShaderInvocations;
-		uint64_t tessControlShaderInvocations;
-		uint64_t tessEvaluationShaderInvocations;
-		uint64_t geometryShaderInvocations;
-		uint64_t fragmentShaderInvocations;
-		uint64_t tessEvaluationShaderPrimitives;
-		uint64_t geometryShaderPrimitives;
-		uint64_t clipperInputPrimitives;
-		uint64_t clipperOutputPrimitives;
-		uint64_t primitivesGenerated;
-		uint64_t transformFeedbackPrimitivesWritten;
-		uint32_t tilesProcessedByZcull;
-		uint32_t pixelBlocksBehindPrimitivesAndCulled;
-		uint32_t pixelBlocksInFrontOfPrimitivesCulled;
-		uint32_t pixelBlocksFailedStencilTestAndCulled;
-	} NVN;
+	union {
+		struct {
+			uint64_t timestamp; //NX 1 tick = 1.625 ns | (x * 13 / 8) ns
+			uint64_t samplesPassed;
+			uint64_t inputVertices;
+			uint64_t inputPrimitives;
+			uint64_t vertexShaderInvocations;
+			uint64_t tessControlShaderInvocations;
+			uint64_t tessEvaluationShaderInvocations;
+			uint64_t geometryShaderInvocations;
+			uint64_t fragmentShaderInvocations;
+			uint64_t tessEvaluationShaderPrimitives;
+			uint64_t geometryShaderPrimitives;
+			uint64_t clipperInputPrimitives;
+			uint64_t clipperOutputPrimitives;
+			uint64_t primitivesGenerated;
+			uint64_t transformFeedbackPrimitivesWritten;
+			uint32_t tilesProcessedByZcull;
+			uint32_t pixelBlocksBehindPrimitivesAndCulled;
+			uint32_t pixelBlocksInFrontOfPrimitivesCulled;
+			uint32_t pixelBlocksFailedStencilTestAndCulled;
+		} NVN;
+
+		struct {
+			char reserved[8];
+		} EGL;
+
+		struct {
+			char reserved[8];
+		} Vulkan;
+	} PerfCounters;
 } PACKED;
 
 static_assert(sizeof(NxFpsSharedBlock) == 310);
@@ -1253,24 +1263,24 @@ namespace NVN {
 		}
 		NX_FPS_Math::PreFrame();
 		FUNC_PTR(nvnQueuePresentTexture, queue, nvnWindow, index);
-		Shared->NVN.timestamp = timestampDataCPU->timestamp;
-		Shared->NVN.inputVertices = timestampDataCPU->inputVertices;
-		Shared->NVN.inputPrimitives = timestampDataCPU->inputPrimitives;
-		Shared->NVN.vertexShaderInvocations = timestampDataCPU->vertexShaderInvocations;
-		Shared->NVN.tessControlShaderInvocations = timestampDataCPU->tessControlShaderInvocations;
-		Shared->NVN.tessEvaluationShaderInvocations = timestampDataCPU->tessEvaluationShaderInvocations;
-		Shared->NVN.geometryShaderInvocations = timestampDataCPU->geometryShaderInvocations;
-		Shared->NVN.fragmentShaderInvocations = timestampDataCPU->fragmentShaderInvocations;
-		Shared->NVN.tessEvaluationShaderPrimitives = timestampDataCPU->tessEvaluationShaderPrimitives;
-		Shared->NVN.geometryShaderPrimitives = timestampDataCPU->geometryShaderPrimitives;
-		Shared->NVN.clipperInputPrimitives = timestampDataCPU->clipperInputPrimitives;
-		Shared->NVN.clipperOutputPrimitives = timestampDataCPU->clipperOutputPrimitives;
-		Shared->NVN.primitivesGenerated = timestampDataCPU->primitivesGenerated;
-		Shared->NVN.transformFeedbackPrimitivesWritten = timestampDataCPU->transformFeedbackPrimitivesWritten;
-		Shared->NVN.tilesProcessedByZcull = timestampDataCPU->tilesProcessedByZcull;
-		Shared->NVN.pixelBlocksBehindPrimitivesAndCulled = timestampDataCPU->pixelBlocksBehindPrimitivesAndCulled;
-		Shared->NVN.pixelBlocksInFrontOfPrimitivesCulled = timestampDataCPU->pixelBlocksInFrontOfPrimitivesCulled;
-		Shared->NVN.pixelBlocksFailedStencilTestAndCulled = timestampDataCPU->pixelBlocksFailedStencilTestAndCulled;
+		Shared->PerfCounters.NVN.timestamp = timestampDataCPU->timestamp;
+		Shared->PerfCounters.NVN.inputVertices = timestampDataCPU->inputVertices;
+		Shared->PerfCounters.NVN.inputPrimitives = timestampDataCPU->inputPrimitives;
+		Shared->PerfCounters.NVN.vertexShaderInvocations = timestampDataCPU->vertexShaderInvocations;
+		Shared->PerfCounters.NVN.tessControlShaderInvocations = timestampDataCPU->tessControlShaderInvocations;
+		Shared->PerfCounters.NVN.tessEvaluationShaderInvocations = timestampDataCPU->tessEvaluationShaderInvocations;
+		Shared->PerfCounters.NVN.geometryShaderInvocations = timestampDataCPU->geometryShaderInvocations;
+		Shared->PerfCounters.NVN.fragmentShaderInvocations = timestampDataCPU->fragmentShaderInvocations;
+		Shared->PerfCounters.NVN.tessEvaluationShaderPrimitives = timestampDataCPU->tessEvaluationShaderPrimitives;
+		Shared->PerfCounters.NVN.geometryShaderPrimitives = timestampDataCPU->geometryShaderPrimitives;
+		Shared->PerfCounters.NVN.clipperInputPrimitives = timestampDataCPU->clipperInputPrimitives;
+		Shared->PerfCounters.NVN.clipperOutputPrimitives = timestampDataCPU->clipperOutputPrimitives;
+		Shared->PerfCounters.NVN.primitivesGenerated = timestampDataCPU->primitivesGenerated;
+		Shared->PerfCounters.NVN.transformFeedbackPrimitivesWritten = timestampDataCPU->transformFeedbackPrimitivesWritten;
+		Shared->PerfCounters.NVN.tilesProcessedByZcull = timestampDataCPU->tilesProcessedByZcull;
+		Shared->PerfCounters.NVN.pixelBlocksBehindPrimitivesAndCulled = timestampDataCPU->pixelBlocksBehindPrimitivesAndCulled;
+		Shared->PerfCounters.NVN.pixelBlocksInFrontOfPrimitivesCulled = timestampDataCPU->pixelBlocksInFrontOfPrimitivesCulled;
+		Shared->PerfCounters.NVN.pixelBlocksFailedStencilTestAndCulled = timestampDataCPU->pixelBlocksFailedStencilTestAndCulled;
 		FUNC_PTR(nvnQueueSubmitCommands, queue, 1, &cmdHandles);
 		NX_FPS_Math::PostFrame();
 
