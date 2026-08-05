@@ -222,7 +222,7 @@ namespace nn {
 		if (!bytesRead)
 			bytesRead = &bytesRead_impl;
 		Result ret = FUNC_PTR(FileAccessorRead, fileHandle, bytesRead, position, buffer, readBytes, ReadOption);
-		if (__builtin_expect(R_SUCCEEDED(ret), true)) fileBytesRead += *bytesRead;
+		if (R_SUCCEEDED(ret)) [[likely]] fileBytesRead += *bytesRead;
 		return ret;
 	}
 
@@ -231,7 +231,7 @@ namespace nn {
 		if (!bytesRead)
 			bytesRead = &bytesRead_impl;
 		Result ret = FUNC_PTR(FileAccessorReadCache, fileHandle, bytesRead, position, buffer, readBytes, ReadOption, FileDataCacheAccessResult);
-		if (__builtin_expect(R_SUCCEEDED(ret), true)) fileBytesRead += *bytesRead;
+		if (R_SUCCEEDED(ret)) [[likely]] fileBytesRead += *bytesRead;
 		return ret;
 	}
 
@@ -604,7 +604,7 @@ namespace vk {
 			if (check_redirection == true) {
 				return ((vkQueuePresentKHR_0)(pointer))(VkQueue_T, VkPresentInfoKHR);
 			}
-			if (__builtin_expect(!NX_FPS_Math::starttick, 0)) {
+			if (NX_FPS_Math::starttick == 0) [[unlikely]] {
 				(Shared -> API) = 3;
 				NX_FPS_Math::starttick = Utils::_getSystemTick();
 				NX_FPS_Math::starttick2 = NX_FPS_Math::starttick;
@@ -806,7 +806,7 @@ namespace EGL {
 
 	bool Swap (const void* EGLDisplay, const void* EGLSurface) {
 
-		if (__builtin_expect(!NX_FPS_Math::starttick, 0)) {
+		if (NX_FPS_Math::starttick == 0) [[unlikely]] {
 			(Shared -> API) = 2;
 			NX_FPS_Math::starttick = Utils::_getSystemTick();
 			NX_FPS_Math::starttick2 = NX_FPS_Math::starttick;
