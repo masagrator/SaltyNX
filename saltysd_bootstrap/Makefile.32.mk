@@ -50,7 +50,7 @@ CFLAGS				:=	-Wall -Werror -O3 \
 
 CFLAGS				+=	$(INCLUDE) -DSWITCH32
 
-CXXFLAGS			:= $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++23
+CXXFLAGS			:= $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++26
 
 ASFLAGS				:=	-g $(ARCH)
 LDFLAGS_3K			=	-specs=$(CURDIR)/switch_3k.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map) -B$(ARMV6K_LIBDIR) -L$(ARMV6K_SYSLIB) 
