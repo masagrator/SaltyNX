@@ -118,7 +118,7 @@ resolutionCalls m_resolutionRenderCalls[8] = {0};
 resolutionCalls m_resolutionViewportCalls[8] = {0};
 
 struct NxFpsSharedBlock {
-	uint32_t MAGIC;
+	uint32_t MAGIC; //0x465053 "\x00FPS" 
 	uint8_t FPS;
 	float FPSavg;
 	bool pluginActive;
@@ -126,7 +126,7 @@ struct NxFpsSharedBlock {
 	uint8_t FPSmode;
 	uint8_t ZeroSync;
 	uint8_t patchApplied;
-	uint8_t API;
+	uint8_t API; //1 - NVN, 2 - EGL, 3 - Vulkan
 	uint32_t FPSticks[10];
 	uint8_t Buffers;
 	uint8_t SetBuffers;
