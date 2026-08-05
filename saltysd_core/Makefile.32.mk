@@ -53,7 +53,7 @@ CFLAGS			:=	-Wall -Werror -O2 \
 
 CFLAGS			+=	$(INCLUDE) -DSWITCH32 -DAPP_VERSION=\"$(VERSION)\" -DMODULE_NAME=\"$(MODULE_NAME)\"
 
-CXXFLAGS		:=	$(CFLAGS) -fno-exceptions -fno-rtti -std=gnu++23
+CXXFLAGS		:=	$(CFLAGS) -fno-exceptions -fno-rtti -std=gnu++26
 
 ASFLAGS			:=	-g $(ARCH)
 LDFLAGS			=	-specs=$(CURDIR)/../libnx32_min/nx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map) -B$(ARMV6K_LIBDIR) -L$(ARMV6K_SYSLIB) -Wl,-wrap,__syscall_getreent

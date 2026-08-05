@@ -29,30 +29,30 @@
 
 namespace elf_parser {
 
-typedef struct {
+struct section_t {
 	Elf64_Shdr *shdr;
 	uint8_t* data;
 
 	int section_index = 0; 
 	std::string section_name;
 	std::string section_type;
-} section_t;
+};
 
-typedef struct {
+struct segment_t {
 	Elf64_Phdr *phdr;
 	uint8_t* data;
 
 	std::string segment_type, segment_flags;
-} segment_t;
+};
 
-typedef struct {
+struct symbol_t {
 	Elf64_Sym* sym;
 	int symbol_num = 0;
 	std::string symbol_name, symbol_section;  
 
-} symbol_t;
+};
 
-typedef struct {
+struct relocation_t {
 	Elf64_Rela* rela;
 	std::string   relocation_section_name;
 	uint64_t section_idx, relocation_plt_address;
@@ -96,7 +96,7 @@ typedef struct {
 		}
 	}
 
-} relocation_t;
+};
 
 
 class Elf_parser {

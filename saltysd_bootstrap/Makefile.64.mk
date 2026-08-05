@@ -49,7 +49,7 @@ CFLAGS	:=	-g -Wall -Werror -O3 \
 
 CFLAGS	+=	$(INCLUDE) -DSWITCH
 
-CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++23
+CXXFLAGS	:= $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++26
 
 ASFLAGS	:=	-g $(ARCH)
 LDFLAGS	=	-z max-page-size=0x1000 -T $(TOPDIR)/rel.ld -z text -z nodynamic-undefined-weak --build-id=sha1 -g --emit-relocs

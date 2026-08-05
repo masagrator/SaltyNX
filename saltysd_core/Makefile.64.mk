@@ -50,7 +50,7 @@ CFLAGS	 :=	-Wall -Werror -O2 \
 
 CFLAGS	 +=	$(INCLUDE) -DSWITCH -DAPP_VERSION=\"$(VERSION)\" -DMODULE_NAME=\"$(MODULE_NAME)\"
 
-CXXFLAGS := $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++23
+CXXFLAGS := $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++26
 
 ASFLAGS	 :=	-g $(ARCH)
 

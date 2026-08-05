@@ -13,16 +13,21 @@
 #include <algorithm>
 #include "nanoprintf.h"
 
+#define FUNC_PTR(func, ...) ((func##_0)(Address_weaks.func))(__VA_ARGS__)
+
 struct {
 	uintptr_t nvnBootstrapLoader;
 
 	uintptr_t nvnDeviceGetProcAddress;
+	uintptr_t nvnDeviceGetInteger;
 	uintptr_t nvnQueuePresentTexture;
+	uintptr_t nvnQueueFinish;
+	uintptr_t nvnQueueSubmitCommands;
+	uintptr_t nvnQueueFenceSync;
 	uintptr_t nvnWindowSetPresentInterval;
 	uintptr_t nvnWindowGetPresentInterval;
 	uintptr_t nvnWindowBuilderSetTextures;
 	uintptr_t nvnWindowAcquireTexture;
-	uintptr_t nvnSyncWait;
 	uintptr_t nvnWindowSetNumActiveTextures;
 	uintptr_t nvnWindowGetNumActiveTextures;
 	uintptr_t nvnWindowInitialize;
@@ -35,7 +40,22 @@ struct {
 	uintptr_t nvnCommandBufferSetScissor;
 	uintptr_t nvnCommandBufferSetScissors;
 	uintptr_t nvnCommandBufferSetDepthRange;
-	uintptr_t nvnQueueFinish;
+	uintptr_t nvnCommandBufferInitialize;
+	uintptr_t nvnCommandBufferAddCommandMemory;
+	uintptr_t nvnCommandBufferAddControlMemory;
+	uintptr_t nvnCommandBufferBeginRecording;
+	uintptr_t nvnCommandBufferReportCounter;
+	uintptr_t nvnCommandBufferResetCounter;
+	uintptr_t nvnCommandBufferEndRecording;
+	uintptr_t nvnSyncWait;
+	uintptr_t nvnSyncInitialize;
+	uintptr_t nvnMemoryPoolBuilderSetDefaults;
+	uintptr_t nvnMemoryPoolBuilderSetDevice;
+	uintptr_t nvnMemoryPoolBuilderSetFlags;
+	uintptr_t nvnMemoryPoolBuilderSetStorage;
+	uintptr_t nvnMemoryPoolInitialize;
+	uintptr_t nvnMemoryPoolMap;
+	uintptr_t nvnMemoryPoolGetBufferAddress;
 
 	uintptr_t eglSwapBuffers;
 	uintptr_t eglSwapInterval;
@@ -98,7 +118,7 @@ resolutionCalls m_resolutionRenderCalls[8] = {0};
 resolutionCalls m_resolutionViewportCalls[8] = {0};
 
 struct NxFpsSharedBlock {
-	uint32_t MAGIC;
+	uint32_t MAGIC; //0x465053 "\x00FPS" 
 	uint8_t FPS;
 	float FPSavg;
 	bool pluginActive;
@@ -106,7 +126,7 @@ struct NxFpsSharedBlock {
 	uint8_t FPSmode;
 	uint8_t ZeroSync;
 	uint8_t patchApplied;
-	uint8_t API;
+	uint8_t API; //1 - NVN, 2 - EGL, 3 - Vulkan
 	uint32_t FPSticks[10];
 	uint8_t Buffers;
 	uint8_t SetBuffers;
@@ -130,9 +150,30 @@ struct NxFpsSharedBlock {
 	uint8_t FPSlockedDocked;
 	uint64_t frameNumber;
 	int8_t expectedSetBuffers;
+	struct {
+		uint64_t timestamp; //NX 1 tick = 1.625 ns | (x * 13 / 8) ns
+		uint64_t samplesPassed;
+		uint64_t inputVertices;
+		uint64_t inputPrimitives;
+		uint64_t vertexShaderInvocations;
+		uint64_t tessControlShaderInvocations;
+		uint64_t tessEvaluationShaderInvocations;
+		uint64_t geometryShaderInvocations;
+		uint64_t fragmentShaderInvocations;
+		uint64_t tessEvaluationShaderPrimitives;
+		uint64_t geometryShaderPrimitives;
+		uint64_t clipperInputPrimitives;
+		uint64_t clipperOutputPrimitives;
+		uint64_t primitivesGenerated;
+		uint64_t transformFeedbackPrimitivesWritten;
+		uint32_t tilesProcessedByZcull;
+		uint32_t pixelBlocksBehindPrimitivesAndCulled;
+		uint32_t pixelBlocksInFrontOfPrimitivesCulled;
+		uint32_t pixelBlocksFailedStencilTestAndCulled;
+	} NVN;
 } PACKED;
 
-static_assert(sizeof(NxFpsSharedBlock) == 174);
+static_assert(sizeof(NxFpsSharedBlock) == 310);
 
 NxFpsSharedBlock* Shared = 0;
 
@@ -180,8 +221,8 @@ namespace nn {
 		size_t bytesRead_impl;
 		if (!bytesRead)
 			bytesRead = &bytesRead_impl;
-		Result ret = ((FileAccessorRead_0)(Address_weaks.FileAccessorRead))(fileHandle, bytesRead, position, buffer, readBytes, ReadOption);
-		if (__builtin_expect(R_SUCCEEDED(ret), true)) fileBytesRead += *bytesRead;
+		Result ret = FUNC_PTR(FileAccessorRead, fileHandle, bytesRead, position, buffer, readBytes, ReadOption);
+		if (R_SUCCEEDED(ret)) [[likely]] fileBytesRead += *bytesRead;
 		return ret;
 	}
 
@@ -189,13 +230,13 @@ namespace nn {
 		size_t bytesRead_impl;
 		if (!bytesRead)
 			bytesRead = &bytesRead_impl;
-		Result ret = ((FileAccessorReadCache_0)(Address_weaks.FileAccessorReadCache))(fileHandle, bytesRead, position, buffer, readBytes, ReadOption, FileDataCacheAccessResult);
-		if (__builtin_expect(R_SUCCEEDED(ret), true)) fileBytesRead += *bytesRead;
+		Result ret = FUNC_PTR(FileAccessorReadCache, fileHandle, bytesRead, position, buffer, readBytes, ReadOption, FileDataCacheAccessResult);
+		if (R_SUCCEEDED(ret)) [[likely]] fileBytesRead += *bytesRead;
 		return ret;
 	}
 
 	Result SetUserInactivityDetectionTimeExtended(bool isTrue) {
-		return ((SetUserInactivityDetectionTimeExtended_0)(Address_weaks.SetUserInactivityDetectionTimeExtended))(isTrue);
+		return FUNC_PTR(SetUserInactivityDetectionTimeExtended, isTrue);
 	}
 
 	AppletFocusHandlingMode defaultFocusHandlingMode = AppletFocusHandlingMode_SuspendHomeSleep;
@@ -210,7 +251,7 @@ namespace nn {
 		else if (last_mode == mode) return;
 		last_mode = mode;
 		if (!focusHandlingOverwrite) defaultFocusHandlingMode = mode;
-		return ((SetFocusHandlingMode_0)(Address_weaks.SetFocusHandlingMode))(mode);
+		return FUNC_PTR(SetFocusHandlingMode, mode);
 	}
 }
 
@@ -227,7 +268,7 @@ namespace Utils {
 			((_ZN2nn2os13GetSystemTickEv_1)(Address_weaks.GetSystemTick))(&tick);
 			return tick;
 		#else
-			return ((_ZN2nn2os13GetSystemTickEv_0)(Address_weaks.GetSystemTick))();
+			return FUNC_PTR(ZN2nn2os13GetSystemTickEv);
 		#endif
 	}
 
@@ -522,7 +563,7 @@ namespace vk {
 				last_viewport = {width, height};
 			}
 		}
-		return ((vkCmdSetViewport_0)(Address_weaks.vkCmdSetViewport))(commandBuffer, firstViewport, viewportCount, pViewports);
+		return FUNC_PTR(vkCmdSetViewport, commandBuffer, firstViewport, viewportCount, pViewports);
 	}
 
 	void CmdSetViewportWithCount(void* commandBuffer, uint32_t viewportCount, const VkViewport* pViewports) {
@@ -534,7 +575,7 @@ namespace vk {
 				last_viewport = {width, height};
 			}
 		}
-		return ((vkCmdSetViewportWithCount_0)(Address_weaks.vkCmdSetViewportWithCount))(commandBuffer, viewportCount, pViewports);
+		return FUNC_PTR(vkCmdSetViewportWithCount, commandBuffer, viewportCount, pViewports);
 	}
 
 	void CmdSetScissor(void* commandBuffer, uint32_t firstScissor, uint32_t ScissorCount, const VkRect2D* pScissors) {
@@ -543,7 +584,7 @@ namespace vk {
 				NX_FPS_Math::addResToViewports(pScissors[i].width, pScissors[i].height);
 			}
 		}
-		return ((vkCmdSetScissor_0)(Address_weaks.vkCmdSetScissor))(commandBuffer, firstScissor, ScissorCount, pScissors);
+		return FUNC_PTR(vkCmdSetScissor, commandBuffer, firstScissor, ScissorCount, pScissors);
 	}
 
 	void CmdSetScissorWithCount(void* commandBuffer, uint32_t ScissorCount, const VkRect2D* pScissors) {
@@ -552,7 +593,7 @@ namespace vk {
 				NX_FPS_Math::addResToViewports(pScissors[i].width, pScissors[i].height);
 			}
 		}
-		return ((vkCmdSetScissorWithCount_0)(Address_weaks.vkCmdSetScissorWithCount))(commandBuffer, ScissorCount, pScissors);
+		return FUNC_PTR(vkCmdSetScissorWithCount, commandBuffer, ScissorCount, pScissors);
 	}
 
 	namespace Common {
@@ -563,7 +604,7 @@ namespace vk {
 			if (check_redirection == true) {
 				return ((vkQueuePresentKHR_0)(pointer))(VkQueue_T, VkPresentInfoKHR);
 			}
-			if (__builtin_expect(!NX_FPS_Math::starttick, 0)) {
+			if (NX_FPS_Math::starttick == 0) [[unlikely]] {
 				(Shared -> API) = 3;
 				NX_FPS_Math::starttick = Utils::_getSystemTick();
 				NX_FPS_Math::starttick2 = NX_FPS_Math::starttick;
@@ -598,7 +639,7 @@ namespace vk {
 			int32_t vulkanResult = ((vkCreateSwapchainKHR_0)(pointer))(Device, (const VkSwapchainCreateInfoKHR*)pCreateInfo, pAllocator, pSwapchain);
 			if (vulkanResult >= 0) {
 				uint32_t numBuffers = 0;
-				((vkGetSwapchainImagesKHR_0)(Address_weaks.vkGetSwapchainImagesKHR))(Device, (void*)pSwapchain[0], &numBuffers, nullptr);
+				FUNC_PTR(vkGetSwapchainImagesKHR, Device, (void*)pSwapchain[0], &numBuffers, nullptr);
 				(Shared -> Buffers) = numBuffers;
 			}
 			return vulkanResult;
@@ -745,7 +786,7 @@ namespace EGL {
 	bool Interval(const void* EGLDisplay, int interval) {
 		bool result = false;
 		if (!changeFPS) {
-			result = ((eglSwapInterval_0)(Address_weaks.eglSwapInterval))(EGLDisplay, interval);
+			result = FUNC_PTR(eglSwapInterval, EGLDisplay, interval);
 			changedFPS = false;
 			if (result == true) {
 				(Shared -> FPSmode) = std::clamp(interval, EGL_MIN_SWAP_INTERVAL, EGL_MAX_SWAP_INTERVAL);
@@ -754,7 +795,7 @@ namespace EGL {
 		else if (interval < 0) {
 			interval *= -1;
 			if ((Shared -> FPSmode) != interval) {
-				result = ((eglSwapInterval_0)(Address_weaks.eglSwapInterval))(EGLDisplay, interval);
+				result = FUNC_PTR(eglSwapInterval, EGLDisplay, interval);
 				if (result == true)
 					(Shared -> FPSmode) = interval;
 			}
@@ -765,7 +806,7 @@ namespace EGL {
 
 	bool Swap (const void* EGLDisplay, const void* EGLSurface) {
 
-		if (__builtin_expect(!NX_FPS_Math::starttick, 0)) {
+		if (NX_FPS_Math::starttick == 0) [[unlikely]] {
 			(Shared -> API) = 2;
 			NX_FPS_Math::starttick = Utils::_getSystemTick();
 			NX_FPS_Math::starttick2 = NX_FPS_Math::starttick;
@@ -773,7 +814,7 @@ namespace EGL {
 
 		NX_FPS_Math::PreFrame();
 		
-		const bool result = ((eglSwapBuffers_0)(Address_weaks.eglSwapBuffers))(EGLDisplay, EGLSurface);
+		const bool result = FUNC_PTR(eglSwapBuffers, EGLDisplay, EGLSurface);
 		if (result == true)
 			 NX_FPS_Math::PostFrame();
 		
@@ -840,7 +881,7 @@ namespace EGL {
 		if (resolutionLookup && height > 1 && width > 1 && !x && !y) {
 			NX_FPS_Math::addResToViewports(width, height);
 		}
-		return ((glViewport_0)(Address_weaks.glViewport))(x, y, width, height);
+		return FUNC_PTR(glViewport, x, y, width, height);
 	}
 
 	
@@ -881,7 +922,7 @@ namespace EGL {
 	}
 
 	uintptr_t GetProc(const char* eglName) {
-		uintptr_t address = ((eglGetProcAddress_0)(Address_weaks.eglGetProcAddress))(eglName);
+		uintptr_t address = FUNC_PTR(eglGetProcAddress, eglName);
 		if (!strcmp(eglName, "eglSwapInterval")) {
 			if (!Address_weaks.eglSwapInterval) Address_weaks.eglSwapInterval = address;
 			return (uintptr_t)&Interval;
@@ -936,16 +977,14 @@ namespace EGL {
 
 namespace NVN {
 
-	void* WindowSync = 0;
-
 	struct Texture {
-		char reserved[0x80];
+		char reserved[0xC0];
 	};
 	struct TextureView {
-		char reserved[0x40];
+		char reserved[0x28];
 	};
 	struct TextureBuilder {
-		char reserved[0x80];
+		char reserved[0x40];
 	};
 	struct Window {
 		char reserved[0x180];
@@ -954,13 +993,26 @@ namespace NVN {
 		char reserved[0x3000];
 	};
 	struct CommandBuffer {
-		char reserved[0x80];
+		char reserved[0xA0];
 	};
-
+	struct MemoryPool {
+    	char reserved[0x100];
+	};
+	struct Sync {
+		char reserved[0x40];
+	};
+	struct Queue {
+		char reserved[0x2000];
+	};
 	struct WindowBuilder {
 		const char reserved[16];
 		uint8_t numBufferedFrames;
+		const char reserved2[47];
 	};
+	struct MemoryPoolBuilder {
+		char reserved[0x40];
+	};
+
 	struct Viewport {
 		float x;
 		float y;
@@ -973,33 +1025,115 @@ namespace NVN {
 		int width;
 		int height;
 	};
+	struct CopyRegion {
+		int depth;
+		int height;
+		int width;
+		int x;
+		int y;
+		int z;
+	};
+
+	Sync* WindowSync = 0;
+	Device* mainDevice = 0;
 
 	typedef int textureFlags;
 	typedef int textureTarget;
 	typedef int textureFormat;
 	typedef int memoryPoolFlags;
+	typedef uint64_t BufferAddress;
+	typedef uint64_t CommandHandle;
 
-	typedef uintptr_t (*nvnBootstrapLoader_0)(const char * nvnName);
+	typedef uintptr_t (*nvnBootstrapLoader_0)(const char* nvnName);
 	typedef u16 (*nvnTextureGetWidth_0)(const Texture* texture);
 	typedef u16 (*nvnTextureGetHeight_0)(const Texture* texture);
 	typedef u32 (*nvnTextureGetFormat_0)(const Texture* texture);
-	typedef void* (*nvnCommandBufferSetRenderTargets_0)(const void* cmdBuf, int numTextures, const Texture** texture, const TextureView** textureView, const Texture* depth, const TextureView* depthView);
-	typedef void* (*nvnCommandBufferSetViewport_0)(const void* cmdBuf, int x, int y, int width, int height);
-	typedef void* (*nvnCommandBufferSetViewports_0)(void* cmdBuf, int start, int count, const Viewport* viewports);
-	typedef void* (*nvnCommandBufferSetScissor_0)(const void* cmdBuf, int x, int y, int width, int height);
-	typedef void* (*nvnCommandBufferSetScissors_0)(void* cmdBuf, int start, int count, const Scissor* viewports);
-	typedef void* (*nvnCommandBufferSetDepthRange_0)(void* cmdBuf, float s0, float s1);
-	typedef void (*nvnQueuePresentTexture_0)(const void* _this, const void* unk2_1, int index);
-	typedef uintptr_t (*GetProcAddress)(const void* unk1_a, const char * nvnFunction_a);
-	typedef void (*nvnBuilderSetTextures_0)(const WindowBuilder* nvnWindowBuilder, int buffers, const Texture** texturesBuffer);
+	typedef void* (*nvnCommandBufferSetRenderTargets_0)(const CommandBuffer* cmdBuf, int numTextures, const Texture** texture, const TextureView** textureView, const Texture* depth, const TextureView* depthView);
+	typedef void* (*nvnCommandBufferSetViewport_0)(const CommandBuffer* cmdBuf, int x, int y, int width, int height);
+	typedef void* (*nvnCommandBufferSetViewports_0)(CommandBuffer* cmdBuf, int start, int count, const Viewport* viewports);
+	typedef void* (*nvnCommandBufferSetScissor_0)(const CommandBuffer* cmdBuf, int x, int y, int width, int height);
+	typedef void* (*nvnCommandBufferSetScissors_0)(CommandBuffer* cmdBuf, int start, int count, const Scissor* viewports);
+	typedef void* (*nvnCommandBufferSetDepthRange_0)(CommandBuffer* cmdBuf, float s0, float s1);
+	typedef void (*nvnQueuePresentTexture_0)(const Queue* queue, const Window* nvnWindow, int index);
+	typedef uintptr_t (*nvnDeviceGetProcAddress_0)(const void* unk1_a, const char* nvnFunction_a);
+	typedef void (*nvnWindowBuilderSetTextures_0)(const WindowBuilder* nvnWindowBuilder, int buffers, const Texture** texturesBuffer);
 	typedef void (*nvnWindowSetNumActiveTextures_0)(const Window* nvnWindow, int buffers);
 	typedef int (*nvnWindowGetNumActiveTextures_0)(const Window* nvnWindow);
 	typedef bool (*nvnWindowInitialize_0)(const Window* nvnWindow, struct WindowBuilder* windowBuilder);
-	typedef Result (*nvnWindowAcquireTexture_0)(const Window* nvnWindow, const void* nvnSync, const void* index);
-	typedef void (*nvnSetPresentInterval_0)(const Window* nvnWindow, int mode);
-	typedef int (*nvnGetPresentInterval_0)(const Window* nvnWindow);
-	typedef void* (*nvnSyncWait_0)(const void* _this, uint64_t timeout_ns);
-	typedef void (*nvnQueueFinish_0)(const void* nvnQueue);
+	typedef Result (*nvnWindowAcquireTexture_0)(const Window* nvnWindow, const Sync* nvnSync, const int* index);
+	typedef void (*nvnWindowSetPresentInterval_0)(const Window* nvnWindow, int mode);
+	typedef int (*nvnWindowGetPresentInterval_0)(const Window* nvnWindow);
+	typedef int (*nvnSyncWait_0)(const Sync* _this, uint64_t timeout_ns);
+	typedef void (*nvnQueueFinish_0)(const Queue* nvnQueue);
+	typedef void (*nvnQueueFenceSync_0)(const Queue* nvnQueue, const Sync* nvnSync, int condition, int flags);
+	typedef void (*nvnQueueSubmitCommands_0)(const Queue* nvnQueue, int numCommandBuffers, const CommandHandle* handles);
+	typedef bool (*nvnCommandBufferInitialize_0)(const CommandBuffer* nvnCmdBuf, Device* nvnDevice);
+	typedef void (*nvnCommandBufferAddCommandMemory_0)(const CommandBuffer* nvnCmdBuf, const MemoryPool* nvnMemPool, ptrdiff_t offset, size_t size);
+	typedef void (*nvnCommandBufferAddControlMemory_0)(const CommandBuffer* nvnCmdBuf, void* buffer, size_t size);
+	typedef void (*nvnCommandBufferBeginRecording_0)(const CommandBuffer* nvnCmdBuf);
+	typedef CommandHandle (*nvnCommandBufferEndRecording_0)(const CommandBuffer* nvnCmdBuf);
+	typedef void (*nvnCommandBufferReportCounter_0)(const CommandBuffer* nvnCmdBuf, int type, const BufferAddress address);
+	typedef void (*nvnCommandBufferResetCounter_0)(const CommandBuffer* nvnCmdBuf, int type);
+	typedef bool (*nvnSyncInitialize_0)(const Sync* nvnSync, Device* nvnDevice);
+	typedef void (*nvnMemoryPoolBuilderSetDefaults_0)(const MemoryPoolBuilder* nvnMemPoolBuilder);
+	typedef void (*nvnMemoryPoolBuilderSetDevice_0)(const MemoryPoolBuilder* nvnMemPoolBuilder, const Device* nvnDevice);
+	typedef void (*nvnMemoryPoolBuilderSetFlags_0)(const MemoryPoolBuilder* nvnMemPoolBuilder, int flags);
+	typedef void (*nvnMemoryPoolBuilderSetStorage_0)(const MemoryPoolBuilder* nvnMemPoolBuilder, void* buffer, size_t size);
+	typedef bool (*nvnMemoryPoolInitialize_0)(const MemoryPool* nvnMemPool, const MemoryPoolBuilder* nvnMemPoolBuilder);
+	typedef void* (*nvnMemoryPoolMap_0)(const MemoryPool* nvnMemPool);
+	typedef BufferAddress (*nvnMemoryPoolGetBufferAddress_0)(const MemoryPool* nvnMemPool);
+	typedef void (*nvnDeviceGetInteger_0)(const Device* nvnDevice, int info, int* out);
+
+	constexpr size_t COMMAND_MEMORY_PER_BUF = 0x1000; 
+	constexpr size_t CONTROL_MEMORY_PER_BUF = 0x1000;
+	int COUNTER_ALIGNMENT = 0x10; //Default value for 64-bit
+
+	struct nvnCounterData {
+		uint64_t empty;
+		uint64_t timestamp;
+		uint64_t samplesPassed;
+		uint64_t timestamp1;
+		uint64_t inputVertices;
+		uint64_t timestamp2;
+		uint64_t inputPrimitives;
+		uint64_t timestamp3;
+		uint64_t vertexShaderInvocations;
+		uint64_t timestamp4;
+		uint64_t tessControlShaderInvocations;
+		uint64_t timestamp5;
+		uint64_t tessEvaluationShaderInvocations;
+		uint64_t timestamp6;
+		uint64_t geometryShaderInvocations;
+		uint64_t timestamp7;
+		uint64_t fragmentShaderInvocations;
+		uint64_t timestamp8;
+		uint64_t tessEvaluationShaderPrimitives;
+		uint64_t timestamp9;
+		uint64_t geometryShaderPrimitives;
+		uint64_t timestamp10;
+		uint64_t clipperInputPrimitives;
+		uint64_t timestamp11;
+		uint64_t clipperOutputPrimitives;
+		uint64_t timestamp12;
+		uint64_t primitivesGenerated;
+		uint64_t timestamp13;
+		uint64_t transformFeedbackPrimitivesWritten;
+		uint64_t timestamp14;
+		uint32_t tilesProcessedByZcull;
+		uint32_t pixelBlocksBehindPrimitivesAndCulled;
+		uint32_t pixelBlocksInFrontOfPrimitivesCulled;
+		uint32_t pixelBlocksFailedStencilTestAndCulled;
+	};
+
+	MemoryPool timestampDataPool{};
+	nvnCounterData* timestampDataCPU = 0;
+	MemoryPool profilingCmdMemoryPool{};
+	alignas(0x1000) char controlMemoryStorage[0x1000]{};
+	Sync timestampSync{};
+	CommandBuffer tsCmdBuf{};
+	alignas(0x1000) char dataPoolHostPtr[0x1000]{};
+	alignas(0x1000) char cmdPoolHostPtr[0x1000]{};
+	CommandHandle cmdHandles{};
 
 	bool WindowInitialize(const Window* nvnWindow, struct WindowBuilder* windowBuilder) {
 		if (Shared->Buffers == 0) {
@@ -1009,7 +1143,7 @@ namespace NVN {
 			}
 			(Shared -> ActiveBuffers) = windowBuilder -> numBufferedFrames;	
 		}
-		return ((nvnWindowInitialize_0)(Address_weaks.nvnWindowInitialize))(nvnWindow, windowBuilder);
+		return FUNC_PTR(nvnWindowInitialize, nvnWindow, windowBuilder);
 	}
 
 	void WindowBuilderSetTextures(const WindowBuilder* nvnWindowBuilder, int numBufferedFrames, const Texture** nvnTextures) {
@@ -1020,14 +1154,14 @@ namespace NVN {
 			else Shared->expectedSetBuffers = (Shared -> SetBuffers);
 		}
 		(Shared -> ActiveBuffers) = numBufferedFrames;
-		return ((nvnBuilderSetTextures_0)(Address_weaks.nvnWindowBuilderSetTextures))(nvnWindowBuilder, numBufferedFrames, nvnTextures);
+		return FUNC_PTR(nvnWindowBuilderSetTextures, nvnWindowBuilder, numBufferedFrames, nvnTextures);
 	}
 
 	void WindowSetNumActiveTextures(const Window* nvnWindow, int numBufferedFrames) {
 		if (numBufferedFrames < 0) {
 			numBufferedFrames *= -1;
-			((nvnWindowSetNumActiveTextures_0)(Address_weaks.nvnWindowSetNumActiveTextures))(nvnWindow, numBufferedFrames);
-			(Shared -> ActiveBuffers) = ((nvnWindowGetNumActiveTextures_0)(Address_weaks.nvnWindowGetNumActiveTextures))(nvnWindow);
+			FUNC_PTR(nvnWindowSetNumActiveTextures, nvnWindow, numBufferedFrames);
+			(Shared -> ActiveBuffers) = FUNC_PTR(nvnWindowGetNumActiveTextures, nvnWindow);
 		}
 		else {
 			(Shared -> SetActiveBuffers) = numBufferedFrames;
@@ -1037,27 +1171,27 @@ namespace NVN {
 			}
 			(Shared -> ActiveBuffers) = numBufferedFrames;
 		}
-		return ((nvnWindowSetNumActiveTextures_0)(Address_weaks.nvnWindowSetNumActiveTextures))(nvnWindow, numBufferedFrames);
+		return FUNC_PTR(nvnWindowSetNumActiveTextures, nvnWindow, numBufferedFrames);
 	}
 
 	void SetPresentInterval(const Window* nvnWindow, int mode) {
 		if (mode < 0) {
 			mode *= -1;
 			if ((Shared -> FPSmode) != mode) {
-				((nvnSetPresentInterval_0)(Address_weaks.nvnWindowSetPresentInterval))(nvnWindow, mode);
+				FUNC_PTR(nvnWindowSetPresentInterval, nvnWindow, mode);
 				(Shared -> FPSmode) = mode;
 			}
 			changedFPS = true;
 		}
 		else if (!changeFPS) {
-			((nvnSetPresentInterval_0)(Address_weaks.nvnWindowSetPresentInterval))(nvnWindow, mode);
+			FUNC_PTR(nvnWindowSetPresentInterval, nvnWindow, mode);
 			changedFPS = false;
 			(Shared -> FPSmode) = mode;
 		}
 		return;
 	}
 
-	void* SyncWait0(const void* _this, uint64_t timeout_ns) {
+	int SyncWait0(const Sync* _this, uint64_t timeout_ns) {
 		if (_this == WindowSync && (Shared -> ActiveBuffers) == 2) {
 			if ((Shared -> ZeroSync) == ZeroSyncType_Semi) {
 				const uint64_t endFrameTick = Utils::_getSystemTick();
@@ -1074,30 +1208,82 @@ namespace NVN {
 			else if ((Shared -> ZeroSync) == ZeroSyncType_Soft) 
 				timeout_ns = 0;
 		}
-		return ((nvnSyncWait_0)(Address_weaks.nvnSyncWait))(_this, timeout_ns);
+		return FUNC_PTR(nvnSyncWait, _this, timeout_ns);
 	}
 
-	void PresentTexture(const void* _this, const Window* nvnWindow, int index) {
+	void PresentTexture(const Queue* queue, const Window* nvnWindow, int index) {
 
 		//Initialize time calculation;
-		if (__builtin_expect(!NX_FPS_Math::starttick, 0)) {
+		if (NX_FPS_Math::starttick == 0) [[unlikely]] {
 			NX_FPS_Math::starttick = Utils::_getSystemTick();
 			NX_FPS_Math::starttick2 = NX_FPS_Math::starttick;
+
+			MemoryPoolBuilder dataPoolBuilder{};
+			FUNC_PTR(nvnMemoryPoolBuilderSetDefaults, &dataPoolBuilder);
+			FUNC_PTR(nvnMemoryPoolBuilderSetDevice, &dataPoolBuilder, mainDevice);
+			FUNC_PTR(nvnMemoryPoolBuilderSetFlags, &dataPoolBuilder, BIT(1) | BIT(5));
+			FUNC_PTR(nvnMemoryPoolBuilderSetStorage, &dataPoolBuilder, (void*)&dataPoolHostPtr, sizeof(dataPoolHostPtr));
+			FUNC_PTR(nvnMemoryPoolInitialize, &timestampDataPool, &dataPoolBuilder);
+			timestampDataCPU = (nvnCounterData*)FUNC_PTR(nvnMemoryPoolMap, &timestampDataPool);
+			BufferAddress dataGpuAddress = FUNC_PTR(nvnMemoryPoolGetBufferAddress, &timestampDataPool);
+
+			MemoryPoolBuilder cmdPoolBuilder{};
+			FUNC_PTR(nvnMemoryPoolBuilderSetDefaults, &cmdPoolBuilder);
+			FUNC_PTR(nvnMemoryPoolBuilderSetDevice, &cmdPoolBuilder, mainDevice);
+			FUNC_PTR(nvnMemoryPoolBuilderSetFlags, &cmdPoolBuilder, BIT(1) | BIT(5));
+			FUNC_PTR(nvnMemoryPoolBuilderSetStorage, &cmdPoolBuilder, (void*)&cmdPoolHostPtr, sizeof(cmdPoolHostPtr));
+			FUNC_PTR(nvnMemoryPoolInitialize, &profilingCmdMemoryPool, &cmdPoolBuilder);
+
+			FUNC_PTR(nvnDeviceGetInteger, mainDevice, 10, &COUNTER_ALIGNMENT);
+
+			FUNC_PTR(nvnCommandBufferInitialize, &tsCmdBuf, mainDevice);
+			
+			FUNC_PTR(nvnCommandBufferAddCommandMemory, &tsCmdBuf, &profilingCmdMemoryPool, 0, COMMAND_MEMORY_PER_BUF);
+			FUNC_PTR(nvnCommandBufferAddControlMemory, &tsCmdBuf, controlMemoryStorage, CONTROL_MEMORY_PER_BUF);
+
+			FUNC_PTR(nvnCommandBufferBeginRecording, &tsCmdBuf);
+
+			for (size_t counter = 0; counter < 0x10; counter++) {
+				BufferAddress currentFrameOffset = dataGpuAddress + (counter * COUNTER_ALIGNMENT);
+				FUNC_PTR(nvnCommandBufferReportCounter, &tsCmdBuf, counter, currentFrameOffset);
+				FUNC_PTR(nvnCommandBufferResetCounter, &tsCmdBuf, counter);			
+			}
+			
+			cmdHandles = FUNC_PTR(nvnCommandBufferEndRecording, &tsCmdBuf);
 		}
 		NX_FPS_Math::PreFrame();
-		((nvnQueuePresentTexture_0)(Address_weaks.nvnQueuePresentTexture))(_this, nvnWindow, index);
+		FUNC_PTR(nvnQueuePresentTexture, queue, nvnWindow, index);
+		Shared->NVN.timestamp = timestampDataCPU->timestamp;
+		Shared->NVN.inputVertices = timestampDataCPU->inputVertices;
+		Shared->NVN.inputPrimitives = timestampDataCPU->inputPrimitives;
+		Shared->NVN.vertexShaderInvocations = timestampDataCPU->vertexShaderInvocations;
+		Shared->NVN.tessControlShaderInvocations = timestampDataCPU->tessControlShaderInvocations;
+		Shared->NVN.tessEvaluationShaderInvocations = timestampDataCPU->tessEvaluationShaderInvocations;
+		Shared->NVN.geometryShaderInvocations = timestampDataCPU->geometryShaderInvocations;
+		Shared->NVN.fragmentShaderInvocations = timestampDataCPU->fragmentShaderInvocations;
+		Shared->NVN.tessEvaluationShaderPrimitives = timestampDataCPU->tessEvaluationShaderPrimitives;
+		Shared->NVN.geometryShaderPrimitives = timestampDataCPU->geometryShaderPrimitives;
+		Shared->NVN.clipperInputPrimitives = timestampDataCPU->clipperInputPrimitives;
+		Shared->NVN.clipperOutputPrimitives = timestampDataCPU->clipperOutputPrimitives;
+		Shared->NVN.primitivesGenerated = timestampDataCPU->primitivesGenerated;
+		Shared->NVN.transformFeedbackPrimitivesWritten = timestampDataCPU->transformFeedbackPrimitivesWritten;
+		Shared->NVN.tilesProcessedByZcull = timestampDataCPU->tilesProcessedByZcull;
+		Shared->NVN.pixelBlocksBehindPrimitivesAndCulled = timestampDataCPU->pixelBlocksBehindPrimitivesAndCulled;
+		Shared->NVN.pixelBlocksInFrontOfPrimitivesCulled = timestampDataCPU->pixelBlocksInFrontOfPrimitivesCulled;
+		Shared->NVN.pixelBlocksFailedStencilTestAndCulled = timestampDataCPU->pixelBlocksFailedStencilTestAndCulled;
+		FUNC_PTR(nvnQueueSubmitCommands, queue, 1, &cmdHandles);
 		NX_FPS_Math::PostFrame();
 
 		if (setNumActiveTexturesDetected) {
 			auto expectedBuffers = Shared->expectedSetBuffers;
 			if ((expectedBuffers > 0) && (amountOfAvailableBuffers >= expectedBuffers) && (expectedBuffers != (Shared->ActiveBuffers))) {
 				expectedBuffers *= -1;
-				((nvnQueueFinish_0)(Address_weaks.nvnQueueFinish))(_this);
+				FUNC_PTR(nvnQueueFinish, queue);
 				WindowSetNumActiveTextures(nvnWindow, expectedBuffers);
 			}
 		}
 
-		const auto nvnInterval = ((nvnGetPresentInterval_0)(Address_weaks.nvnWindowGetPresentInterval))(nvnWindow);
+		const auto nvnInterval = FUNC_PTR(nvnWindowGetPresentInterval, nvnWindow);
 
 		(Shared -> FPSmode) = (uint8_t)nvnInterval;
 
@@ -1137,11 +1323,12 @@ namespace NVN {
 		return;
 	}
 
-	Result AcquireTexture(const Window* nvnWindow, const void* nvnSync, const int* index) {
+	Result AcquireTexture(const Window* nvnWindow, const Sync* nvnSync, const int* index) {
 		if (WindowSync != nvnSync) {
-			WindowSync = (void*)nvnSync;
+			WindowSync = (Sync*)nvnSync;
 		}
-		Result ret = ((nvnWindowAcquireTexture_0)(Address_weaks.nvnWindowAcquireTexture))(nvnWindow, nvnSync, index);
+		Result ret = FUNC_PTR(nvnWindowAcquireTexture, nvnWindow, nvnSync, index);
+		
 		startFrameTick = Utils::_getSystemTick();
 		return ret;
 	}
@@ -1155,7 +1342,7 @@ namespace NVN {
 				last_viewport = {width, height};
 			}
 		}
-		return ((nvnCommandBufferSetViewports_0)(Address_weaks.nvnCommandBufferSetViewports))(cmdBuf, start, count, viewports);
+		return FUNC_PTR(nvnCommandBufferSetViewports, cmdBuf, start, count, viewports);
 	}
 
 	void* CommandBufferSetViewport(const CommandBuffer* cmdBuf, int x, int y, int width, int height) {
@@ -1163,7 +1350,7 @@ namespace NVN {
 			NX_FPS_Math::addResToViewports((uint32_t)width, (uint32_t)height);
 				last_viewport = {(uint32_t)width, (uint32_t)height};
 		}
-		return ((nvnCommandBufferSetViewport_0)(Address_weaks.nvnCommandBufferSetViewport))(cmdBuf, x, y, width, height);
+		return FUNC_PTR(nvnCommandBufferSetViewport, cmdBuf, x, y, width, height);
 	}
 
 	void* CommandBufferSetScissors(CommandBuffer* cmdBuf, int start, int count, const Scissor* viewports) {
@@ -1172,14 +1359,14 @@ namespace NVN {
 				NX_FPS_Math::addResToViewports((uint32_t)viewports[i].width, (uint32_t)viewports[i].height);
 			}
 		}
-		return ((nvnCommandBufferSetScissors_0)(Address_weaks.nvnCommandBufferSetScissors))(cmdBuf, start, count, viewports);
+		return FUNC_PTR(nvnCommandBufferSetScissors, cmdBuf, start, count, viewports);
 	}
 
 	void* CommandBufferSetScissor(const CommandBuffer* cmdBuf, int x, int y, int width, int height) {
 		if (!x && !y && height > 1 && width > 1 && resolutionLookup && (uint32_t)width != last_viewport.first && (uint32_t)height != last_viewport.second) {
 			NX_FPS_Math::addResToViewports((uint32_t)width, (uint32_t)height);
 		}
-		return ((nvnCommandBufferSetScissor_0)(Address_weaks.nvnCommandBufferSetScissor))(cmdBuf, x, y, width, height);
+		return FUNC_PTR(nvnCommandBufferSetScissor, cmdBuf, x, y, width, height);
 	}
 
 	void* CommandBufferSetRenderTargets(const CommandBuffer* cmdBuf, int numTextures, const Texture** texture, const TextureView** textureView, const Texture* depthTexture, const TextureView* depthView) {
@@ -1191,11 +1378,13 @@ namespace NVN {
 				NX_FPS_Math::addResToRender((uint32_t)depth_width, (uint32_t)depth_height);
 			}
 		}
-		return ((nvnCommandBufferSetRenderTargets_0)(Address_weaks.nvnCommandBufferSetRenderTargets))(cmdBuf, numTextures, texture, textureView, depthTexture, depthView);
+		return FUNC_PTR(nvnCommandBufferSetRenderTargets, cmdBuf, numTextures, texture, textureView, depthTexture, depthView);
 	}
 
 	uintptr_t GetProcAddress0 (Device* nvnDevice, const char* nvnFunction) {
-		uintptr_t address = ((GetProcAddress)(Address_weaks.nvnDeviceGetProcAddress))(nvnDevice, nvnFunction);
+		if (nvnDevice) mainDevice = nvnDevice;
+		uintptr_t address = FUNC_PTR(nvnDeviceGetProcAddress, nvnDevice, nvnFunction);
+
 		if (!strcmp("nvnDeviceGetProcAddress", nvnFunction))
 			return (uintptr_t)&GetProcAddress0;
 		else if (!strcmp("nvnQueuePresentTexture", nvnFunction)) {
@@ -1266,16 +1455,70 @@ namespace NVN {
 		else if (!strcmp("nvnWindowGetNumActiveTextures", nvnFunction)) {
 			Address_weaks.nvnWindowGetNumActiveTextures = address;
 		}
+		else if (!strcmp("nvnMemoryPoolBuilderSetDefaults", nvnFunction)) {
+			Address_weaks.nvnMemoryPoolBuilderSetDefaults = address;
+		}
+		else if (!strcmp("nvnMemoryPoolBuilderSetDevice", nvnFunction)) {
+			Address_weaks.nvnMemoryPoolBuilderSetDevice = address;
+		}
+		else if (!strcmp("nvnMemoryPoolBuilderSetFlags", nvnFunction)) {
+			Address_weaks.nvnMemoryPoolBuilderSetFlags = address;
+		}
+		else if (!strcmp("nvnMemoryPoolBuilderSetStorage", nvnFunction)) {
+			Address_weaks.nvnMemoryPoolBuilderSetStorage = address;
+		}
+		else if (!strcmp("nvnMemoryPoolInitialize", nvnFunction)) {
+			Address_weaks.nvnMemoryPoolInitialize = address;
+		}
+		else if (!strcmp("nvnMemoryPoolMap", nvnFunction)) {
+			Address_weaks.nvnMemoryPoolMap = address;
+		}
+		else if (!strcmp("nvnMemoryPoolGetBufferAddress", nvnFunction)) {
+			Address_weaks.nvnMemoryPoolGetBufferAddress = address;
+		}
+		else if (!strcmp("nvnSyncInitialize", nvnFunction)) {
+			Address_weaks.nvnSyncInitialize = address;
+		}
+		else if (!strcmp("nvnCommandBufferInitialize", nvnFunction)) {
+			Address_weaks.nvnCommandBufferInitialize = address;
+		}
+		else if (!strcmp("nvnCommandBufferAddCommandMemory", nvnFunction)) {
+			Address_weaks.nvnCommandBufferAddCommandMemory = address;
+		}
+		else if (!strcmp("nvnCommandBufferAddControlMemory", nvnFunction)) {
+			Address_weaks.nvnCommandBufferAddControlMemory = address;
+		}
+		else if (!strcmp("nvnCommandBufferBeginRecording", nvnFunction)) {
+			Address_weaks.nvnCommandBufferBeginRecording = address;
+		}
+		else if (!strcmp("nvnCommandBufferReportCounter", nvnFunction)) {
+			Address_weaks.nvnCommandBufferReportCounter = address;
+		}
+		else if (!strcmp("nvnCommandBufferEndRecording", nvnFunction)) {
+			Address_weaks.nvnCommandBufferEndRecording = address;
+		}
+		else if (!strcmp("nvnQueueSubmitCommands", nvnFunction)) {
+			Address_weaks.nvnQueueSubmitCommands = address;
+		}
+		else if (!strcmp("nvnQueueFenceSync", nvnFunction)) {
+			Address_weaks.nvnQueueFenceSync = address;
+		}
+		else if (!strcmp("nvnDeviceGetInteger", nvnFunction)) {
+			Address_weaks.nvnDeviceGetInteger = address;
+		}
+		else if (!strcmp("nvnCommandBufferResetCounter", nvnFunction)) {
+			Address_weaks.nvnCommandBufferResetCounter = address;
+		}
 		return address;
 	}
 
 	uintptr_t BootstrapLoader_1(const char* nvnName) {
 		if (strcmp(nvnName, "nvnDeviceGetProcAddress") == 0) {
 			Shared->API = 1;
-			if (!Address_weaks.nvnDeviceGetProcAddress) Address_weaks.nvnDeviceGetProcAddress = ((nvnBootstrapLoader_0)(Address_weaks.nvnBootstrapLoader))("nvnDeviceGetProcAddress");
+			if (!Address_weaks.nvnDeviceGetProcAddress) Address_weaks.nvnDeviceGetProcAddress = FUNC_PTR(nvnBootstrapLoader, "nvnDeviceGetProcAddress");
 			return (uintptr_t)&GetProcAddress0;
 		}
-		return ((nvnBootstrapLoader_0)(Address_weaks.nvnBootstrapLoader))(nvnName);
+		return FUNC_PTR(nvnBootstrapLoader, nvnName);
 	}
 }
 
