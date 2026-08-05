@@ -98,7 +98,7 @@ static inline void SaltyNX_printf(const char* format, ...)
 	svcOutputDebugString(buffer, strlen(buffer));
 	
 	static bool previous_line_had_endline = false;
-	FILE* f = fopen("sdmc:/SaltySD/saltysd.log", "ab");
+	FILE* f = fopen("sdmc:/SaltySD/saltynx.log", "ab");
 	if (f)
 	{
 		static uint64_t tick = 0;
