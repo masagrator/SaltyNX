@@ -15,6 +15,13 @@
 
 #define FUNC_PTR(func, ...) ((func##_0)(Address_weaks.func))(__VA_ARGS__)
 
+struct runtime_replace {
+	const char* name;
+	uintptr_t* orig_ptr;
+	void* hook_ptr;
+	void (*cond_check)(bool* check);
+};
+
 struct {
 	uintptr_t nvnBootstrapLoader;
 
@@ -655,68 +662,41 @@ namespace vk {
 			return vulkanResult;
 		}
 
+		std::array vk_replacements = {
+			runtime_replace{"vkQueuePresentKHR", &Address_weaks.vkQueuePresentKHR, (void*)vk::QueuePresent},
+			runtime_replace{"vkGetDeviceProcAddr", &Address_weaks.vkGetDeviceProcAddr, (void*)vk::GetDeviceProcAddr},
+			runtime_replace{"vkCmdSetViewport", &Address_weaks.vkCmdSetViewport, (void*)CmdSetViewport},
+			runtime_replace{"vkCmdSetViewportWithCount", &Address_weaks.vkCmdSetViewportWithCount, (void*)CmdSetViewportWithCount},
+			runtime_replace{"vkCmdSetScissor", &Address_weaks.vkCmdSetScissor, (void*)CmdSetScissor},
+			runtime_replace{"vkCmdSetScissorWithCount", &Address_weaks.vkCmdSetScissorWithCount, (void*)CmdSetScissorWithCount},
+			runtime_replace{"vkCreateSwapchainKHR", &Address_weaks.vkCreateSwapchainKHR, (void*)vk::CreateSwapchain},
+			runtime_replace{"vkGetSwapchainImagesKHR", &Address_weaks.vkGetSwapchainImagesKHR}
+		};
+
 		NOINLINE void* GetDeviceProcAddr(void* device, const char* vkFunction, uintptr_t pointer) {
 			uintptr_t address = (uintptr_t)((vkGetDeviceProcAddr_0)(pointer))(device, vkFunction);
-			if (!strcmp("vkQueuePresentKHR", vkFunction)) {
-				if (!Address_weaks.vkQueuePresentKHR) Address_weaks.vkQueuePresentKHR = address;
-				return (void*)&vk::QueuePresent;
-			}
 			if (!strcmp("vkGetDeviceProcAddr", vkFunction)) {
 				if (!Address_weaks.vkGetDeviceProcAddr) Address_weaks.vkGetDeviceProcAddr = address;
 				return (void*)pointer;
 			}
-			if (!strcmp("vkCmdSetViewport", vkFunction)) {
-				if (!Address_weaks.vkCmdSetViewport) Address_weaks.vkCmdSetViewport = address;
-				return (void*)&CmdSetViewport;
-			}
-			if (!strcmp("vkCmdSetViewportWithCount", vkFunction)) {
-				if (!Address_weaks.vkCmdSetViewportWithCount) Address_weaks.vkCmdSetViewportWithCount = address;
-				return (void*)&CmdSetViewportWithCount;
-			}
-			if (!strcmp("vkCmdSetScissor", vkFunction)) {
-				if (!Address_weaks.vkCmdSetScissor) Address_weaks.vkCmdSetScissor = address;
-				return (void*)&CmdSetScissor;
-			}
-			if (!strcmp("vkCmdSetScissorWithCount", vkFunction)) {
-				if (!Address_weaks.vkCmdSetScissorWithCount) Address_weaks.vkCmdSetScissorWithCount = address;
-				return (void*)&CmdSetScissorWithCount;
-			}
-			if (!strcmp("vkCreateSwapchainKHR", vkFunction)) {
-				if (!Address_weaks.vkCreateSwapchainKHR) Address_weaks.vkCreateSwapchainKHR = address;
-				return (void*)&vk::CreateSwapchain;
-			}
-			if (!strcmp("vkGetSwapchainImagesKHR", vkFunction)) {
-				if (!Address_weaks.vkGetSwapchainImagesKHR) Address_weaks.vkGetSwapchainImagesKHR = address;
-				return (void*)Address_weaks.vkGetSwapchainImagesKHR;
+
+			for (const auto& replacement : vk_replacements) {
+				if (!strcmp(replacement.name, vkFunction)) {
+					if (replacement.orig_ptr && *replacement.orig_ptr == 0) *replacement.orig_ptr = address;
+					if (replacement.hook_ptr) return replacement.hook_ptr;
+				}
 			}
 			return (void*)address;
 		}
 
 		NOINLINE void* GetInstanceProcAddr(void* instance, const char* vkFunction, uintptr_t pointer) {
 			uintptr_t address = (uintptr_t)((_vkGetInstanceProcAddr_0)(pointer))(instance, vkFunction);
-			if (!strcmp("vkQueuePresentKHR", vkFunction)) {
-				if (!Address_weaks.vkQueuePresentKHR) Address_weaks.vkQueuePresentKHR = address;
-				return (void*)&vk::QueuePresent;
-			}
-			if (!strcmp("vkGetDeviceProcAddr", vkFunction)) {
-				if (!Address_weaks.vkGetDeviceProcAddr) Address_weaks.vkGetDeviceProcAddr = address;
-				return (void*)&vk::GetDeviceProcAddr;
-			}
-			if (!strcmp("vkCreateSwapchainKHR", vkFunction)) {
-				if (!Address_weaks.vkCreateSwapchainKHR) Address_weaks.vkCreateSwapchainKHR = address;
-				return (void*)&vk::CreateSwapchain;
-			}
-			if (!strcmp("vkGetSwapchainImagesKHR", vkFunction)) {
-				if (!Address_weaks.vkGetSwapchainImagesKHR) Address_weaks.vkGetSwapchainImagesKHR = address;
-				return (void*)Address_weaks.vkGetSwapchainImagesKHR;
-			}
-			if (!strcmp("vkCmdSetViewport", vkFunction)) {
-				if (!Address_weaks.vkCmdSetViewport) Address_weaks.vkCmdSetViewport = address;
-				return (void*)&CmdSetViewport;
-			}
-			if (!strcmp("vkCmdSetViewportWithCount", vkFunction)) {
-				if (!Address_weaks.vkCmdSetViewportWithCount) Address_weaks.vkCmdSetViewportWithCount = address;
-				return (void*)&CmdSetViewportWithCount;
+			
+			for (const auto& replacement : vk_replacements) {
+				if (!strcmp(replacement.name, vkFunction)) {
+					if (replacement.orig_ptr && *replacement.orig_ptr == 0) *replacement.orig_ptr = address;
+					if (replacement.hook_ptr) return replacement.hook_ptr;
+				}
 			}
 			return (void*)address;
 		}
@@ -931,55 +911,29 @@ namespace EGL {
 		return EGL::Common::ViewportIndexedfv(i, pViewports, Address_weaks.glViewportIndexedfvOES);
 	}
 
+	std::array egl_replacements = {
+		runtime_replace{"eglSwapInterval", &Address_weaks.eglSwapInterval, (void*)Interval},
+		runtime_replace{"eglSwapBuffers", &Address_weaks.eglSwapBuffers, (void*)Swap},
+		runtime_replace{"glViewport", &Address_weaks.glViewport, (void*)Viewport},
+		runtime_replace{"glViewportArrayv", &Address_weaks.glViewportArrayv, (void*)ViewportArrayv},
+		runtime_replace{"glViewportArrayvNV", &Address_weaks.glViewportArrayvNV, (void*)ViewportArrayvNV},
+		runtime_replace{"glViewportArrayvOES", &Address_weaks.glViewportArrayvOES, (void*)ViewportArrayvOES},
+		runtime_replace{"glViewportIndexedf", &Address_weaks.glViewportIndexedf, (void*)ViewportIndexedf},
+		runtime_replace{"glViewportIndexedfNV", &Address_weaks.glViewportIndexedfNV, (void*)ViewportIndexedfNV},
+		runtime_replace{"glViewportIndexedfOES", &Address_weaks.glViewportIndexedfOES, (void*)ViewportIndexedfOES},
+		runtime_replace{"glViewportIndexedfv", &Address_weaks.glViewportIndexedfv, (void*)ViewportIndexedfv},
+		runtime_replace{"glViewportIndexedfvNV", &Address_weaks.glViewportIndexedfvNV, (void*)ViewportIndexedfvNV},
+		runtime_replace{"glViewportIndexedfvOES", &Address_weaks.glViewportIndexedfvOES, (void*)ViewportIndexedfvOES}
+	};
+
 	uintptr_t GetProc(const char* eglName) {
 		uintptr_t address = FUNC_PTR(eglGetProcAddress, eglName);
-		if (!strcmp(eglName, "eglSwapInterval")) {
-			if (!Address_weaks.eglSwapInterval) Address_weaks.eglSwapInterval = address;
-			return (uintptr_t)&Interval;
-		}
-		else if (!strcmp(eglName, "eglSwapBuffers")) {
-			if (!Address_weaks.eglSwapBuffers) Address_weaks.eglSwapBuffers = address;
-			return (uintptr_t)&Swap;
-		}
-		else if (!strcmp(eglName, "glViewport")) {
-			if (!Address_weaks.glViewport) Address_weaks.glViewport = address;
-			return (uintptr_t)&Viewport;
-		}
-		else if (!strcmp(eglName, "glViewportArrayv")) {
-			if (!Address_weaks.glViewportArrayv) Address_weaks.glViewportArrayv = address;
-			return (uintptr_t)&ViewportArrayv;
-		}
-		else if (!strcmp(eglName, "glViewportArrayvNV")) {
-			if (!Address_weaks.glViewportArrayvNV) Address_weaks.glViewportArrayvNV = address;
-			return (uintptr_t)&ViewportArrayvNV;
-		}
-		else if (!strcmp(eglName, "glViewportArrayvOES")) {
-			if (!Address_weaks.glViewportArrayvOES) Address_weaks.glViewportArrayvOES = address;
-			return (uintptr_t)&ViewportArrayvOES;
-		}
-		else if (!strcmp(eglName, "glViewportIndexedf")) {
-			if (!Address_weaks.glViewportIndexedf) Address_weaks.glViewportIndexedf = address;
-			return (uintptr_t)&ViewportIndexedf;
-		}
-		else if (!strcmp(eglName, "glViewportIndexedfNV")) {
-			if (!Address_weaks.glViewportIndexedfNV) Address_weaks.glViewportIndexedfNV = address;
-			return (uintptr_t)&ViewportIndexedfNV;
-		}
-		else if (!strcmp(eglName, "glViewportIndexedfOES")) {
-			if (!Address_weaks.glViewportIndexedfOES) Address_weaks.glViewportIndexedfOES = address;
-			return (uintptr_t)&ViewportIndexedfOES;
-		}
-		else if (!strcmp(eglName, "glViewportIndexedfv")) {
-			if (!Address_weaks.glViewportIndexedfv) Address_weaks.glViewportIndexedfv = address;
-			return (uintptr_t)&ViewportIndexedfv;
-		}
-		else if (!strcmp(eglName, "glViewportIndexedfvNV")) {
-			if (!Address_weaks.glViewportIndexedfvNV) Address_weaks.glViewportIndexedfvNV = address;
-			return (uintptr_t)&ViewportIndexedfvNV;
-		}
-		else if (!strcmp(eglName, "glViewportIndexedfvOES")) {
-			if (!Address_weaks.glViewportIndexedfvOES) Address_weaks.glViewportIndexedfvOES = address;
-			return (uintptr_t)&ViewportIndexedfvOES;
+
+		for (const auto& replacement : egl_replacements) {
+			if (!strcmp(replacement.name, eglName)) {
+				if (replacement.orig_ptr && *replacement.orig_ptr == 0) *replacement.orig_ptr = address;
+				if (replacement.hook_ptr) return (uintptr_t)replacement.hook_ptr;
+			}
 		}
 		return address;
 	}
@@ -1391,133 +1345,64 @@ namespace NVN {
 		return FUNC_PTR(nvnCommandBufferSetRenderTargets, cmdBuf, numTextures, texture, textureView, depthTexture, depthView);
 	}
 
+	void initWindowSetNumActiveTextures(bool* out) {
+		setNumActiveTexturesDetected = true;
+		Shared->expectedSetBuffers = 0;
+		*out = true;
+	}
+
+	uintptr_t GetProcAddress0 (Device* nvnDevice, const char* nvnFunction);
+
 	uintptr_t GetProcAddress0 (Device* nvnDevice, const char* nvnFunction) {
 		if (nvnDevice) mainDevice = nvnDevice;
 		uintptr_t address = FUNC_PTR(nvnDeviceGetProcAddress, nvnDevice, nvnFunction);
 
-		if (!strcmp("nvnDeviceGetProcAddress", nvnFunction))
-			return (uintptr_t)&GetProcAddress0;
-		else if (!strcmp("nvnQueuePresentTexture", nvnFunction)) {
-			if (!Address_weaks.nvnQueuePresentTexture) Address_weaks.nvnQueuePresentTexture = address;
-			return (uintptr_t)&PresentTexture;
-		}
-		else if (!strcmp("nvnWindowAcquireTexture", nvnFunction)) {
-			if (!Address_weaks.nvnWindowAcquireTexture) Address_weaks.nvnWindowAcquireTexture = address;
-			return (uintptr_t)&AcquireTexture;
-		}
-		else if (!strcmp("nvnWindowSetPresentInterval", nvnFunction)) {
-			if (!Address_weaks.nvnWindowSetPresentInterval) Address_weaks.nvnWindowSetPresentInterval = address;
-			return (uintptr_t)&SetPresentInterval;
-		}
-		else if (!strcmp("nvnWindowGetPresentInterval", nvnFunction)) {
-			if (!Address_weaks.nvnWindowGetPresentInterval) Address_weaks.nvnWindowGetPresentInterval = address;
-		}
-		else if (!strcmp("nvnWindowSetNumActiveTextures", nvnFunction)) {
-			if (!Address_weaks.nvnWindowSetNumActiveTextures) Address_weaks.nvnWindowSetNumActiveTextures = address;
-			setNumActiveTexturesDetected = true;
-			Shared->expectedSetBuffers = 0;
-			return (uintptr_t)&WindowSetNumActiveTextures;
-		}
-		else if (!strcmp("nvnWindowBuilderSetTextures", nvnFunction)) {
-			if (!Address_weaks.nvnWindowBuilderSetTextures) Address_weaks.nvnWindowBuilderSetTextures = address;
-			return (uintptr_t)&WindowBuilderSetTextures;
-		}
-		else if (!strcmp("nvnWindowInitialize", nvnFunction)) {
-			if (!Address_weaks.nvnWindowInitialize) Address_weaks.nvnWindowInitialize = address;
-			return (uintptr_t)&WindowInitialize;
-		}
-		else if (!strcmp("nvnSyncWait", nvnFunction)) {
-			if (!Address_weaks.nvnSyncWait) Address_weaks.nvnSyncWait = address;
-			return (uintptr_t)&SyncWait0;
-		}
-		else if (!strcmp("nvnCommandBufferSetRenderTargets", nvnFunction)) {
-			if (!Address_weaks.nvnCommandBufferSetRenderTargets) Address_weaks.nvnCommandBufferSetRenderTargets = address;
-			return (uintptr_t)&CommandBufferSetRenderTargets;
-		}
-		else if (!strcmp("nvnCommandBufferSetViewport", nvnFunction)) {
-			if (!Address_weaks.nvnCommandBufferSetViewport) Address_weaks.nvnCommandBufferSetViewport = address;
-			return (uintptr_t)&CommandBufferSetViewport;
-		}
-		else if (!strcmp("nvnCommandBufferSetViewports", nvnFunction)) {
-			if (!Address_weaks.nvnCommandBufferSetViewports) Address_weaks.nvnCommandBufferSetViewports = address;
-			return (uintptr_t)&CommandBufferSetViewports;
-		}
-		else if (!strcmp("nvnCommandBufferSetScissor", nvnFunction)) {
-			if (!Address_weaks.nvnCommandBufferSetScissor) Address_weaks.nvnCommandBufferSetScissor = address;
-			return (uintptr_t)&CommandBufferSetScissor;
-		}
-		else if (!strcmp("nvnCommandBufferSetScissors", nvnFunction)) {
-			if (!Address_weaks.nvnCommandBufferSetScissors) Address_weaks.nvnCommandBufferSetScissors = address;
-			return (uintptr_t)&CommandBufferSetScissors;
-		}
-		else if (!strcmp("nvnTextureGetWidth", nvnFunction)) {
-			Address_weaks.nvnTextureGetWidth = address;
-		}
-		else if (!strcmp("nvnTextureGetHeight", nvnFunction)) {
-			Address_weaks.nvnTextureGetHeight = address;
-		}
-		else if (!strcmp("nvnTextureGetFormat", nvnFunction)) {
-			Address_weaks.nvnTextureGetFormat = address;
-		}
-		else if (!strcmp("nvnQueueFinish", nvnFunction)) {
-			Address_weaks.nvnQueueFinish = address;
-		}
-		else if (!strcmp("nvnWindowGetNumActiveTextures", nvnFunction)) {
-			Address_weaks.nvnWindowGetNumActiveTextures = address;
-		}
-		else if (!strcmp("nvnMemoryPoolBuilderSetDefaults", nvnFunction)) {
-			Address_weaks.nvnMemoryPoolBuilderSetDefaults = address;
-		}
-		else if (!strcmp("nvnMemoryPoolBuilderSetDevice", nvnFunction)) {
-			Address_weaks.nvnMemoryPoolBuilderSetDevice = address;
-		}
-		else if (!strcmp("nvnMemoryPoolBuilderSetFlags", nvnFunction)) {
-			Address_weaks.nvnMemoryPoolBuilderSetFlags = address;
-		}
-		else if (!strcmp("nvnMemoryPoolBuilderSetStorage", nvnFunction)) {
-			Address_weaks.nvnMemoryPoolBuilderSetStorage = address;
-		}
-		else if (!strcmp("nvnMemoryPoolInitialize", nvnFunction)) {
-			Address_weaks.nvnMemoryPoolInitialize = address;
-		}
-		else if (!strcmp("nvnMemoryPoolMap", nvnFunction)) {
-			Address_weaks.nvnMemoryPoolMap = address;
-		}
-		else if (!strcmp("nvnMemoryPoolGetBufferAddress", nvnFunction)) {
-			Address_weaks.nvnMemoryPoolGetBufferAddress = address;
-		}
-		else if (!strcmp("nvnSyncInitialize", nvnFunction)) {
-			Address_weaks.nvnSyncInitialize = address;
-		}
-		else if (!strcmp("nvnCommandBufferInitialize", nvnFunction)) {
-			Address_weaks.nvnCommandBufferInitialize = address;
-		}
-		else if (!strcmp("nvnCommandBufferAddCommandMemory", nvnFunction)) {
-			Address_weaks.nvnCommandBufferAddCommandMemory = address;
-		}
-		else if (!strcmp("nvnCommandBufferAddControlMemory", nvnFunction)) {
-			Address_weaks.nvnCommandBufferAddControlMemory = address;
-		}
-		else if (!strcmp("nvnCommandBufferBeginRecording", nvnFunction)) {
-			Address_weaks.nvnCommandBufferBeginRecording = address;
-		}
-		else if (!strcmp("nvnCommandBufferReportCounter", nvnFunction)) {
-			Address_weaks.nvnCommandBufferReportCounter = address;
-		}
-		else if (!strcmp("nvnCommandBufferEndRecording", nvnFunction)) {
-			Address_weaks.nvnCommandBufferEndRecording = address;
-		}
-		else if (!strcmp("nvnQueueSubmitCommands", nvnFunction)) {
-			Address_weaks.nvnQueueSubmitCommands = address;
-		}
-		else if (!strcmp("nvnQueueFenceSync", nvnFunction)) {
-			Address_weaks.nvnQueueFenceSync = address;
-		}
-		else if (!strcmp("nvnDeviceGetInteger", nvnFunction)) {
-			Address_weaks.nvnDeviceGetInteger = address;
-		}
-		else if (!strcmp("nvnCommandBufferResetCounter", nvnFunction)) {
-			Address_weaks.nvnCommandBufferResetCounter = address;
+		//They must be inside function otherwise 32-bit Core stucks at relocations
+		std::array nvn_replacements = {
+			runtime_replace{"nvnDeviceGetProcAddress", nullptr, (void*)GetProcAddress0},
+			runtime_replace{"nvnQueuePresentTexture", &Address_weaks.nvnQueuePresentTexture, (void*)PresentTexture},
+			runtime_replace{"nvnWindowAcquireTexture", &Address_weaks.nvnWindowAcquireTexture, (void*)AcquireTexture},
+			runtime_replace{"nvnWindowSetPresentInterval", &Address_weaks.nvnWindowSetPresentInterval, (void*)SetPresentInterval},
+			runtime_replace{"nvnWindowGetPresentInterval", &Address_weaks.nvnWindowGetPresentInterval},
+			runtime_replace{"nvnWindowSetNumActiveTextures", &Address_weaks.nvnWindowSetNumActiveTextures, (void*)WindowSetNumActiveTextures, initWindowSetNumActiveTextures},
+			runtime_replace{"nvnWindowBuilderSetTextures", &Address_weaks.nvnWindowBuilderSetTextures, (void*)WindowBuilderSetTextures},
+			runtime_replace{"nvnWindowInitialize", &Address_weaks.nvnWindowInitialize, (void*)WindowInitialize},
+			runtime_replace{"nvnSyncWait", &Address_weaks.nvnSyncWait, (void*)SyncWait0},
+			runtime_replace{"nvnCommandBufferSetRenderTargets", &Address_weaks.nvnCommandBufferSetRenderTargets, (void*)CommandBufferSetRenderTargets},
+			runtime_replace{"nvnCommandBufferSetViewport", &Address_weaks.nvnCommandBufferSetViewport, (void*)CommandBufferSetViewport},
+			runtime_replace{"nvnCommandBufferSetViewports", &Address_weaks.nvnCommandBufferSetViewports, (void*)CommandBufferSetViewports},
+			runtime_replace{"nvnCommandBufferSetScissor", &Address_weaks.nvnCommandBufferSetScissor, (void*)CommandBufferSetScissor},
+			runtime_replace{"nvnCommandBufferSetScissors", &Address_weaks.nvnCommandBufferSetScissors, (void*)CommandBufferSetScissors},
+			runtime_replace{"nvnTextureGetWidth", &Address_weaks.nvnTextureGetWidth},
+			runtime_replace{"nvnTextureGetHeight", &Address_weaks.nvnTextureGetHeight},
+			runtime_replace{"nvnTextureGetFormat", &Address_weaks.nvnTextureGetFormat},
+			runtime_replace{"nvnQueueFinish", &Address_weaks.nvnQueueFinish},
+			runtime_replace{"nvnWindowGetNumActiveTextures", &Address_weaks.nvnWindowGetNumActiveTextures},
+			runtime_replace{"nvnMemoryPoolBuilderSetDefaults", &Address_weaks.nvnMemoryPoolBuilderSetDefaults},
+			runtime_replace{"nvnMemoryPoolBuilderSetDevice", &Address_weaks.nvnMemoryPoolBuilderSetDevice},
+			runtime_replace{"nvnMemoryPoolBuilderSetFlags", &Address_weaks.nvnMemoryPoolBuilderSetFlags},
+			runtime_replace{"nvnMemoryPoolBuilderSetStorage", &Address_weaks.nvnMemoryPoolBuilderSetStorage},
+			runtime_replace{"nvnMemoryPoolInitialize", &Address_weaks.nvnMemoryPoolInitialize},
+			runtime_replace{"nvnMemoryPoolMap", &Address_weaks.nvnMemoryPoolMap},
+			runtime_replace{"nvnMemoryPoolGetBufferAddress", &Address_weaks.nvnMemoryPoolGetBufferAddress},
+			runtime_replace{"nvnSyncInitialize", &Address_weaks.nvnSyncInitialize},
+			runtime_replace{"nvnCommandBufferInitialize", &Address_weaks.nvnCommandBufferInitialize},
+			runtime_replace{"nvnCommandBufferAddCommandMemory", &Address_weaks.nvnCommandBufferAddCommandMemory},
+			runtime_replace{"nvnCommandBufferAddControlMemory", &Address_weaks.nvnCommandBufferAddControlMemory},
+			runtime_replace{"nvnCommandBufferBeginRecording", &Address_weaks.nvnCommandBufferBeginRecording},
+			runtime_replace{"nvnCommandBufferReportCounter", &Address_weaks.nvnCommandBufferReportCounter},
+			runtime_replace{"nvnCommandBufferEndRecording", &Address_weaks.nvnCommandBufferEndRecording},
+			runtime_replace{"nvnQueueSubmitCommands", &Address_weaks.nvnQueueSubmitCommands},
+			runtime_replace{"nvnQueueFenceSync", &Address_weaks.nvnQueueFenceSync},
+			runtime_replace{"nvnDeviceGetInteger", &Address_weaks.nvnDeviceGetInteger},
+			runtime_replace{"nvnCommandBufferResetCounter", &Address_weaks.nvnCommandBufferResetCounter}
+		};
+
+		for (const auto& replacement : nvn_replacements) {
+			if (!strcmp(replacement.name, nvnFunction)) {
+				if (replacement.orig_ptr && *replacement.orig_ptr == 0) *replacement.orig_ptr = address;
+				if (replacement.hook_ptr) return (uintptr_t)replacement.hook_ptr;
+			}
 		}
 		return address;
 	}
@@ -1532,9 +1417,83 @@ namespace NVN {
 	}
 }
 
+void checkvkGetInstanceProcAddr(bool* out) {
+	if (Address_weaks.vkGetInstanceProcAddr) *out = true;
+	else *out = false;
+}
+
+void checkReadFlag(bool* out) {
+	FILE* readFlag = SaltySDCore_fopen("sdmc:/SaltySD/flags/blockfilestats.flag", "rb");
+	if (readFlag) {
+		SaltySDCore_fclose(readFlag);
+		*out = false;
+	}
+	else {
+		*out = true;
+	}
+}
+
 extern "C" {
 
 	void NX_FPS(SharedMemory* _sharedmemory, uint32_t* _sharedOperationMode) {
+
+		//They must be inside function otherwise 32-bit Core stucks at relocations
+		std::array replacements = {
+			runtime_replace{"nvnBootstrapLoader", &Address_weaks.nvnBootstrapLoader, (void*)NVN::BootstrapLoader_1, nullptr},
+
+			runtime_replace{"eglGetProcAddress", &Address_weaks.eglGetProcAddress, (void*)EGL::GetProc, nullptr},
+			runtime_replace{"eglSwapBuffers", &Address_weaks.eglSwapBuffers, (void*)EGL::Swap, nullptr},
+			runtime_replace{"eglSwapInterval", &Address_weaks.eglSwapInterval, (void*)EGL::Interval, nullptr},
+			runtime_replace{"glViewport", &Address_weaks.glViewport, (void*)EGL::Viewport, nullptr},
+			runtime_replace{"glViewportArrayv", &Address_weaks.glViewportArrayv, (void*)EGL::ViewportArrayv, nullptr},
+			runtime_replace{"glViewportArrayvNV", &Address_weaks.glViewportArrayvNV, (void*)EGL::ViewportArrayvNV, nullptr},
+			runtime_replace{"glViewportArrayvOES", &Address_weaks.glViewportArrayvOES, (void*)EGL::ViewportArrayvOES, nullptr},
+			runtime_replace{"glViewportIndexedf", &Address_weaks.glViewportIndexedf, (void*)EGL::ViewportIndexedf, nullptr},
+			runtime_replace{"glViewportIndexedfNV", &Address_weaks.glViewportIndexedfNV, (void*)EGL::ViewportIndexedfNV, nullptr},
+			runtime_replace{"glViewportIndexedfOES", &Address_weaks.glViewportIndexedfOES, (void*)EGL::ViewportIndexedfOES, nullptr},
+			runtime_replace{"glViewportIndexedfv", &Address_weaks.glViewportIndexedfv, (void*)EGL::ViewportIndexedfv, nullptr},
+			runtime_replace{"glViewportIndexedfvNV", &Address_weaks.glViewportIndexedfvNV, (void*)EGL::ViewportIndexedfvNV, nullptr},
+			runtime_replace{"glViewportIndexedfvOES", &Address_weaks.glViewportIndexedfvOES, (void*)EGL::ViewportIndexedfvOES, nullptr},
+			
+			runtime_replace{"vkQueuePresentKHR", &Address_weaks.vkQueuePresentKHR, (void*)vk::QueuePresent, nullptr},
+			runtime_replace{"_ZN11NvSwapchain15QueuePresentKHREP9VkQueue_TPK16VkPresentInfoKHR", &Address_weaks.nvSwapchainQueuePresentKHR, (void*)vk::nvSwapchain::QueuePresent, nullptr},
+			runtime_replace{"vkGetInstanceProcAddr", &Address_weaks.vkGetInstanceProcAddr, (void*)vk::GetInstanceProcAddr, nullptr},
+			runtime_replace{"vkCmdSetViewport", &Address_weaks.vkCmdSetViewport, (void*)vk::CmdSetViewport, nullptr},
+			runtime_replace{"vkCreateSwapchainKHR", &Address_weaks.vkCreateSwapchainKHR, (void*)vk::CreateSwapchain, nullptr},
+			runtime_replace{"vkGetDeviceProcAddr", &Address_weaks.vkGetDeviceProcAddr, (void*)vk::GetDeviceProcAddr, nullptr},
+			runtime_replace{"vkCmdSetViewportWithCount", &Address_weaks.vkCmdSetViewportWithCount, (void*)vk::CmdSetViewportWithCount, nullptr},
+			runtime_replace{"vkGetSwapchainImagesKHR", &Address_weaks.vkGetSwapchainImagesKHR, nullptr, nullptr},
+			runtime_replace{"_ZN11NvSwapchain21GetSwapchainImagesKHREP10VkDevice_TP16VkSwapchainKHR_TPjPP9VkImage_T, &Address_weaks.nvSwapchainGetSwapchainImagesKHR", nullptr, nullptr},
+			runtime_replace{"_ZN11NvSwapchain18CreateSwapchainKHREP10VkDevice_TPK24VkSwapchainCreateInfoKHRPK21VkAllocationCallbacksPP16VkSwapchainKHR_T", &Address_weaks.nvSwapchainCreateSwapchainKHR, nullptr, nullptr},
+
+			runtime_replace{"_ZN2nn2oe20SetFocusHandlingModeENS0_17FocusHandlingModeE", &Address_weaks.SetFocusHandlingMode, (void*)nn::setFocusHandlingMode, nullptr},
+			runtime_replace{"_ZN2nn2os17ConvertToTimeSpanENS0_4TickE", &Address_weaks.ConvertToTimeSpan, nullptr, nullptr},
+			runtime_replace{"_ZN2nn2os13GetSystemTickEv", &Address_weaks.GetSystemTick, nullptr, nullptr},
+			runtime_replace{"_ZN2nn2os22GetSystemTickFrequencyEv", &Address_weaks.GetSystemTickFrequency, nullptr, nullptr},
+			runtime_replace{"_ZN2nn2oe44SetUserInactivityDetectionTimeExtendedUnsafeEb", &Address_weaks.SetUserInactivityDetectionTimeExtended, nullptr, nullptr},
+			runtime_replace{
+				#if defined(SWITCH32) || defined(OUNCE32)
+				"_ZN2nn2ro12LookupSymbolEPjPKc",
+				#else
+				"_ZN2nn2ro12LookupSymbolEPmPKc",
+				#endif
+				&Address_weaks.LookupSymbol, (void*)vk::LookupSymbol, &checkvkGetInstanceProcAddr},
+			runtime_replace{
+				#if defined(SWITCH32) || defined(OUNCE32)
+				"_ZN2nn2fs6detail12FileAccessor4ReadEPjxPvjRKNS0_10ReadOptionE",
+				#else
+				"_ZN2nn2fs6detail12FileAccessor4ReadEPmlPvmRKNS0_10ReadOptionE",
+				#endif
+				&Address_weaks.FileAccessorRead, (void*)nn::FileAccessorRead, &checkReadFlag},
+			runtime_replace{
+				#if defined(SWITCH32) || defined(OUNCE32)
+				"_ZN2nn2fs6detail12FileAccessor4ReadEPjxPvjRKNS0_10ReadOptionEPNS1_25FileDataCacheAccessResultE",
+				#else
+				"_ZN2nn2fs6detail12FileAccessor4ReadEPmlPvmRKNS0_10ReadOptionEPNS1_25FileDataCacheAccessResultE",
+				#endif
+				&Address_weaks.FileAccessorReadCache, (void*)nn::FileAccessorReadCache, &checkReadFlag}
+		};
+
 		sharedOperationMode = _sharedOperationMode;
 		SaltySDCore_printf("NX-FPS: alive\n");
 		LOCK::mappings.main_start = Utils::getMainAddress();
@@ -1551,90 +1510,18 @@ extern "C" {
 			Shared = (NxFpsSharedBlock*)__builtin_assume_aligned((const void*)((uintptr_t)shmemGetAddr(_sharedmemory) + SharedMemoryOffset), 4);
 			Shared -> MAGIC = 0x465053;
 			Shared->expectedSetBuffers = -1;
-			
-			Address_weaks.nvnBootstrapLoader = SaltySDCore_FindSymbolBuiltin("nvnBootstrapLoader");
 
-			Address_weaks.eglGetProcAddress = SaltySDCore_FindSymbolBuiltin("eglGetProcAddress");
-			Address_weaks.eglSwapBuffers = SaltySDCore_FindSymbolBuiltin("eglSwapBuffers");
-			Address_weaks.eglSwapInterval = SaltySDCore_FindSymbolBuiltin("eglSwapInterval");
-			Address_weaks.glViewport = SaltySDCore_FindSymbolBuiltin("glViewport");
-			Address_weaks.glViewportArrayv = SaltySDCore_FindSymbolBuiltin("glViewportArrayv");
-			Address_weaks.glViewportArrayvNV = SaltySDCore_FindSymbolBuiltin("glViewportArrayvNV");
-			Address_weaks.glViewportArrayvOES = SaltySDCore_FindSymbolBuiltin("glViewportArrayvOES");
-			Address_weaks.glViewportIndexedf = SaltySDCore_FindSymbolBuiltin("glViewportIndexedf");
-			Address_weaks.glViewportIndexedfNV = SaltySDCore_FindSymbolBuiltin("glViewportIndexedfNV");
-			Address_weaks.glViewportIndexedfOES = SaltySDCore_FindSymbolBuiltin("glViewportIndexedfOES");
-			Address_weaks.glViewportIndexedfv = SaltySDCore_FindSymbolBuiltin("glViewportIndexedfv");
-			Address_weaks.glViewportIndexedfvNV = SaltySDCore_FindSymbolBuiltin("glViewportIndexedfvNV");
-			Address_weaks.glViewportIndexedfvOES = SaltySDCore_FindSymbolBuiltin("glViewportIndexedfvOES");
-
-			Address_weaks.vkQueuePresentKHR = SaltySDCore_FindSymbolBuiltin("vkQueuePresentKHR");
-			Address_weaks.nvSwapchainQueuePresentKHR = SaltySDCore_FindSymbolBuiltin("_ZN11NvSwapchain15QueuePresentKHREP9VkQueue_TPK16VkPresentInfoKHR");
-			Address_weaks.vkGetInstanceProcAddr = SaltySDCore_FindSymbolBuiltin("vkGetInstanceProcAddr");
-			Address_weaks.vkCmdSetViewport = SaltySDCore_FindSymbolBuiltin("vkCmdSetViewport");
-			Address_weaks.vkCreateSwapchainKHR = SaltySDCore_FindSymbolBuiltin("vkCreateSwapchainKHR");
-			Address_weaks.vkGetDeviceProcAddr = SaltySDCore_FindSymbolBuiltin("vkGetDeviceProcAddr");
-			Address_weaks.vkGetSwapchainImagesKHR = SaltySDCore_FindSymbolBuiltin("vkGetSwapchainImagesKHR");
-			Address_weaks.nvSwapchainGetSwapchainImagesKHR = SaltySDCore_FindSymbolBuiltin("_ZN11NvSwapchain21GetSwapchainImagesKHREP10VkDevice_TP16VkSwapchainKHR_TPjPP9VkImage_T");
-			Address_weaks.nvSwapchainCreateSwapchainKHR = SaltySDCore_FindSymbolBuiltin("_ZN11NvSwapchain18CreateSwapchainKHREP10VkDevice_TPK24VkSwapchainCreateInfoKHRPK21VkAllocationCallbacksPP16VkSwapchainKHR_T");
-
-			Address_weaks.ConvertToTimeSpan = SaltySDCore_FindSymbolBuiltin("_ZN2nn2os17ConvertToTimeSpanENS0_4TickE");
-			Address_weaks.GetSystemTick = SaltySDCore_FindSymbolBuiltin("_ZN2nn2os13GetSystemTickEv");
-			Address_weaks.GetSystemTickFrequency = SaltySDCore_FindSymbolBuiltin("_ZN2nn2os22GetSystemTickFrequencyEv");
-			Address_weaks.SetFocusHandlingMode = SaltySDCore_FindSymbolBuiltin("_ZN2nn2oe20SetFocusHandlingModeENS0_17FocusHandlingModeE");
-			#if defined(SWITCH32) || defined(OUNCE32)
-			Address_weaks.LookupSymbol = SaltySDCore_FindSymbolBuiltin("_ZN2nn2ro12LookupSymbolEPjPKc");
-			#else
-			Address_weaks.LookupSymbol = SaltySDCore_FindSymbolBuiltin("_ZN2nn2ro12LookupSymbolEPmPKc");
-			#endif
-			Address_weaks.SetUserInactivityDetectionTimeExtended = SaltySDCore_FindSymbolBuiltin("_ZN2nn2oe44SetUserInactivityDetectionTimeExtendedUnsafeEb");
-
-			SaltySDCore_ReplaceImport("nvnBootstrapLoader", (void*)NVN::BootstrapLoader_1);
-			SaltySDCore_ReplaceImport("eglSwapBuffers", (void*)EGL::Swap);
-			SaltySDCore_ReplaceImport("eglSwapInterval", (void*)EGL::Interval);
-			SaltySDCore_ReplaceImport("glViewport", (void*)EGL::Viewport);
-			SaltySDCore_ReplaceImport("glViewportArrayv", (void*)EGL::ViewportArrayv);
-			SaltySDCore_ReplaceImport("glViewportArrayvNV", (void*)EGL::ViewportArrayvNV);
-			SaltySDCore_ReplaceImport("glViewportArrayvOES", (void*)EGL::ViewportArrayvOES);
-			SaltySDCore_ReplaceImport("glViewportIndexedf", (void*)EGL::ViewportIndexedf);
-			SaltySDCore_ReplaceImport("glViewportIndexedfNV", (void*)EGL::ViewportIndexedfNV);
-			SaltySDCore_ReplaceImport("glViewportIndexedfOES", (void*)EGL::ViewportIndexedfOES);
-			SaltySDCore_ReplaceImport("glViewportIndexedfv", (void*)EGL::ViewportIndexedfv);
-			SaltySDCore_ReplaceImport("glViewportIndexedfvNV", (void*)EGL::ViewportIndexedfvNV);
-			SaltySDCore_ReplaceImport("glViewportIndexedfvOES", (void*)EGL::ViewportIndexedfvOES);
-			SaltySDCore_ReplaceImport("vkQueuePresentKHR", (void*)vk::QueuePresent);
-			SaltySDCore_ReplaceImport("_ZN11NvSwapchain15QueuePresentKHREP9VkQueue_TPK16VkPresentInfoKHR", (void*)vk::nvSwapchain::QueuePresent);
-			SaltySDCore_ReplaceImport("eglGetProcAddress", (void*)EGL::GetProc);
-			SaltySDCore_ReplaceImport("vkGetDeviceProcAddr", (void*)vk::GetDeviceProcAddr);
-			SaltySDCore_ReplaceImport("vkGetInstanceProcAddr", (void*)vk::GetInstanceProcAddr);
-			SaltySDCore_ReplaceImport("vkCmdSetViewport", (void*)vk::CmdSetViewport);
-			SaltySDCore_ReplaceImport("vkCmdSetViewportWithCount", (void*)vk::CmdSetViewportWithCount);
-			SaltySDCore_ReplaceImport("vkCreateSwapchainKHR", (void*)vk::CreateSwapchain);
-			SaltySDCore_ReplaceImport("_ZN2nn2oe20SetFocusHandlingModeENS0_17FocusHandlingModeE", (void*)nn::setFocusHandlingMode);
-			if (Address_weaks.vkGetInstanceProcAddr) {
-				//Minecraft is using nn::ro::LookupSymbol to search for Vulkan functions
-				#if defined(SWITCH32) || defined(OUNCE32)
-				SaltySDCore_ReplaceImport("_ZN2nn2ro12LookupSymbolEPjPKc", (void*)vk::LookupSymbol);
-				#else
-				SaltySDCore_ReplaceImport("_ZN2nn2ro12LookupSymbolEPmPKc", (void*)vk::LookupSymbol);
-				#endif
+			for (const auto& replacement: replacements) {
+				if (replacement.orig_ptr) *replacement.orig_ptr = SaltySDCore_FindSymbolBuiltin(replacement.name);
+				if (replacement.hook_ptr) {
+					if (replacement.cond_check) {
+						bool check = false;
+						replacement.cond_check(&check);
+						if (check == true) SaltySDCore_ReplaceImport(replacement.name, replacement.hook_ptr);
+					}
+					else SaltySDCore_ReplaceImport(replacement.name, replacement.hook_ptr);
+				}
 			}
-			FILE* readFlag = SaltySDCore_fopen("sdmc:/SaltySD/flags/blockfilestats.flag", "rb");
-			if (!readFlag) {
-				//For 32-bit it's different
-				#if defined(SWITCH32) || defined(OUNCE32)
-				Address_weaks.FileAccessorRead = SaltySDCore_FindSymbolBuiltin("_ZN2nn2fs6detail12FileAccessor4ReadEPjxPvjRKNS0_10ReadOptionE");		
-				SaltySDCore_ReplaceImport("_ZN2nn2fs6detail12FileAccessor4ReadEPjxPvjRKNS0_10ReadOptionE", (void*)nn::FileAccessorRead);
-				Address_weaks.FileAccessorReadCache = SaltySDCore_FindSymbolBuiltin("_ZN2nn2fs6detail12FileAccessor4ReadEPjxPvjRKNS0_10ReadOptionEPNS1_25FileDataCacheAccessResultE");		
-				SaltySDCore_ReplaceImport("_ZN2nn2fs6detail12FileAccessor4ReadEPjxPvjRKNS0_10ReadOptionEPNS1_25FileDataCacheAccessResultE", (void*)nn::FileAccessorReadCache);
-				#else
-				Address_weaks.FileAccessorRead = SaltySDCore_FindSymbolBuiltin("_ZN2nn2fs6detail12FileAccessor4ReadEPmlPvmRKNS0_10ReadOptionE");		
-				SaltySDCore_ReplaceImport("_ZN2nn2fs6detail12FileAccessor4ReadEPmlPvmRKNS0_10ReadOptionE", (void*)nn::FileAccessorRead);
-				Address_weaks.FileAccessorReadCache = SaltySDCore_FindSymbolBuiltin("_ZN2nn2fs6detail12FileAccessor4ReadEPmlPvmRKNS0_10ReadOptionEPNS1_25FileDataCacheAccessResultE");		
-				SaltySDCore_ReplaceImport("_ZN2nn2fs6detail12FileAccessor4ReadEPmlPvmRKNS0_10ReadOptionEPNS1_25FileDataCacheAccessResultE", (void*)nn::FileAccessorReadCache);
-				#endif
-			}
-			else SaltySDCore_fclose(readFlag);
 
 			uint64_t titleid = 0;
 			svcGetInfo(&titleid, InfoType_TitleId, CUR_PROCESS_HANDLE, 0);
