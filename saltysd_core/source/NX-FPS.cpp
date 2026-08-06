@@ -1096,7 +1096,7 @@ namespace NVN {
 
 	constexpr size_t COMMAND_MEMORY_PER_BUF = 0x1000; 
 	constexpr size_t CONTROL_MEMORY_PER_BUF = 0x1000;
-	int COUNTER_ALIGNMENT = 0x10; //Default value for 64-bit
+	int COUNTER_ALIGNMENT = 0x10;
 
 	struct nvnCounterData {
 		uint64_t empty;
@@ -1244,7 +1244,7 @@ namespace NVN {
 			FUNC_PTR(nvnMemoryPoolBuilderSetStorage, &cmdPoolBuilder, (void*)&cmdPoolHostPtr, sizeof(cmdPoolHostPtr));
 			FUNC_PTR(nvnMemoryPoolInitialize, &profilingCmdMemoryPool, &cmdPoolBuilder);
 
-			FUNC_PTR(nvnDeviceGetInteger, mainDevice, 10, &COUNTER_ALIGNMENT);
+			//FUNC_PTR(nvnDeviceGetInteger, mainDevice, 10, &COUNTER_ALIGNMENT);
 
 			FUNC_PTR(nvnCommandBufferInitialize, &tsCmdBuf, mainDevice);
 			
