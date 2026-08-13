@@ -1475,7 +1475,7 @@ extern "C" {
 			runtime_replace{"vkGetDeviceProcAddr", &Address_weaks.vkGetDeviceProcAddr, (void*)vk::GetDeviceProcAddr, nullptr},
 			runtime_replace{"vkCmdSetViewportWithCount", &Address_weaks.vkCmdSetViewportWithCount, (void*)vk::CmdSetViewportWithCount, nullptr},
 			runtime_replace{"vkGetSwapchainImagesKHR", &Address_weaks.vkGetSwapchainImagesKHR, nullptr, nullptr},
-			runtime_replace{"_ZN11NvSwapchain21GetSwapchainImagesKHREP10VkDevice_TP16VkSwapchainKHR_TPjPP9VkImage_T, &Address_weaks.nvSwapchainGetSwapchainImagesKHR", nullptr, nullptr},
+			runtime_replace{"_ZN11NvSwapchain21GetSwapchainImagesKHREP10VkDevice_TP16VkSwapchainKHR_TPjPP9VkImage_T", &Address_weaks.nvSwapchainGetSwapchainImagesKHR, nullptr, nullptr},
 			runtime_replace{"_ZN11NvSwapchain18CreateSwapchainKHREP10VkDevice_TPK24VkSwapchainCreateInfoKHRPK21VkAllocationCallbacksPP16VkSwapchainKHR_T", &Address_weaks.nvSwapchainCreateSwapchainKHR, nullptr, nullptr},
 
 			runtime_replace{"_ZN2nn2oe20SetFocusHandlingModeENS0_17FocusHandlingModeE", &Address_weaks.SetFocusHandlingMode, (void*)nn::setFocusHandlingMode, nullptr},
