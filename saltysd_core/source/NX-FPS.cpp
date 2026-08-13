@@ -27,6 +27,7 @@ struct {
 
 	uintptr_t nvnDeviceGetProcAddress;
 	uintptr_t nvnDeviceGetInteger;
+	uintptr_t nvnDeviceInitialize;
 	uintptr_t nvnQueuePresentTexture;
 	uintptr_t nvnQueueFinish;
 	uintptr_t nvnQueueSubmitCommands;
@@ -953,6 +954,9 @@ namespace NVN {
 	struct Window {
 		char reserved[0x180];
 	};
+	struct DeviceBuilder {
+		char reserved[0x40];
+	};
 	struct Device {
 		char reserved[0x3000];
 	};
@@ -1047,6 +1051,7 @@ namespace NVN {
 	typedef void* (*nvnMemoryPoolMap_0)(const MemoryPool* nvnMemPool);
 	typedef BufferAddress (*nvnMemoryPoolGetBufferAddress_0)(const MemoryPool* nvnMemPool);
 	typedef void (*nvnDeviceGetInteger_0)(const Device* nvnDevice, int info, int* out);
+	typedef bool (*nvnDeviceInitialize_0)(Device* nvnDevice, const DeviceBuilder* nvnDeviceBuilder);
 
 	constexpr size_t COMMAND_MEMORY_PER_BUF = 0x1000; 
 	constexpr size_t CONTROL_MEMORY_PER_BUF = 0x1000;
@@ -1173,6 +1178,12 @@ namespace NVN {
 				timeout_ns = 0;
 		}
 		return FUNC_PTR(nvnSyncWait, _this, timeout_ns);
+	}
+
+	bool DeviceInitialize(Device* nvnDevice, const DeviceBuilder* nvnDeviceBuilder) {
+		bool ret = FUNC_PTR(nvnDeviceInitialize, nvnDevice, nvnDeviceBuilder);
+		if (mainDevice == 0) mainDevice = nvnDevice;
+		return ret;
 	}
 
 	void PresentTexture(const Queue* queue, const Window* nvnWindow, int index) {
@@ -1395,6 +1406,7 @@ namespace NVN {
 			runtime_replace{"nvnQueueSubmitCommands", &Address_weaks.nvnQueueSubmitCommands},
 			runtime_replace{"nvnQueueFenceSync", &Address_weaks.nvnQueueFenceSync},
 			runtime_replace{"nvnDeviceGetInteger", &Address_weaks.nvnDeviceGetInteger},
+			runtime_replace{"nvnDeviceInitialize", &Address_weaks.nvnDeviceInitialize, (void*)DeviceInitialize},
 			runtime_replace{"nvnCommandBufferResetCounter", &Address_weaks.nvnCommandBufferResetCounter}
 		};
 
