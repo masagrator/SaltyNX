@@ -428,7 +428,8 @@ namespace LOCK {
 			{"FPS_LOCK_TARGET", &FPS_LOCK_TARGET, TE_VARIABLE},
 			{"FRAMETIME_TARGET", &FRAMETIME_TARGET, TE_VARIABLE},
 			{"VSYNC_TARGET", &VSYNC_TARGET, TE_VARIABLE},
-			{"INTERVAL_TARGET", &INTERVAL_TARGET, TE_VARIABLE}
+			{"INTERVAL_TARGET", &INTERVAL_TARGET, TE_VARIABLE},
+			{"REFRESH_RATE", &displaySync, TE_VARIABLE}
 		};
 		te_expr *n = te_compile(equation, vars, std::size(vars), 0);
 		double evaluated_value = te_eval(n);
