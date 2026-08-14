@@ -45,7 +45,7 @@ EXEFS_SRC	:=	exefs_src
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
-ARCH			:=	-march=armv8-a+simd -mfpu=vfpv4 -mtune=cortex-a57 -mtp=soft -fPIE -mfloat-abi=hard -fno-plt
+ARCH			:=	-march=armv8-a -mfpu=neon-vfpv4 -mtune=cortex-a57 -mtp=soft -fPIE -mfloat-abi=hard -fno-plt
 
 CFLAGS			:=	-Wall -Werror -O2 \
 					-ffast-math -ffunction-sections -fdata-sections \
