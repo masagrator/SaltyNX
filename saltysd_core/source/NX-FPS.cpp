@@ -930,7 +930,7 @@ namespace EGL {
 			runtime_replace{"glViewportIndexedfvNV", &Address_weaks.glViewportIndexedfvNV, (void*)ViewportIndexedfvNV},
 			runtime_replace{"glViewportIndexedfvOES", &Address_weaks.glViewportIndexedfvOES, (void*)ViewportIndexedfvOES}
 		};
-		
+
 		for (const auto& replacement : egl_replacements) {
 			if (!strcmp(replacement.name, eglName)) {
 				if (replacement.orig_ptr && *replacement.orig_ptr == 0) *replacement.orig_ptr = address;
@@ -1234,7 +1234,7 @@ namespace NVN {
 		uint64x2x4_t loaded_data1 = vld1q_u64_x4(&timestampDataCPU->samplesPassed);
 		uint64x2x4_t loaded_data2 = vld1q_u64_x4(&timestampDataCPU->tessControlShaderInvocations);
 		uint64x2x4_t loaded_data3 = vld1q_u64_x4(&timestampDataCPU->tessEvaluationShaderPrimitives);
-		uint64x2_t loaded_data4 = vld1q_u64(&timestampDataCPU->primitivesGenerated);
+		uint64x2x2_t loaded_data4 = vld1q_u64_x2(&timestampDataCPU->primitivesGenerated);
 		uint32x4_t loaded_data5 = vld1q_u32(&timestampDataCPU->tilesProcessedByZcull);
 
 		Shared->PerfCounters.NVN.samplesPassed = loaded_data1.val[0][0];
@@ -1252,8 +1252,8 @@ namespace NVN {
 		Shared->PerfCounters.NVN.clipperInputPrimitives = loaded_data3.val[2][0];
 		Shared->PerfCounters.NVN.clipperOutputPrimitives = loaded_data3.val[3][0];
 
-		Shared->PerfCounters.NVN.primitivesGenerated = loaded_data4[0];
-		Shared->PerfCounters.NVN.transformFeedbackPrimitivesWritten = loaded_data4[1];
+		Shared->PerfCounters.NVN.primitivesGenerated = loaded_data4.val[0][0];
+		Shared->PerfCounters.NVN.transformFeedbackPrimitivesWritten = loaded_data4.val[1][0];
 
 		Shared->PerfCounters.NVN.tilesProcessedByZcull = loaded_data5[0];
 		Shared->PerfCounters.NVN.pixelBlocksBehindPrimitivesAndCulled = loaded_data5[1];
