@@ -686,6 +686,7 @@ namespace vk {
 				if (!strcmp(replacement.name, vkFunction)) {
 					if (replacement.orig_ptr && *replacement.orig_ptr == 0) *replacement.orig_ptr = address;
 					if (replacement.hook_ptr) return replacement.hook_ptr;
+					break;
 				}
 			}
 			return (void*)address;
@@ -698,6 +699,7 @@ namespace vk {
 				if (!strcmp(replacement.name, vkFunction)) {
 					if (replacement.orig_ptr && *replacement.orig_ptr == 0) *replacement.orig_ptr = address;
 					if (replacement.hook_ptr) return replacement.hook_ptr;
+					break;
 				}
 			}
 			return (void*)address;
@@ -935,6 +937,7 @@ namespace EGL {
 			if (!strcmp(replacement.name, eglName)) {
 				if (replacement.orig_ptr && *replacement.orig_ptr == 0) *replacement.orig_ptr = address;
 				if (replacement.hook_ptr) return (uintptr_t)replacement.hook_ptr;
+				break;
 			}
 		}
 		return address;
@@ -1447,6 +1450,7 @@ namespace NVN {
 			if (!strcmp(replacement.name, nvnFunction)) {
 				if (replacement.orig_ptr && *replacement.orig_ptr == 0) *replacement.orig_ptr = address;
 				if (replacement.hook_ptr) return (uintptr_t)replacement.hook_ptr;
+				break;
 			}
 		}
 		return address;
