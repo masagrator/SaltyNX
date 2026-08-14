@@ -1,11 +1,12 @@
 #if defined(SWITCH32)
 #include <switch_min.h>
+#define InfoType_ProgramId InfoType_TitleId
 #elif defined(SWITCH)
 #include <switch.h>
-#define InfoType_TitleId InfoType_ProgramId
 #else
 #error "Unsupported base architecture!"
 #endif
+#include <arm_neon.h>
 #include "saltysd_ipc.h"
 #include "saltysd_dynamic.h"
 #include "saltysd_core.h"
@@ -1229,6 +1230,37 @@ namespace NVN {
 		NX_FPS_Math::PreFrame();
 		FUNC_PTR(nvnQueuePresentTexture, queue, nvnWindow, index);
 		Shared->PerfCounters.NVN.timestamp = timestampDataCPU->timestamp;
+		#if defined(SWITCH) || defined(OUNCE)
+		uint64x2x4_t loaded_data1 = vld1q_u64_x4(&timestampDataCPU->samplesPassed);
+		uint64x2x4_t loaded_data2 = vld1q_u64_x4(&timestampDataCPU->tessControlShaderInvocations);
+		uint64x2x4_t loaded_data3 = vld1q_u64_x4(&timestampDataCPU->tessEvaluationShaderPrimitives);
+		uint64x2_t loaded_data4 = vld1q_u64(&timestampDataCPU->primitivesGenerated);
+		uint32x4_t loaded_data5 = vld1q_u32(&timestampDataCPU->tilesProcessedByZcull);
+
+		Shared->PerfCounters.NVN.samplesPassed = loaded_data1.val[0][0];
+		Shared->PerfCounters.NVN.inputVertices = loaded_data1.val[1][0];
+		Shared->PerfCounters.NVN.inputPrimitives = loaded_data1.val[2][0];
+		Shared->PerfCounters.NVN.vertexShaderInvocations = loaded_data1.val[3][0];
+
+		Shared->PerfCounters.NVN.tessControlShaderInvocations = loaded_data2.val[0][0];
+		Shared->PerfCounters.NVN.tessEvaluationShaderInvocations = loaded_data2.val[1][0];
+		Shared->PerfCounters.NVN.geometryShaderInvocations = loaded_data2.val[2][0];
+		Shared->PerfCounters.NVN.fragmentShaderInvocations = loaded_data2.val[3][0];
+
+		Shared->PerfCounters.NVN.tessEvaluationShaderPrimitives = loaded_data3.val[0][0];
+		Shared->PerfCounters.NVN.geometryShaderPrimitives = loaded_data3.val[1][0];
+		Shared->PerfCounters.NVN.clipperInputPrimitives = loaded_data3.val[2][0];
+		Shared->PerfCounters.NVN.clipperOutputPrimitives = loaded_data3.val[3][0];
+
+		Shared->PerfCounters.NVN.primitivesGenerated = loaded_data4[0];
+		Shared->PerfCounters.NVN.transformFeedbackPrimitivesWritten = loaded_data4[1];
+
+		Shared->PerfCounters.NVN.tilesProcessedByZcull = loaded_data5[0];
+		Shared->PerfCounters.NVN.pixelBlocksBehindPrimitivesAndCulled = loaded_data5[1];
+		Shared->PerfCounters.NVN.pixelBlocksInFrontOfPrimitivesCulled = loaded_data5[2];
+		Shared->PerfCounters.NVN.pixelBlocksFailedStencilTestAndCulled = loaded_data5[3];
+		#else
+		Shared->PerfCounters.NVN.samplesPassed = timestampDataCPU->samplesPassed;
 		Shared->PerfCounters.NVN.inputVertices = timestampDataCPU->inputVertices;
 		Shared->PerfCounters.NVN.inputPrimitives = timestampDataCPU->inputPrimitives;
 		Shared->PerfCounters.NVN.vertexShaderInvocations = timestampDataCPU->vertexShaderInvocations;
@@ -1246,6 +1278,7 @@ namespace NVN {
 		Shared->PerfCounters.NVN.pixelBlocksBehindPrimitivesAndCulled = timestampDataCPU->pixelBlocksBehindPrimitivesAndCulled;
 		Shared->PerfCounters.NVN.pixelBlocksInFrontOfPrimitivesCulled = timestampDataCPU->pixelBlocksInFrontOfPrimitivesCulled;
 		Shared->PerfCounters.NVN.pixelBlocksFailedStencilTestAndCulled = timestampDataCPU->pixelBlocksFailedStencilTestAndCulled;
+		#endif
 		FUNC_PTR(nvnQueueSubmitCommands, queue, 1, &cmdHandles);
 		NX_FPS_Math::PostFrame();
 
@@ -1536,7 +1569,7 @@ extern "C" {
 			}
 
 			uint64_t titleid = 0;
-			svcGetInfo(&titleid, InfoType_TitleId, CUR_PROCESS_HANDLE, 0);
+			svcGetInfo(&titleid, InfoType_ProgramId, CUR_PROCESS_HANDLE, 0);
 			char path[128];
 			#if defined(SWITCH32) || defined(OUNCE32)
 			npf_snprintf(path, sizeof(path), "sdmc:/SaltySD/plugins/FPSLocker/%016llX.dat", titleid);
