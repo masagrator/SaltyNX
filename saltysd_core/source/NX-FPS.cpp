@@ -913,24 +913,24 @@ namespace EGL {
 		return EGL::Common::ViewportIndexedfv(i, pViewports, Address_weaks.glViewportIndexedfvOES);
 	}
 
-	std::array egl_replacements = {
-		runtime_replace{"eglSwapInterval", &Address_weaks.eglSwapInterval, (void*)Interval},
-		runtime_replace{"eglSwapBuffers", &Address_weaks.eglSwapBuffers, (void*)Swap},
-		runtime_replace{"glViewport", &Address_weaks.glViewport, (void*)Viewport},
-		runtime_replace{"glViewportArrayv", &Address_weaks.glViewportArrayv, (void*)ViewportArrayv},
-		runtime_replace{"glViewportArrayvNV", &Address_weaks.glViewportArrayvNV, (void*)ViewportArrayvNV},
-		runtime_replace{"glViewportArrayvOES", &Address_weaks.glViewportArrayvOES, (void*)ViewportArrayvOES},
-		runtime_replace{"glViewportIndexedf", &Address_weaks.glViewportIndexedf, (void*)ViewportIndexedf},
-		runtime_replace{"glViewportIndexedfNV", &Address_weaks.glViewportIndexedfNV, (void*)ViewportIndexedfNV},
-		runtime_replace{"glViewportIndexedfOES", &Address_weaks.glViewportIndexedfOES, (void*)ViewportIndexedfOES},
-		runtime_replace{"glViewportIndexedfv", &Address_weaks.glViewportIndexedfv, (void*)ViewportIndexedfv},
-		runtime_replace{"glViewportIndexedfvNV", &Address_weaks.glViewportIndexedfvNV, (void*)ViewportIndexedfvNV},
-		runtime_replace{"glViewportIndexedfvOES", &Address_weaks.glViewportIndexedfvOES, (void*)ViewportIndexedfvOES}
-	};
-
 	uintptr_t GetProc(const char* eglName) {
 		uintptr_t address = FUNC_PTR(eglGetProcAddress, eglName);
 
+		std::array egl_replacements = {
+			runtime_replace{"eglSwapInterval", &Address_weaks.eglSwapInterval, (void*)Interval},
+			runtime_replace{"eglSwapBuffers", &Address_weaks.eglSwapBuffers, (void*)Swap},
+			runtime_replace{"glViewport", &Address_weaks.glViewport, (void*)Viewport},
+			runtime_replace{"glViewportArrayv", &Address_weaks.glViewportArrayv, (void*)ViewportArrayv},
+			runtime_replace{"glViewportArrayvNV", &Address_weaks.glViewportArrayvNV, (void*)ViewportArrayvNV},
+			runtime_replace{"glViewportArrayvOES", &Address_weaks.glViewportArrayvOES, (void*)ViewportArrayvOES},
+			runtime_replace{"glViewportIndexedf", &Address_weaks.glViewportIndexedf, (void*)ViewportIndexedf},
+			runtime_replace{"glViewportIndexedfNV", &Address_weaks.glViewportIndexedfNV, (void*)ViewportIndexedfNV},
+			runtime_replace{"glViewportIndexedfOES", &Address_weaks.glViewportIndexedfOES, (void*)ViewportIndexedfOES},
+			runtime_replace{"glViewportIndexedfv", &Address_weaks.glViewportIndexedfv, (void*)ViewportIndexedfv},
+			runtime_replace{"glViewportIndexedfvNV", &Address_weaks.glViewportIndexedfvNV, (void*)ViewportIndexedfvNV},
+			runtime_replace{"glViewportIndexedfvOES", &Address_weaks.glViewportIndexedfvOES, (void*)ViewportIndexedfvOES}
+		};
+		
 		for (const auto& replacement : egl_replacements) {
 			if (!strcmp(replacement.name, eglName)) {
 				if (replacement.orig_ptr && *replacement.orig_ptr == 0) *replacement.orig_ptr = address;
