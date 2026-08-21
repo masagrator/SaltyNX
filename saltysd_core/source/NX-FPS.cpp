@@ -1028,8 +1028,6 @@ namespace NVN {
 	alignas(0x1000) char dataPoolHostPtr[0x1000]{};
 	alignas(0x1000) char cmdPoolHostPtr[0x1000]{};
 	CommandHandle cmdHandles{};
-	const Texture* framebufferTextures[4];
-	CommandBuffer* framebufferCommandBuffer;
 
 	bool WindowInitialize(const Window* nvnWindow, struct WindowBuilder* windowBuilder) {
 		if (Shared->Buffers == 0) {
@@ -1044,7 +1042,6 @@ namespace NVN {
 
 	void WindowBuilderSetTextures(const WindowBuilder* nvnWindowBuilder, int numBufferedFrames, const Texture** nvnTextures) {
 		(Shared -> Buffers) = numBufferedFrames;
-		std::copy(&nvnTextures[0], &nvnTextures[numBufferedFrames], &framebufferTextures[0]);
 		amountOfAvailableBuffers = numBufferedFrames;
 		if ((Shared -> SetBuffers) >= 2 && (Shared -> SetBuffers) <= numBufferedFrames) {
 			if (!setNumActiveTexturesDetected) numBufferedFrames = (Shared -> SetBuffers);
@@ -1311,11 +1308,6 @@ namespace NVN {
 			auto depth_format = nvnTextureGetFormat_0(depthTexture);
 			if (depth_width > 1 && depth_height > 1 && (depth_format >= 51 && depth_format <= 54)) {
 				NX_FPS_Math::addResToRender((uint32_t)depth_width, (uint32_t)depth_height);
-			}
-		}
-		if (!framebufferCommandBuffer && numTextures == 1) {
-			if (std::find(&framebufferTextures[0], &framebufferTextures[amountOfAvailableBuffers], texture[0]) != &framebufferTextures[amountOfAvailableBuffers]) {
-				framebufferCommandBuffer = cmdBuf;
 			}
 		}
 		return nvnCommandBufferSetRenderTargets_0(cmdBuf, numTextures, texture, textureView, depthTexture, depthView);
