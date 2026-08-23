@@ -1509,16 +1509,18 @@ extern "C" {
 					SaltySDCore_fclose(patch_file);
 					SaltySDCore_printf("NX-FPS: FPSLocker: successfully opened: %s\n", path);
 					configRC = LOCK::patcher.loadFromFile(path);
-					if (LOCK::patcher.masterWriteApplied()) {
-						(Shared -> patchApplied) = 2;
-					}
 					SaltySDCore_printf("NX-FPS: FPSLocker: readConfig rc: 0x%x\n", configRC);
-					uint64_t alias_start = 0;
-					uint64_t heap_start = 0;
-					svcGetInfo(&alias_start, InfoType_AliasRegionAddress, CUR_PROCESS_HANDLE, 0);
-					svcGetInfo(&heap_start, InfoType_HeapRegionAddress, CUR_PROCESS_HANDLE, 0);
+					if (R_SUCCEEDED(configRC)) {
+						if (LOCK::patcher.masterWriteApplied()) {
+							(Shared -> patchApplied) = 2;
+						}
+						uint64_t alias_start = 0;
+						uint64_t heap_start = 0;
+						svcGetInfo(&alias_start, InfoType_AliasRegionAddress, CUR_PROCESS_HANDLE, 0);
+						svcGetInfo(&heap_start, InfoType_HeapRegionAddress, CUR_PROCESS_HANDLE, 0);
 
-					LOCK::patcher.bindDynamicRegions((uintptr_t)alias_start, (uintptr_t)heap_start);
+						LOCK::patcher.bindDynamicRegions((uintptr_t)alias_start, (uintptr_t)heap_start);
+					}
 
 				}
 				else SaltySDCore_printf("NX-FPS: FPSLocker: File not found: %s\n", path);

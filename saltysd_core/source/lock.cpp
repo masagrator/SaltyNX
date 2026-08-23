@@ -213,8 +213,7 @@ intptr_t NOINLINE Patcher::getAddress(Cursor& cursor) const {
 	return address;
 }
 
-bool Patcher::isBufferValid(const uint8_t* buffer, size_t filesize) {
-	if (filesize < 0x11) return false;
+bool Patcher::isHeaderValid(const uint8_t* buffer) {
 	const uint8_t MAGIC[4] = {'L', 'O', 'C', 'K'};
 	if (memcmp(buffer, MAGIC, sizeof(MAGIC)) != 0)
 		return false;
@@ -647,7 +646,7 @@ Result Patcher::applyPatch(uint8_t FPS, uint8_t refreshRate) {
 		m_compiled = (uint8_t*)malloc(m_compiledSize);
 		if (!m_compiled)
 			return 0x3004;
-		if (R_FAILED(convertPatchToFPSTarget(m_compiled, configBuffer, FPS, refreshRate))) {
+		if (R_FAILED(convertPatchToFPSTarget(m_compiled, m_configBuffer, FPS, refreshRate))) {
 			m_compiledFPS = 0;
 			return 0x3002;
 		}
@@ -699,7 +698,7 @@ Result Patcher::loadFromFile(const char* path) {
 		printf_sdcard("LOCK: wrong header! Expected: 0x%lx, got: 0x%lx\n", header_size, tell);
 		error = true;
 	}
-	else if (!isBufferValid(buffer, header_size)) {
+	else if (!isHeaderValid(buffer)) {
 		printf_sdcard("LOCK: file is invalid!\n");
 		error = true;			
 	}
@@ -721,7 +720,7 @@ Result Patcher::loadFromFile(const char* path) {
 	fseek_sdcard(patch_file, 0, 0);
 	fread_sdcard(buffer, configSize, 1, patch_file);
 	fclose_sdcard(patch_file);
-	configBuffer = buffer;
+	m_configBuffer = buffer;
 	return 0;
 }
 

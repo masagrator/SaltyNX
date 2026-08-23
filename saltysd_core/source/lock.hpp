@@ -109,11 +109,9 @@ namespace LOCK {
 		void bindMainRegion(intptr_t main_start);
 		void bindDynamicRegions(uintptr_t alias_start, uintptr_t heap_start);
 
-		bool isBufferValid(const uint8_t* buffer, size_t filesize);
+		bool isHeaderValid(const uint8_t* buffer);
 		Result applyMasterWrite(FILE* file, size_t master_offset);
 		Result applyPatch(uint8_t FPS, uint8_t refreshRate = 60);
-
-		void updateConfigPointer(uint8_t* ptr) {configBuffer = ptr;}
 
 		bool hasMasterWrite() const      { return m_masterWrite != 0; }
 		bool masterWriteApplied() const  { return m_masterWriteApplied; }
@@ -124,10 +122,6 @@ namespace LOCK {
 		void clearRefreshRateOverwrite()    { m_overwriteRefreshRate = 0; }
 
 		intptr_t mainRegion() const      { return m_mappings.main_start; }
-		const Mappings& mappings() const { return m_mappings; }
-
-		uint8_t generation() const       { return m_gen; }
-		uint32_t compiledSize() const    { return m_compiledSize; }
 
 	private:
 		class Cursor {
@@ -213,6 +207,6 @@ namespace LOCK {
 		uint8_t* m_compiled             = nullptr;
 		uint8_t  m_compiledFPS          = 0;
 		uint8_t  m_compiledRefreshRate  = 0;
-		uint8_t* configBuffer           = nullptr;
+		uint8_t* m_configBuffer           = nullptr;
 	};
 }
