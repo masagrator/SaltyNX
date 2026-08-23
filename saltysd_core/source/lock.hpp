@@ -30,6 +30,12 @@ namespace nn {
 
 namespace LOCK {
 
+#if defined(SWITCH) || defined(OUNCE)
+	using patch_addr_t = intptr_t;
+#else
+	using patch_addr_t = uintptr_t;
+#endif
+
 	enum class Region : uint8_t {
 		Absolute  = 0,
 		Main      = 1,
@@ -170,7 +176,7 @@ namespace LOCK {
 		template <typename T>
 		static bool compareValues(T value1, T value2, CompareType compare_type);
 
-		intptr_t NOINLINE getAddress(Cursor& cursor) const;
+		patch_addr_t NOINLINE getAddress(Cursor& cursor) const;
 
 		Result processBytes(FILE* file);
 #if defined(SWITCH) || defined(OUNCE)

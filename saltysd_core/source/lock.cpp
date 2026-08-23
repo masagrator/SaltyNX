@@ -43,18 +43,12 @@ static_assert(sizeof(AllFpsOpcode) == 1);
 
 namespace {
 
-#if defined(SWITCH) || defined(OUNCE)
-	using patch_addr_t = intptr_t;
-#else
-	using patch_addr_t = uintptr_t;
-#endif
-
 	double TruncDec(double value, double truncator) {
 		size_t factor = pow(10, truncator);
 		return trunc(value*factor) / factor;
 	}
 
-	bool NOINLINE isAddressValid(uintptr_t address_in) {
+	bool NOINLINE isAddressValid(patch_addr_t address_in) {
 
 		int64_t address = address_in;
 		MemoryInfo memoryinfo = {0};
@@ -162,7 +156,7 @@ bool Patcher::compareValues(T value1, T value2, CompareType compare_type) {
 	return false;
 }
 
-intptr_t NOINLINE Patcher::getAddress(Cursor& cursor) const {
+patch_addr_t NOINLINE Patcher::getAddress(Cursor& cursor) const {
 	bool unsafe_address = !m_unsafeCheck;
 	if (m_gen == 4) unsafe_address = cursor.read<bool>();
 	int8_t offsets_count = cursor.read<int8_t>();
@@ -206,8 +200,8 @@ intptr_t NOINLINE Patcher::getAddress(Cursor& cursor) const {
 		else address += (int64_t)temp_offset;
 #endif
 		if (i + 1 < offsets_count) {
-			if (unsafe_address && !isAddressValid(*(uintptr_t*)address)) return -2;
-			address = *(uintptr_t*)address;
+			if (unsafe_address && !isAddressValid(*(patch_addr_t*)address)) return -2;
+			address = *(patch_addr_t*)address;
 		}
 	}
 	return address;
@@ -302,25 +296,25 @@ Result Patcher::processCodeCave(FILE* file) {
 				} Branch;
 				static_assert(sizeof(Branch) == 4);
 				memcpy(&Branch, &temp_buffer[i].instruction, 4);
-				intptr_t current_address = (intptr_t)&output[i];
+				patch_addr_t current_address = (patch_addr_t)&output[i];
 				if (Branch.imm == -1) {
-					intptr_t jump_address = (intptr_t)&Utils::_convertToTimeSpan;
+					patch_addr_t jump_address = (patch_addr_t)&Utils::_convertToTimeSpan;
 					ptrdiff_t offset = jump_address - current_address;
 					Branch.imm = offset / 4;
 				}
 				else if (Branch.imm == -2) {
-					intptr_t jump_address = (intptr_t)&nn::SetUserInactivityDetectionTimeExtended;
+					patch_addr_t jump_address = (patch_addr_t)&nn::SetUserInactivityDetectionTimeExtended;
 					ptrdiff_t offset = jump_address - current_address;
 					Branch.imm = offset / 4;
 				}
 				else if (Branch.imm <= -64) {
-					intptr_t jump_address = (m_mappings.codeCave_start - 0x100) + (((int64_t)(Branch.imm)*4) * -1);
+					patch_addr_t jump_address = (m_mappings.codeCave_start - 0x100) + (((int64_t)(Branch.imm)*4) * -1);
 					ptrdiff_t offset = jump_address - current_address;
 					Branch.imm = offset / 4;
 				}
 				else if (address_region == Region::CodeCave) {
-					intptr_t jump_address = (intptr_t)(m_mappings.main_start + ((int64_t)(Branch.imm)*4 + (main_offset + (i*4))));
-					current_address = (intptr_t)&output[i];
+					patch_addr_t jump_address = (patch_addr_t)(m_mappings.main_start + ((int64_t)(Branch.imm)*4 + (main_offset + (i*4))));
+					current_address = (patch_addr_t)&output[i];
 					ptrdiff_t offset = jump_address - current_address;
 					Branch.imm = offset / 4;
 				}
@@ -339,19 +333,19 @@ Result Patcher::processCodeCave(FILE* file) {
 				} ADRP;
 				static_assert(sizeof(ADRP) == 4);
 				memcpy(&ADRP, &temp_buffer[i].instruction, 4);
-				intptr_t current_address = (intptr_t)(&output[i]) & ~0xFFF;
-				intptr_t jump_address = 0;
+				patch_addr_t current_address = (patch_addr_t)(&output[i]) & ~0xFFF;
+				patch_addr_t jump_address = 0;
 				ptrdiff_t offset = 0;
 				if (temp_buffer[i].adjustment_type == CodeCaveAdjustmentType::Adrp_CodeCave) {
-					jump_address = (intptr_t)m_mappings.codeCave_start;
+					jump_address = (patch_addr_t)m_mappings.codeCave_start;
 					offset = jump_address - current_address;
 				}
 				else if (temp_buffer[i].adjustment_type == CodeCaveAdjustmentType::Adrp_Variables) {
-					jump_address = (intptr_t)m_mappings.variables_start;
+					jump_address = (patch_addr_t)m_mappings.variables_start;
 					offset = jump_address - current_address;
 				}
 				else if (temp_buffer[i].adjustment_type == CodeCaveAdjustmentType::Adrp_MainFromCodeCave) {
-					jump_address = (intptr_t)(((uintptr_t)ADRP.immlo << 12) + ((uintptr_t)ADRP.immhi << 14));
+					jump_address = (patch_addr_t)(((uintptr_t)ADRP.immlo << 12) + ((uintptr_t)ADRP.immhi << 14));
 					offset = jump_address + (m_mappings.main_start - m_mappings.codeCave_start);
 				}
 				ADRP.immlo = (offset % 0x4000) >> 12;
@@ -366,8 +360,8 @@ Result Patcher::processCodeCave(FILE* file) {
 				} Branch;
 				static_assert(sizeof(Branch) == 4);
 				memcpy(&Branch, &temp_buffer[i].instruction, 4);
-				intptr_t current_address = (intptr_t)&output[i];
-				intptr_t jump_address = (intptr_t)(m_mappings.main_start + ((int64_t)(Branch.imm)*4) + (i*4));
+				patch_addr_t current_address = (patch_addr_t)&output[i];
+				patch_addr_t jump_address = (patch_addr_t)(m_mappings.main_start + ((int64_t)(Branch.imm)*4) + (i*4));
 				ptrdiff_t offset = jump_address - current_address;
 				Branch.imm = offset / 4;
 				memcpy_unsafe((u64)&output[i], (u64)&Branch, 4);
