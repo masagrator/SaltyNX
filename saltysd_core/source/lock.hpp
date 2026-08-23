@@ -105,12 +105,15 @@ namespace LOCK {
 		Patcher(const Patcher&) = delete;
 		Patcher& operator=(const Patcher&) = delete;
 
+		Result loadFromFile(const char* path);
 		void bindMainRegion(intptr_t main_start);
 		void bindDynamicRegions(uintptr_t alias_start, uintptr_t heap_start);
 
 		bool isBufferValid(const uint8_t* buffer, size_t filesize);
 		Result applyMasterWrite(FILE* file, size_t master_offset);
-		Result applyPatch(const uint8_t* buffer, uint8_t FPS, uint8_t refreshRate = 60);
+		Result applyPatch(uint8_t FPS, uint8_t refreshRate = 60);
+
+		void updateConfigPointer(uint8_t* ptr) {configBuffer = ptr;}
 
 		bool hasMasterWrite() const      { return m_masterWrite != 0; }
 		bool masterWriteApplied() const  { return m_masterWriteApplied; }
@@ -210,5 +213,6 @@ namespace LOCK {
 		uint8_t* m_compiled             = nullptr;
 		uint8_t  m_compiledFPS          = 0;
 		uint8_t  m_compiledRefreshRate  = 0;
+		uint8_t* configBuffer           = nullptr;
 	};
 }

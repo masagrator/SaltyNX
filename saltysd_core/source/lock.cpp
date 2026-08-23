@@ -76,6 +76,10 @@ namespace {
 		return false;
 	}
 
+	inline FILE* fopen_sdcard(const char* path, const char* mode) {
+		return SaltySDCore_fopen(path, mode);
+	}
+
 	inline size_t fread_sdcard(void* ptr, size_t size, size_t count, FILE* stream) {
 		return SaltySDCore_fread(ptr, size, count, stream);
 	}
@@ -86,6 +90,10 @@ namespace {
 
 	inline size_t ftell_sdcard(FILE* stream) {
 		return SaltySDCore_ftell(stream); 
+	}
+
+	inline int fclose_sdcard(FILE* stream) {
+		return SaltySDCore_fclose(stream); 
 	}
 
 	#define printf_sdcard SaltySDCore_printf
@@ -389,7 +397,7 @@ Result Patcher::applyMasterWrite(FILE* file, size_t master_offset) {
 	Result rc = 0;
 	while (true) {
 		fread_sdcard(&OPCODE, 1, 1, file);
-		printf_sdcard("processes opcode: %d, offset: 0x%x\n", OPCODE, ftell_sdcard(file));
+		printf_sdcard("LOCK: processes opcode: %d, offset: 0x%x\n", OPCODE, ftell_sdcard(file));
 		switch (OPCODE) {
 			case MasterWriteOpcode::Bytes: {rc = processBytes(file); break;}
 #if defined(SWITCH) || defined(OUNCE)
@@ -627,7 +635,7 @@ Result Patcher::execBlock(Cursor& cursor) {
 	}
 }
 
-Result Patcher::applyPatch(const uint8_t* buffer, uint8_t FPS, uint8_t refreshRate) {
+Result Patcher::applyPatch(uint8_t FPS, uint8_t refreshRate) {
 	m_overwriteRefreshRate = 0;
 	m_blockDelayFPS = false;
 	if (!refreshRate) refreshRate = 60;
@@ -639,7 +647,7 @@ Result Patcher::applyPatch(const uint8_t* buffer, uint8_t FPS, uint8_t refreshRa
 		m_compiled = (uint8_t*)malloc(m_compiledSize);
 		if (!m_compiled)
 			return 0x3004;
-		if (R_FAILED(convertPatchToFPSTarget(m_compiled, buffer, FPS, refreshRate))) {
+		if (R_FAILED(convertPatchToFPSTarget(m_compiled, configBuffer, FPS, refreshRate))) {
 			m_compiledFPS = 0;
 			return 0x3002;
 		}
@@ -673,6 +681,48 @@ Result Patcher::applyPatch(const uint8_t* buffer, uint8_t FPS, uint8_t refreshRa
 		}
 		if (R_FAILED(rc)) return rc;
 	}
+}
+
+Result Patcher::loadFromFile(const char* path) {
+	FILE* patch_file = fopen_sdcard(path, "rb");
+	fseek_sdcard(patch_file, 0, 2);
+	size_t configSize = ftell_sdcard(patch_file);
+	fseek_sdcard(patch_file, 8, 0);
+	uint32_t header_size = 0;
+	fread_sdcard(&header_size, 0x4, 1, patch_file);
+	uint8_t* buffer = (uint8_t*)calloc(1, header_size);
+	fseek_sdcard(patch_file, 0, 0);
+	fread_sdcard(buffer, header_size, 1, patch_file);
+	bool error = false;
+	size_t tell = ftell_sdcard(patch_file);
+	if (tell != header_size) {
+		printf_sdcard("LOCK: wrong header! Expected: 0x%lx, got: 0x%lx\n", header_size, tell);
+		error = true;
+	}
+	else if (!isBufferValid(buffer, header_size)) {
+		printf_sdcard("LOCK: file is invalid!\n");
+		error = true;			
+	}
+	if (error == true) {
+		fclose_sdcard(patch_file);
+		free(buffer);
+		return 0x1201;
+	}
+	if (hasMasterWrite()) {
+		Result ret = applyMasterWrite(patch_file, header_size - 4);
+		if (R_FAILED(ret))  {
+			fclose_sdcard(patch_file);
+			return ret;
+		}
+		configSize = *(uint32_t*)(&(buffer[header_size - 4]));
+	}
+	free(buffer);
+	buffer = (uint8_t*)calloc(1, configSize);
+	fseek_sdcard(patch_file, 0, 0);
+	fread_sdcard(buffer, configSize, 1, patch_file);
+	fclose_sdcard(patch_file);
+	configBuffer = buffer;
+	return 0;
 }
 
 }
