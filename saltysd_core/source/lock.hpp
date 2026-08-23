@@ -48,6 +48,44 @@ namespace LOCK {
 		RefreshRate = 0x38,
 	};
 
+	enum class CompareType : uint8_t {
+		GT = 1,
+		GE = 2,
+		LT = 3,
+		LE = 4,
+		EQ = 5,
+		NE = 6,
+	};
+
+	enum class CodeCaveAdjustmentType : uint8_t {
+		None = 0,
+		Branch_Direct = 1,
+		Adrp_CodeCave = 2,
+		Adrp_Variables = 3,
+		Adrp_MainFromCodeCave = 4,
+		Branch_Relative = 5,
+	};
+
+	enum class MasterWriteOpcode : uint8_t {
+		Bytes = 1,
+		Variables = 2,
+		CodeCave = 3,
+		End = 0xFF,
+	};
+
+	enum class AllFpsOpcode : uint8_t {
+		Write = 1,
+		Eval_Write = 0x81,
+		Compare = 2,
+		Eval_Compare = 0x82,
+		Block = 3,
+		End = 0xFF,
+	};
+
+	enum class BlockOpcodeWhatType : uint8_t {
+		Timing = 1,
+	};
+
 	class Patcher {
 	public:
 		struct Mappings {
@@ -133,7 +171,7 @@ namespace LOCK {
 		}
 
 		template <typename T>
-		static bool compareValues(T value1, T value2, uint8_t compare_type);
+		static bool compareValues(T value1, T value2, CompareType compare_type);
 
 		intptr_t NOINLINE getAddress(Cursor& cursor) const;
 

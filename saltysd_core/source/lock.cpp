@@ -35,6 +35,11 @@ namespace LOCK {
 
 static_assert(sizeof(ValueType) == 1);
 static_assert(sizeof(Region) == 1);
+static_assert(sizeof(CompareType) == 1);
+static_assert(sizeof(CodeCaveAdjustmentType) == 1);
+static_assert(sizeof(MasterWriteOpcode) == 1);
+static_assert(sizeof(BlockOpcodeWhatType) == 1);
+static_assert(sizeof(AllFpsOpcode) == 1);
 
 namespace {
 
@@ -56,10 +61,13 @@ namespace {
 		u32 pageinfo = 0;
 
 	#if defined(SWITCH) || defined(OUNCE)
-		if ((address < 0x8000000) || (address >= 0x8000000000)) return false;
+		#define MIN_ASLR_ADDRESS 0x8000000
+		#define MAX_ASLR_ADDRESS 0x7FFFFFFFFF
 	#else
-		if (address < 0x200000 || address > 0xFFFFFFFF) return false;
+		#define MIN_ASLR_ADDRESS 0x200000
+		#define MAX_ASLR_ADDRESS 0xFFFFFFFF
 	#endif
+		if (address < MIN_ASLR_ADDRESS || address > MAX_ASLR_ADDRESS) return false;
 
 		Result rc = svcQueryMemory(&memoryinfo, &pageinfo, address);
 		if (R_FAILED(rc)) return false;
@@ -134,14 +142,14 @@ void Patcher::bindDynamicRegions(uintptr_t alias_start, uintptr_t heap_start) {
 }
 
 template <typename T>
-bool Patcher::compareValues(T value1, T value2, uint8_t compare_type) {
+bool Patcher::compareValues(T value1, T value2, CompareType compare_type) {
 	switch (compare_type) {
-		case 1: return (value1 >  value2);
-		case 2: return (value1 >= value2);
-		case 3: return (value1 <  value2);
-		case 4: return (value1 <= value2);
-		case 5: return (value1 == value2);
-		case 6: return (value1 != value2);
+		case CompareType::GT: return (value1 >  value2);
+		case CompareType::GE: return (value1 >= value2);
+		case CompareType::LT: return (value1 <  value2);
+		case CompareType::LE: return (value1 <= value2);
+		case CompareType::EQ: return (value1 == value2);
+		case CompareType::NE: return (value1 != value2);
 	}
 	return false;
 }
@@ -198,8 +206,7 @@ intptr_t NOINLINE Patcher::getAddress(Cursor& cursor) const {
 }
 
 bool Patcher::isBufferValid(const uint8_t* buffer, size_t filesize) {
-	(void)filesize;
-
+	if (filesize < 0x11) return false;
 	const uint8_t MAGIC[4] = {'L', 'O', 'C', 'K'};
 	if (memcmp(buffer, MAGIC, sizeof(MAGIC)) != 0)
 		return false;
@@ -259,13 +266,13 @@ Result Patcher::processCodeCave(FILE* file) {
 	fread_sdcard(&address_region, 1, 1, file);
 	uint32_t main_offset = 0;
 	fread_sdcard(&main_offset, 4, 1, file);
-	uint8_t value_type = 0;
+	[[maybe_unused]] uint8_t value_type = 0;
 	fread_sdcard(&value_type, 1, 1, file);
 	uint8_t elements = 0;
 	fread_sdcard(&elements, 1, 1, file);
 
 	struct codeCaveData {
-		uint8_t adjustment_type;
+		CodeCaveAdjustmentType adjustment_type;
 		uint32_t instruction;
 	} PACKED;
 	static_assert(sizeof(codeCaveData) == 5);
@@ -278,10 +285,10 @@ Result Patcher::processCodeCave(FILE* file) {
 	fread_sdcard(temp_buffer, sizeof(codeCaveData), elements, file);
 	for (size_t i = 0; i < elements; i++) {
 		switch (temp_buffer[i].adjustment_type) {
-			case 0:
+			case CodeCaveAdjustmentType::None:
 				memcpy_unsafe((u64)&output[i], (u64)&temp_buffer[i].instruction, 4);
 				break;
-			case 1: {
+			case CodeCaveAdjustmentType::Branch_Direct: {
 				struct {
 					signed int imm: 26;
 					unsigned int opcode: 6;
@@ -313,9 +320,9 @@ Result Patcher::processCodeCave(FILE* file) {
 				memcpy_unsafe((u64)&output[i], (u64)&Branch, 4);
 				break;
 			}
-			case 2:
-			case 3:
-			case 4: {
+			case CodeCaveAdjustmentType::Adrp_CodeCave:
+			case CodeCaveAdjustmentType::Adrp_Variables:
+			case CodeCaveAdjustmentType::Adrp_MainFromCodeCave: {
 				struct {
 					unsigned int reg: 5;
 					signed int immhi: 19;
@@ -328,15 +335,15 @@ Result Patcher::processCodeCave(FILE* file) {
 				intptr_t current_address = (intptr_t)(&output[i]) & ~0xFFF;
 				intptr_t jump_address = 0;
 				ptrdiff_t offset = 0;
-				if (temp_buffer[i].adjustment_type == 2) {
+				if (temp_buffer[i].adjustment_type == CodeCaveAdjustmentType::Adrp_CodeCave) {
 					jump_address = (intptr_t)m_mappings.codeCave_start;
 					offset = jump_address - current_address;
 				}
-				else if (temp_buffer[i].adjustment_type == 3) {
+				else if (temp_buffer[i].adjustment_type == CodeCaveAdjustmentType::Adrp_Variables) {
 					jump_address = (intptr_t)m_mappings.variables_start;
 					offset = jump_address - current_address;
 				}
-				else if (temp_buffer[i].adjustment_type == 4) {
+				else if (temp_buffer[i].adjustment_type == CodeCaveAdjustmentType::Adrp_MainFromCodeCave) {
 					jump_address = (intptr_t)(((uintptr_t)ADRP.immlo << 12) + ((uintptr_t)ADRP.immhi << 14));
 					offset = jump_address + (m_mappings.main_start - m_mappings.codeCave_start);
 				}
@@ -345,7 +352,7 @@ Result Patcher::processCodeCave(FILE* file) {
 				memcpy_unsafe((u64)&output[i], (u64)&ADRP, 4);
 				break;
 			}
-			case 5: {
+			case CodeCaveAdjustmentType::Branch_Relative: {
 				struct {
 					signed int imm: 26;
 					unsigned int opcode: 6;
@@ -378,18 +385,18 @@ Result Patcher::applyMasterWrite(FILE* file, size_t master_offset) {
 	if (ftell_sdcard(file) != offset_impl)
 		return 0x312;
 
-	int8_t OPCODE = 0;
+	MasterWriteOpcode OPCODE{};
 	Result rc = 0;
 	while (true) {
 		fread_sdcard(&OPCODE, 1, 1, file);
 		printf_sdcard("processes opcode: %d, offset: 0x%x\n", OPCODE, ftell_sdcard(file));
 		switch (OPCODE) {
-			case 1: {rc = processBytes(file); break;}
+			case MasterWriteOpcode::Bytes: {rc = processBytes(file); break;}
 #if defined(SWITCH) || defined(OUNCE)
-			case 2: {rc = processVariables(file); break;}
-			case 3: {rc = processCodeCave(file); break;}
+			case MasterWriteOpcode::Variables: {rc = processVariables(file); break;}
+			case MasterWriteOpcode::CodeCave: {rc = processCodeCave(file); break;}
 #endif
-			case -1: {m_masterWriteApplied = true; return 0;}
+			case MasterWriteOpcode::End: {m_masterWriteApplied = true; return 0;}
 			default: return 0x355;
 		}
 		if (R_FAILED(rc)) return rc;
@@ -397,7 +404,6 @@ Result Patcher::applyMasterWrite(FILE* file, size_t master_offset) {
 }
 
 Result Patcher::writeExprTo(double value, Writer& out, ValueType value_type) {
-	uint8_t size = memberSize(value_type);
 	union {
 		uint64_t u;
 		int64_t i;
@@ -405,27 +411,27 @@ Result Patcher::writeExprTo(double value, Writer& out, ValueType value_type) {
 		float f;
 	} tmp;
 
-	switch ((uint8_t)value_type >> 4) {
-		case 0:
-			tmp.u = (uint64_t)value;
-			break;
-		case 1:
-			tmp.i = (int64_t)value;
-			break;
-		case 2:
-			if (size == 4) {
-				tmp.f = (float)value;
-				break;
-			}
-			//Fallthrough
-		case 3:
+	switch (value_type) {
+		case ValueType::F64:
+		case ValueType::RefreshRate:
 			tmp.d = value;
 			break;
+		case ValueType::F32:
+			tmp.f = (float)value;	
+			break;
 		default:
-			return 4;
+			switch(uint8_t(value_type) >> 4) {
+				case 0: //unsigned
+					tmp.u = (uint64_t)value;
+					break;
+				case 1: //signed
+					tmp.i = (int64_t)value;
+					break;
+				default: return 4;
+			}
 	}
 
-	out.copy(reinterpret_cast<const uint8_t*>(&tmp), size);
+	out.copy(reinterpret_cast<const uint8_t*>(&tmp), memberSize(value_type));
 	return 0;
 }
 
@@ -495,21 +501,19 @@ Result NOINLINE Patcher::convertPatchToFPSTarget(uint8_t* out_buffer, const uint
 	Writer out(out_buffer, header_size);
 
 	while (true) {
-		const auto OPCODE = in.read<uint8_t>();
+		const auto OPCODE = in.read<AllFpsOpcode>();
 		switch (OPCODE) {
-			// write, plain or with expressions to evaluate (0x80 flag)
-			case 1:
-			case 0x81: {
-				out.write<uint8_t>(OPCODE & 0x7F);
+			case AllFpsOpcode::Write:
+			case AllFpsOpcode::Eval_Write: {
+				out.write<uint8_t>((uint8_t)OPCODE & 0x7F);
 				copyAddress(in, out);
-				Result rc = copyValues(in, out, (OPCODE & 0x80) == 0x80, FPS, refreshRate);
+				Result rc = copyValues(in, out, OPCODE == AllFpsOpcode::Eval_Write, FPS, refreshRate);
 				if (R_FAILED(rc)) return rc;
 				break;
 			}
-			// compare, plain or with expressions to evaluate (0x80 flag)
-			case 2:
-			case 0x82: {
-				out.write<uint8_t>(OPCODE & 0x7F);
+			case AllFpsOpcode::Compare:
+			case AllFpsOpcode::Eval_Compare: {
+				out.write<uint8_t>((uint8_t)OPCODE & 0x7F);
 				copyAddress(in, out);
 				out.write<uint8_t>(in.read<uint8_t>()); // compare_type
 				const auto value_type = in.read<ValueType>();
@@ -517,18 +521,16 @@ Result NOINLINE Patcher::convertPatchToFPSTarget(uint8_t* out_buffer, const uint
 				const auto member_size = memberSize(value_type);
 				out.copy(in.take(member_size), member_size);
 				copyAddress(in, out);
-				Result rc = copyValues(in, out, (OPCODE & 0x80) == 0x80, FPS, refreshRate);
+				Result rc = copyValues(in, out, OPCODE == AllFpsOpcode::Eval_Compare, FPS, refreshRate);
 				if (R_FAILED(rc)) return rc;
 				break;
 			}
-			// block
-			case 3:
-				out.write<uint8_t>(OPCODE);
+			case AllFpsOpcode::Block:
+				out.write<uint8_t>((uint8_t)OPCODE);
 				out.write<uint8_t>(in.read<uint8_t>());
 				break;
-			// end of execution
-			case 0xFF:
-				out.write<uint8_t>(OPCODE);
+			case AllFpsOpcode::End:
+				out.write<uint8_t>((uint8_t)OPCODE);
 				return 0;
 			default:
 				return 0x2002;
@@ -542,18 +544,6 @@ Result Patcher::execWrite(Cursor& cursor) {
 	if (address < 0) return 6;
 #endif
 
-	/* value_type:
-		1		=	uint8
-		2		=	uint16
-		4		=	uint32
-		8		=	uint64
-		0x11	=	int8
-		0x12	=	int16
-		0x14	=	int32
-		0x18	=	int64
-		0x24	=	float
-		0x28	=	double
-	*/
 	const ValueType value_type = cursor.read<LOCK::ValueType>();
 	const auto loops = cursor.read<uint8_t>();
 
@@ -579,15 +569,7 @@ Result Patcher::execCompare(Cursor& cursor) {
 	if (address < 0) return 6;
 #endif
 
-	/* compare_type:
-		1	=	>
-		2	=	>=
-		3	=	<
-		4	=	<=
-		5	=	==
-		6	=	!=
-	*/
-	const auto compare_type = cursor.read<uint8_t>();
+	const auto compare_type = cursor.read<CompareType>();
 	ValueType value_type = cursor.read<ValueType>();
 	bool passed = false;
 
@@ -636,8 +618,8 @@ Result Patcher::execCompare(Cursor& cursor) {
 }
 
 Result Patcher::execBlock(Cursor& cursor) {
-	switch (cursor.read<uint8_t>()) {
-		case 1:
+	switch (cursor.read<BlockOpcodeWhatType>()) {
+		case BlockOpcodeWhatType::Timing:
 			m_blockDelayFPS = true;
 			return 0;
 		default:
@@ -680,13 +662,13 @@ Result Patcher::applyPatch(const uint8_t* buffer, uint8_t FPS, uint8_t refreshRa
 			3	=	block
 			-1	=	endExecution
 		*/
-		const auto OPCODE = cursor.read<int8_t>();
+		const auto OPCODE = cursor.read<AllFpsOpcode>();
 		Result rc = 0;
 		switch (OPCODE) {
-			case 1:  rc = execWrite(cursor);   break;
-			case 2:  rc = execCompare(cursor); break;
-			case 3:  rc = execBlock(cursor);   break;
-			case -1: return 0;
+			case AllFpsOpcode::Write:  rc = execWrite(cursor);   break;
+			case AllFpsOpcode::Compare:  rc = execCompare(cursor); break;
+			case AllFpsOpcode::Block:  rc = execBlock(cursor);   break;
+			case AllFpsOpcode::End: return 0;
 			default: return 255;
 		}
 		if (R_FAILED(rc)) return rc;
