@@ -127,7 +127,7 @@ namespace LOCK {
 			size_t m_offset = 0;
 		};
 
-		static constexpr uint8_t memberSize(uint8_t value_type) { return value_type % 0x10; }
+		static constexpr uint8_t memberSize(ValueType value_type) { return (uint8_t)value_type % 0x10; }
 		static constexpr bool validMemberSize(uint8_t size) {
 			return size != 0 && size <= 8 && (size & (size - 1)) == 0;
 		}
@@ -145,7 +145,7 @@ namespace LOCK {
 
 		static double NOINLINE evaluateExpression(const char* equation, double fps_target,
 		                                          double displaySync);
-		static Result writeExprTo(double value, Writer& out, uint8_t value_type);
+		static Result writeExprTo(double value, Writer& out, ValueType value_type);
 
 		void copyAddress(Cursor& in, Writer& out) const;
 		Result copyValues(Cursor& in, Writer& out, bool evaluate,

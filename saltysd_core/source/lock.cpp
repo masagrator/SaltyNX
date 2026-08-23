@@ -33,6 +33,9 @@ alignas(0x1000) static uint8_t variables_buffer[0x1000];
 
 namespace LOCK {
 
+static_assert(sizeof(ValueType) == 1);
+static_assert(sizeof(Region) == 1);
+
 namespace {
 
 #if defined(SWITCH) || defined(OUNCE)
@@ -147,10 +150,10 @@ intptr_t NOINLINE Patcher::getAddress(Cursor& cursor) const {
 	bool unsafe_address = !m_unsafeCheck;
 	if (m_gen == 4) unsafe_address = cursor.read<bool>();
 	int8_t offsets_count = cursor.read<int8_t>();
-	uint8_t region = cursor.read<uint8_t>();
+	Region region = cursor.read<Region>();
 	offsets_count -= 1;
 	int64_t address = 0;
-	switch (static_cast<Region>(region)) {
+	switch (region) {
 		case Region::Absolute:
 			break;
 		case Region::Main:
@@ -179,7 +182,7 @@ intptr_t NOINLINE Patcher::getAddress(Cursor& cursor) const {
 		address += temp_offset;
 #else
 		uint32_t temp_offset = cursor.read<uint32_t>();
-		if (region > 0 && region < 4) {
+		if (region > Region::Absolute && region < Region::Variables) {
 			int32_t temp_offset_int = 0;
 			memcpy(&temp_offset_int, &temp_offset, 4);
 			address += (int64_t)temp_offset_int;
@@ -222,7 +225,7 @@ bool Patcher::isBufferValid(const uint8_t* buffer, size_t filesize) {
 Result Patcher::processBytes(FILE* file) {
 	uint32_t main_offset = 0;
 	fread_sdcard(&main_offset, 4, 1, file);
-	uint8_t value_type = 0;
+	ValueType value_type{};
 	fread_sdcard(&value_type, 1, 1, file);
 	uint8_t elements = 0;
 	fread_sdcard(&elements, 1, 1, file);
@@ -239,7 +242,7 @@ Result Patcher::processBytes(FILE* file) {
 Result Patcher::processVariables(FILE* file) {
 	uint32_t main_offset = 0;
 	fread_sdcard(&main_offset, 4, 1, file);
-	uint8_t value_type = 0;
+	ValueType value_type{};
 	fread_sdcard(&value_type, 1, 1, file);
 	uint8_t elements = 0;
 	fread_sdcard(&elements, 1, 1, file);
@@ -252,7 +255,7 @@ Result Patcher::processVariables(FILE* file) {
 }
 
 Result Patcher::processCodeCave(FILE* file) {
-	uint8_t address_region = 0;
+	Region address_region{};
 	fread_sdcard(&address_region, 1, 1, file);
 	uint32_t main_offset = 0;
 	fread_sdcard(&main_offset, 4, 1, file);
@@ -269,8 +272,8 @@ Result Patcher::processCodeCave(FILE* file) {
 
 	codeCaveData* temp_buffer = (codeCaveData*)calloc(elements, sizeof(codeCaveData));
 	uint32_t* output = 0;
-	if (address_region == (uint8_t)Region::CodeCave) output = (uint32_t*)(m_mappings.codeCave_start + main_offset);
-	else if (address_region == (uint8_t)Region::Main) output = (uint32_t*)(m_mappings.main_start + main_offset);
+	if (address_region == Region::CodeCave) output = (uint32_t*)(m_mappings.codeCave_start + main_offset);
+	else if (address_region == Region::Main) output = (uint32_t*)(m_mappings.main_start + main_offset);
 	else return 0x321;
 	fread_sdcard(temp_buffer, sizeof(codeCaveData), elements, file);
 	for (size_t i = 0; i < elements; i++) {
@@ -301,7 +304,7 @@ Result Patcher::processCodeCave(FILE* file) {
 					ptrdiff_t offset = jump_address - current_address;
 					Branch.imm = offset / 4;
 				}
-				else if (address_region == (uint8_t)Region::CodeCave) {
+				else if (address_region == Region::CodeCave) {
 					intptr_t jump_address = (intptr_t)(m_mappings.main_start + ((int64_t)(Branch.imm)*4 + (main_offset + (i*4))));
 					current_address = (intptr_t)&output[i];
 					ptrdiff_t offset = jump_address - current_address;
@@ -393,7 +396,7 @@ Result Patcher::applyMasterWrite(FILE* file, size_t master_offset) {
 	}
 }
 
-Result Patcher::writeExprTo(double value, Writer& out, uint8_t value_type) {
+Result Patcher::writeExprTo(double value, Writer& out, ValueType value_type) {
 	uint8_t size = memberSize(value_type);
 	union {
 		uint64_t u;
@@ -402,7 +405,7 @@ Result Patcher::writeExprTo(double value, Writer& out, uint8_t value_type) {
 		float f;
 	} tmp;
 
-	switch (value_type >> 4) {
+	switch ((uint8_t)value_type >> 4) {
 		case 0:
 			tmp.u = (uint64_t)value;
 			break;
@@ -463,8 +466,8 @@ void Patcher::copyAddress(Cursor& in, Writer& out) const {
 
 Result Patcher::copyValues(Cursor& in, Writer& out, bool evaluate,
                            uint8_t FPS, uint8_t refreshRate) const {
-	uint8_t value_type = in.read<uint8_t>();
-	out.write<uint8_t>(value_type);
+	ValueType value_type = in.read<ValueType>();
+	out.write<uint8_t>((uint8_t)value_type);
 	uint8_t value_count = in.read<uint8_t>();
 	out.write<uint8_t>(value_count);
 
@@ -509,8 +512,8 @@ Result NOINLINE Patcher::convertPatchToFPSTarget(uint8_t* out_buffer, const uint
 				out.write<uint8_t>(OPCODE & 0x7F);
 				copyAddress(in, out);
 				out.write<uint8_t>(in.read<uint8_t>()); // compare_type
-				const auto value_type = in.read<uint8_t>();
-				out.write<uint8_t>(value_type);
+				const auto value_type = in.read<ValueType>();
+				out.write<uint8_t>((uint8_t)value_type);
 				const auto member_size = memberSize(value_type);
 				out.copy(in.take(member_size), member_size);
 				copyAddress(in, out);
@@ -551,10 +554,10 @@ Result Patcher::execWrite(Cursor& cursor) {
 		0x24	=	float
 		0x28	=	double
 	*/
-	const auto value_type = cursor.read<uint8_t>();
+	const ValueType value_type = cursor.read<LOCK::ValueType>();
 	const auto loops = cursor.read<uint8_t>();
 
-	if (value_type == (uint8_t)ValueType::RefreshRate) {
+	if (value_type == ValueType::RefreshRate) {
 		for (uint8_t i = 0; i < loops; i++) {
 			m_overwriteRefreshRate = cursor.read<double>();
 		}
@@ -585,7 +588,7 @@ Result Patcher::execCompare(Cursor& cursor) {
 		6	=	!=
 	*/
 	const auto compare_type = cursor.read<uint8_t>();
-	uint8_t value_type = cursor.read<uint8_t>();
+	ValueType value_type = cursor.read<ValueType>();
 	bool passed = false;
 
 	auto doCompare = [&]<typename T>(std::in_place_type_t<T>) {
@@ -593,16 +596,16 @@ Result Patcher::execCompare(Cursor& cursor) {
 	};
 
 	switch (value_type) {
-		case 1:    doCompare(std::in_place_type<uint8_t>);  break;
-		case 2:    doCompare(std::in_place_type<uint16_t>); break;
-		case 4:    doCompare(std::in_place_type<uint32_t>); break;
-		case 8:    doCompare(std::in_place_type<uint64_t>); break;
-		case 0x11: doCompare(std::in_place_type<int8_t>);   break;
-		case 0x12: doCompare(std::in_place_type<int16_t>);  break;
-		case 0x14: doCompare(std::in_place_type<int32_t>);  break;
-		case 0x18: doCompare(std::in_place_type<int64_t>);  break;
-		case 0x24: doCompare(std::in_place_type<float>);    break;
-		case 0x28: doCompare(std::in_place_type<double>);   break;
+		case ValueType::U8:  doCompare(std::in_place_type<uint8_t>);  break;
+		case ValueType::U16: doCompare(std::in_place_type<uint16_t>); break;
+		case ValueType::U32: doCompare(std::in_place_type<uint32_t>); break;
+		case ValueType::U64: doCompare(std::in_place_type<uint64_t>); break;
+		case ValueType::S8:  doCompare(std::in_place_type<int8_t>);   break;
+		case ValueType::S16: doCompare(std::in_place_type<int16_t>);  break;
+		case ValueType::S32: doCompare(std::in_place_type<int32_t>);  break;
+		case ValueType::S64: doCompare(std::in_place_type<int64_t>);  break;
+		case ValueType::F32: doCompare(std::in_place_type<float>);    break;
+		case ValueType::F64: doCompare(std::in_place_type<double>);   break;
 		default:
 			return 8;
 	}
@@ -611,10 +614,10 @@ Result Patcher::execCompare(Cursor& cursor) {
 #if defined(SWITCH) || defined(OUNCE)
 	if (address < 0) return 6;
 #endif
-	value_type = cursor.read<uint8_t>();
+	value_type = cursor.read<ValueType>();
 	const auto loops = cursor.read<uint8_t>();
 
-	if (value_type == (uint8_t)ValueType::RefreshRate) {
+	if (value_type == ValueType::RefreshRate) {
 		for (uint8_t i = 0; i < loops; i++) {
 			const auto valueDouble = cursor.read<uint64_t>();
 			if (passed) memcpy(&m_overwriteRefreshRate, &valueDouble, sizeof(valueDouble));
