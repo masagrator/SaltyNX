@@ -53,9 +53,9 @@ namespace {
 		u32 pageinfo = 0;
 
 	#if defined(SWITCH) || defined(OUNCE)
-		if (address < 0x200000 || address > 0xFFFFFFFF) return false;
-	#else
 		if ((address < 0x8000000) || (address >= 0x8000000000)) return false;
+	#else
+		if (address < 0x200000 || address > 0xFFFFFFFF) return false;
 	#endif
 
 		Result rc = svcQueryMemory(&memoryinfo, &pageinfo, address);
@@ -497,7 +497,7 @@ Result NOINLINE Patcher::convertPatchToFPSTarget(uint8_t* out_buffer, const uint
 			// write, plain or with expressions to evaluate (0x80 flag)
 			case 1:
 			case 0x81: {
-				out.write<uint8_t>(OPCODE & 0x80);
+				out.write<uint8_t>(OPCODE & 0x7F);
 				copyAddress(in, out);
 				Result rc = copyValues(in, out, (OPCODE & 0x80) == 0x80, FPS, refreshRate);
 				if (R_FAILED(rc)) return rc;
@@ -506,7 +506,7 @@ Result NOINLINE Patcher::convertPatchToFPSTarget(uint8_t* out_buffer, const uint
 			// compare, plain or with expressions to evaluate (0x80 flag)
 			case 2:
 			case 0x82: {
-				out.write<uint8_t>(OPCODE & 0x80);
+				out.write<uint8_t>(OPCODE & 0x7F);
 				copyAddress(in, out);
 				out.write<uint8_t>(in.read<uint8_t>()); // compare_type
 				const auto value_type = in.read<uint8_t>();
@@ -520,12 +520,12 @@ Result NOINLINE Patcher::convertPatchToFPSTarget(uint8_t* out_buffer, const uint
 			}
 			// block
 			case 3:
-				out.write<uint8_t>(3);
+				out.write<uint8_t>(OPCODE);
 				out.write<uint8_t>(in.read<uint8_t>());
 				break;
 			// end of execution
-			case 255:
-				out.write<uint8_t>(255);
+			case 0xFF:
+				out.write<uint8_t>(OPCODE);
 				return 0;
 			default:
 				return 0x2002;
