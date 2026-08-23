@@ -662,13 +662,6 @@ Result Patcher::applyPatch(uint8_t FPS, uint8_t refreshRate) {
 	Cursor cursor(m_compiled, start_offset);
 
 	while (true) {
-		/* OPCODE:
-			0	=	err
-			1	=	write
-			2	=	compare
-			3	=	block
-			-1	=	endExecution
-		*/
 		const auto OPCODE = cursor.read<AllFpsOpcode>();
 		Result rc = 0;
 		switch (OPCODE) {
