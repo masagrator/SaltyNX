@@ -207,6 +207,6 @@ namespace LOCK {
 		uint8_t* m_compiled             = nullptr;
 		uint8_t  m_compiledFPS          = 0;
 		uint8_t  m_compiledRefreshRate  = 0;
-		uint8_t* m_configBuffer           = nullptr;
+		uint8_t* m_configBuffer         = nullptr;
 	};
 }
