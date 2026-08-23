@@ -12,7 +12,14 @@
 #include "saltysd_core.h"
 #include "lock.hpp"
 #include <algorithm>
+#include <array>
+#include <cmath>
+#include <utility>
 #include "nanoprintf.h"
+
+namespace LOCK {
+	constinit Patcher patcher;
+}
 
 struct runtime_replace {
 	const char* name;
@@ -242,7 +249,7 @@ namespace Utils {
 			SaltySDCore_printf("NX-FPS: FPSLocker, wrong header! Expected: 0x%lx, got: 0x%lx\n", header_size, tell);
 			error = true;
 		}
-		else if (!LOCK::isValid(buffer, header_size)) {
+		else if (!LOCK::patcher.isBufferValid(buffer, header_size)) {
 			SaltySDCore_printf("NX-FPS: FPSLocker, LOCK file is invalid!\n");
 			error = true;			
 		}
@@ -251,8 +258,8 @@ namespace Utils {
 			free(buffer);
 			return 0x1201;
 		}
-		if (LOCK::masterWrite) {
-			Result ret = LOCK::applyMasterWrite(patch_file, header_size - 4);
+		if (LOCK::patcher.hasMasterWrite()) {
+			Result ret = LOCK::patcher.applyMasterWrite(patch_file, header_size - 4);
 			if (R_FAILED(ret))  {
 				SaltySDCore_fclose(patch_file);
 				return ret;
@@ -285,14 +292,14 @@ namespace NX_FPS_Math {
 	uint32_t new_fpslock = 0;
 
 	void PreFrame() {
-		new_fpslock = (LOCK::overwriteRefreshRate ? LOCK::overwriteRefreshRate : ((*sharedOperationMode == 1) ? (Shared -> FPSlockedDocked) : (Shared -> FPSlocked)));
+		new_fpslock = (LOCK::patcher.refreshRateOverwrite() ? LOCK::patcher.refreshRateOverwrite() : ((*sharedOperationMode == 1) ? (Shared -> FPSlockedDocked) : (Shared -> FPSlocked)));
 		if (old_force != (Shared -> forceOriginalRefreshRate)) {
 			if (*sharedOperationMode == 1 && !(Shared -> dontForce60InDocked))
-				svcSleepThread(LOCK::DockedRefreshRateDelay);
+				svcSleepThread(LOCK::Patcher::DockedRefreshRateDelay);
 			old_force = (Shared -> forceOriginalRefreshRate);
 		}
 
-		if ((FPStiming && !LOCK::blockDelayFPS && (new_fpslock && new_fpslock < (Shared -> currentRefreshRate)))) {
+		if ((FPStiming && !LOCK::patcher.fpsDelayBlocked() && (new_fpslock && new_fpslock < (Shared -> currentRefreshRate)))) {
 			const int64_t FPSTiming_internal = FPStiming + (range * 32);
 			if ((int64_t)(Utils::_getSystemTick() - frameend) < FPSTiming_internal) {
 				FPSlock_delayed = true;
@@ -333,9 +340,9 @@ namespace NX_FPS_Math {
 		frameend = endtick;
 		FPS_temp++;
 		const uint64_t deltatick = endtick - starttick;
-		LOCK::overwriteRefreshRate = 0;
+		LOCK::patcher.clearRefreshRateOverwrite();
 		if (!configRC && FPSlock) {
-			LOCK::applyPatch(configBuffer, FPSlock, (Shared -> currentRefreshRate));
+			LOCK::patcher.applyPatch(configBuffer, FPSlock, (Shared -> currentRefreshRate));
 		}
 		if (deltatick > systemtickfrequency) {
 			nn::focusHandlingOverwrite = true;
@@ -368,7 +375,7 @@ namespace NX_FPS_Math {
 			}
 		}
 
-		if (LOCK::overwriteRefreshRate != 0) (Shared -> forceOriginalRefreshRate) = true;
+		if (LOCK::patcher.refreshRateOverwrite() != 0) (Shared -> forceOriginalRefreshRate) = true;
 		else (Shared -> forceOriginalRefreshRate) = false;
 
 		(Shared -> FPSavg) = Stats.FPSavg;
@@ -1465,12 +1472,8 @@ extern "C" {
 
 		sharedOperationMode = _sharedOperationMode;
 		SaltySDCore_printf("NX-FPS: alive\n");
-		LOCK::mappings.main_start = Utils::getMainAddress();
-		#if defined(SWITCH) || defined(OUNCE)
-		LOCK::mappings.variables_start = (int64_t)&variables_buffer[0];
-		LOCK::mappings.codeCave_start = (int64_t)&codeCave;
-		#endif
-		SaltySDCore_printf("NX-FPS: found main at: 0x%lX\n", LOCK::mappings.main_start);
+		LOCK::patcher.bindMainRegion(Utils::getMainAddress());
+		SaltySDCore_printf("NX-FPS: found main at: 0x%lX\n", LOCK::patcher.mainRegion());
 		Result ret = SaltySD_CheckIfSharedMemoryAvailable(&SharedMemoryOffset, sizeof(NxFpsSharedBlock));
 		SaltySDCore_printf("NX-FPS: ret: 0x%X\n", ret);
 		if (!ret) {
@@ -1550,7 +1553,7 @@ extern "C" {
 					SaltySDCore_fclose(patch_file);
 					SaltySDCore_printf("NX-FPS: FPSLocker: successfully opened: %s\n", path);
 					configRC = Utils::readConfig(path, &configBuffer);
-					if (LOCK::MasterWriteApplied) {
+					if (LOCK::patcher.masterWriteApplied()) {
 						(Shared -> patchApplied) = 2;
 					}
 					SaltySDCore_printf("NX-FPS: FPSLocker: readConfig rc: 0x%x\n", configRC);
@@ -1559,8 +1562,7 @@ extern "C" {
 					svcGetInfo(&alias_start, InfoType_AliasRegionAddress, CUR_PROCESS_HANDLE, 0);
 					svcGetInfo(&heap_start, InfoType_HeapRegionAddress, CUR_PROCESS_HANDLE, 0);
 
-					LOCK::mappings.alias_start = (uintptr_t)alias_start;
-					LOCK::mappings.heap_start = (uintptr_t)heap_start;
+					LOCK::patcher.bindDynamicRegions((uintptr_t)alias_start, (uintptr_t)heap_start);
 
 				}
 				else SaltySDCore_printf("NX-FPS: FPSLocker: File not found: %s\n", path);
