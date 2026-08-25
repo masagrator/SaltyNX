@@ -1367,59 +1367,6 @@ void checkReadFlag(bool* out) {
 	else {
 		*out = true;
 	}
-}
-
-std::array replacements = {
-	runtime_replace{"nvnBootstrapLoader", (uintptr_t*)&NVN::nvnBootstrapLoader_0, (void*)NVN::BootstrapLoader_1, nullptr},
-
-	runtime_replace{"eglGetProcAddress", (uintptr_t*)&EGL::eglGetProcAddress_0, (void*)EGL::GetProc, nullptr},
-	runtime_replace{"eglSwapBuffers", (uintptr_t*)&EGL::eglSwapBuffers_0, (void*)EGL::Swap, nullptr},
-	runtime_replace{"eglSwapInterval", (uintptr_t*)&EGL::eglSwapInterval_0, (void*)EGL::Interval, nullptr},
-	runtime_replace{"glViewport", (uintptr_t*)&EGL::glViewport_0, (void*)EGL::Viewport, nullptr},
-	runtime_replace{"glViewportArrayv", (uintptr_t*)&EGL::glViewportArrayv_0, (void*)EGL::ViewportArrayv, nullptr},
-	runtime_replace{"glViewportArrayvNV", (uintptr_t*)&EGL::glViewportArrayvNV_0, (void*)EGL::ViewportArrayvNV, nullptr},
-	runtime_replace{"glViewportArrayvOES", (uintptr_t*)&EGL::glViewportArrayvOES_0, (void*)EGL::ViewportArrayvOES, nullptr},
-	runtime_replace{"glViewportIndexedf", (uintptr_t*)&EGL::glViewportIndexedf_0, (void*)EGL::ViewportIndexedf, nullptr},
-	runtime_replace{"glViewportIndexedfNV", (uintptr_t*)&EGL::glViewportIndexedfNV_0, (void*)EGL::ViewportIndexedfNV, nullptr},
-	runtime_replace{"glViewportIndexedfOES", (uintptr_t*)&EGL::glViewportIndexedfOES_0, (void*)EGL::ViewportIndexedfOES, nullptr},
-	runtime_replace{"glViewportIndexedfv", (uintptr_t*)&EGL::glViewportIndexedfv_0, (void*)EGL::ViewportIndexedfv, nullptr},
-	runtime_replace{"glViewportIndexedfvNV", (uintptr_t*)&EGL::glViewportIndexedfvNV_0, (void*)EGL::ViewportIndexedfvNV, nullptr},
-	runtime_replace{"glViewportIndexedfvOES", (uintptr_t*)&EGL::glViewportIndexedfvOES_0, (void*)EGL::ViewportIndexedfvOES, nullptr},
-	
-	runtime_replace{"vkQueuePresentKHR", (uintptr_t*)&vk::vkQueuePresentKHR_0, (void*)vk::QueuePresent, nullptr},
-	runtime_replace{"_ZN11NvSwapchain15QueuePresentKHREP9VkQueue_TPK16VkPresentInfoKHR", (uintptr_t*)&vk::nvSwapchainQueuePresentKHR_0, (void*)vk::nvSwapchain::QueuePresent, nullptr},
-	runtime_replace{"vkGetInstanceProcAddr", (uintptr_t*)&vk::vkGetInstanceProcAddr_0, (void*)vk::GetInstanceProcAddr, nullptr},
-	runtime_replace{"vkCmdSetViewport", (uintptr_t*)&vk::vkCmdSetViewport_0, (void*)vk::CmdSetViewport, nullptr},
-	runtime_replace{"vkCreateSwapchainKHR", (uintptr_t*)&vk::vkCreateSwapchainKHR_0, (void*)vk::CreateSwapchain, nullptr},
-	runtime_replace{"vkGetDeviceProcAddr", (uintptr_t*)&vk::vkGetDeviceProcAddr_0, (void*)vk::GetDeviceProcAddr, nullptr},
-	runtime_replace{"vkCmdSetViewportWithCount", (uintptr_t*)&vk::vkCmdSetViewportWithCount_0, (void*)vk::CmdSetViewportWithCount, nullptr},
-	runtime_replace{"vkGetSwapchainImagesKHR", (uintptr_t*)&vk::vkGetSwapchainImagesKHR_0, nullptr, nullptr},
-	runtime_replace{"_ZN11NvSwapchain18CreateSwapchainKHREP10VkDevice_TPK24VkSwapchainCreateInfoKHRPK21VkAllocationCallbacksPP16VkSwapchainKHR_T", (uintptr_t*)&vk::nvSwapchainCreateSwapchainKHR_0, nullptr, nullptr},
-
-	runtime_replace{"_ZN2nn2oe20SetFocusHandlingModeENS0_17FocusHandlingModeE", (uintptr_t*)&nn::SetFocusHandlingMode_0, (void*)nn::setFocusHandlingMode, nullptr},
-	runtime_replace{"_ZN2nn2os13GetSystemTickEv", (uintptr_t*)&Utils::osGetSystemTick_1, nullptr, nullptr},
-	runtime_replace{"_ZN2nn2oe44SetUserInactivityDetectionTimeExtendedUnsafeEb", (uintptr_t*)&nn::SetUserInactivityDetectionTimeExtended_0, nullptr, nullptr},
-	runtime_replace{
-		#if defined(SWITCH32) || defined(OUNCE32)
-		"_ZN2nn2ro12LookupSymbolEPjPKc",
-		#else
-		"_ZN2nn2ro12LookupSymbolEPmPKc",
-		#endif
-		(uintptr_t*)&nn::roLookupSymbol_0, (void*)vk::LookupSymbol, &checkvkGetInstanceProcAddr},
-	runtime_replace{
-		#if defined(SWITCH32) || defined(OUNCE32)
-		"_ZN2nn2fs6detail12FileAccessor4ReadEPjxPvjRKNS0_10ReadOptionE",
-		#else
-		"_ZN2nn2fs6detail12FileAccessor4ReadEPmlPvmRKNS0_10ReadOptionE",
-		#endif
-		(uintptr_t*)&nn::FileAccessorRead_0, (void*)nn::FileAccessorRead, &checkReadFlag},
-	runtime_replace{
-		#if defined(SWITCH32) || defined(OUNCE32)
-		"_ZN2nn2fs6detail12FileAccessor4ReadEPjxPvjRKNS0_10ReadOptionEPNS1_25FileDataCacheAccessResultE",
-		#else
-		"_ZN2nn2fs6detail12FileAccessor4ReadEPmlPvmRKNS0_10ReadOptionEPNS1_25FileDataCacheAccessResultE",
-		#endif
-		(uintptr_t*)&nn::FileAccessorReadCache_0, (void*)nn::FileAccessorReadCache, &checkReadFlag}
 };
 
 extern "C" {
@@ -1438,6 +1385,60 @@ extern "C" {
 			Shared = (NxFpsSharedBlock*)__builtin_assume_aligned((const void*)((uintptr_t)shmemGetAddr(_sharedmemory) + SharedMemoryOffset), 4);
 			Shared -> MAGIC = 0x465053;
 			Shared->expectedSetBuffers = -1;
+
+			//Putting this inside doesn't generate bloat in .init_array
+			std::array replacements = {
+				runtime_replace{"nvnBootstrapLoader", (uintptr_t*)&NVN::nvnBootstrapLoader_0, (void*)NVN::BootstrapLoader_1, nullptr},
+
+				runtime_replace{"eglGetProcAddress", (uintptr_t*)&EGL::eglGetProcAddress_0, (void*)EGL::GetProc, nullptr},
+				runtime_replace{"eglSwapBuffers", (uintptr_t*)&EGL::eglSwapBuffers_0, (void*)EGL::Swap, nullptr},
+				runtime_replace{"eglSwapInterval", (uintptr_t*)&EGL::eglSwapInterval_0, (void*)EGL::Interval, nullptr},
+				runtime_replace{"glViewport", (uintptr_t*)&EGL::glViewport_0, (void*)EGL::Viewport, nullptr},
+				runtime_replace{"glViewportArrayv", (uintptr_t*)&EGL::glViewportArrayv_0, (void*)EGL::ViewportArrayv, nullptr},
+				runtime_replace{"glViewportArrayvNV", (uintptr_t*)&EGL::glViewportArrayvNV_0, (void*)EGL::ViewportArrayvNV, nullptr},
+				runtime_replace{"glViewportArrayvOES", (uintptr_t*)&EGL::glViewportArrayvOES_0, (void*)EGL::ViewportArrayvOES, nullptr},
+				runtime_replace{"glViewportIndexedf", (uintptr_t*)&EGL::glViewportIndexedf_0, (void*)EGL::ViewportIndexedf, nullptr},
+				runtime_replace{"glViewportIndexedfNV", (uintptr_t*)&EGL::glViewportIndexedfNV_0, (void*)EGL::ViewportIndexedfNV, nullptr},
+				runtime_replace{"glViewportIndexedfOES", (uintptr_t*)&EGL::glViewportIndexedfOES_0, (void*)EGL::ViewportIndexedfOES, nullptr},
+				runtime_replace{"glViewportIndexedfv", (uintptr_t*)&EGL::glViewportIndexedfv_0, (void*)EGL::ViewportIndexedfv, nullptr},
+				runtime_replace{"glViewportIndexedfvNV", (uintptr_t*)&EGL::glViewportIndexedfvNV_0, (void*)EGL::ViewportIndexedfvNV, nullptr},
+				runtime_replace{"glViewportIndexedfvOES", (uintptr_t*)&EGL::glViewportIndexedfvOES_0, (void*)EGL::ViewportIndexedfvOES, nullptr},
+				
+				runtime_replace{"vkQueuePresentKHR", (uintptr_t*)&vk::vkQueuePresentKHR_0, (void*)vk::QueuePresent, nullptr},
+				runtime_replace{"_ZN11NvSwapchain15QueuePresentKHREP9VkQueue_TPK16VkPresentInfoKHR", (uintptr_t*)&vk::nvSwapchainQueuePresentKHR_0, (void*)vk::nvSwapchain::QueuePresent, nullptr},
+				runtime_replace{"vkGetInstanceProcAddr", (uintptr_t*)&vk::vkGetInstanceProcAddr_0, (void*)vk::GetInstanceProcAddr, nullptr},
+				runtime_replace{"vkCmdSetViewport", (uintptr_t*)&vk::vkCmdSetViewport_0, (void*)vk::CmdSetViewport, nullptr},
+				runtime_replace{"vkCreateSwapchainKHR", (uintptr_t*)&vk::vkCreateSwapchainKHR_0, (void*)vk::CreateSwapchain, nullptr},
+				runtime_replace{"vkGetDeviceProcAddr", (uintptr_t*)&vk::vkGetDeviceProcAddr_0, (void*)vk::GetDeviceProcAddr, nullptr},
+				runtime_replace{"vkCmdSetViewportWithCount", (uintptr_t*)&vk::vkCmdSetViewportWithCount_0, (void*)vk::CmdSetViewportWithCount, nullptr},
+				runtime_replace{"vkGetSwapchainImagesKHR", (uintptr_t*)&vk::vkGetSwapchainImagesKHR_0, nullptr, nullptr},
+				runtime_replace{"_ZN11NvSwapchain18CreateSwapchainKHREP10VkDevice_TPK24VkSwapchainCreateInfoKHRPK21VkAllocationCallbacksPP16VkSwapchainKHR_T", (uintptr_t*)&vk::nvSwapchainCreateSwapchainKHR_0, nullptr, nullptr},
+
+				runtime_replace{"_ZN2nn2oe20SetFocusHandlingModeENS0_17FocusHandlingModeE", (uintptr_t*)&nn::SetFocusHandlingMode_0, (void*)nn::setFocusHandlingMode, nullptr},
+				runtime_replace{"_ZN2nn2os13GetSystemTickEv", (uintptr_t*)&Utils::osGetSystemTick_1, nullptr, nullptr},
+				runtime_replace{"_ZN2nn2oe44SetUserInactivityDetectionTimeExtendedUnsafeEb", (uintptr_t*)&nn::SetUserInactivityDetectionTimeExtended_0, nullptr, nullptr},
+				runtime_replace{
+					#if defined(SWITCH32) || defined(OUNCE32)
+					"_ZN2nn2ro12LookupSymbolEPjPKc",
+					#else
+					"_ZN2nn2ro12LookupSymbolEPmPKc",
+					#endif
+					(uintptr_t*)&nn::roLookupSymbol_0, (void*)vk::LookupSymbol, &checkvkGetInstanceProcAddr},
+				runtime_replace{
+					#if defined(SWITCH32) || defined(OUNCE32)
+					"_ZN2nn2fs6detail12FileAccessor4ReadEPjxPvjRKNS0_10ReadOptionE",
+					#else
+					"_ZN2nn2fs6detail12FileAccessor4ReadEPmlPvmRKNS0_10ReadOptionE",
+					#endif
+					(uintptr_t*)&nn::FileAccessorRead_0, (void*)nn::FileAccessorRead, &checkReadFlag},
+				runtime_replace{
+					#if defined(SWITCH32) || defined(OUNCE32)
+					"_ZN2nn2fs6detail12FileAccessor4ReadEPjxPvjRKNS0_10ReadOptionEPNS1_25FileDataCacheAccessResultE",
+					#else
+					"_ZN2nn2fs6detail12FileAccessor4ReadEPmlPvmRKNS0_10ReadOptionEPNS1_25FileDataCacheAccessResultE",
+					#endif
+					(uintptr_t*)&nn::FileAccessorReadCache_0, (void*)nn::FileAccessorReadCache, &checkReadFlag}
+			};
 
 			for (const auto& replacement: replacements) {
 				if (replacement.orig_ptr) *replacement.orig_ptr = SaltySDCore_FindSymbolBuiltin(replacement.name);
