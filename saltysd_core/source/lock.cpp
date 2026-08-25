@@ -281,8 +281,8 @@ Result Patcher::processCodeCave(FILE* file) {
 				memcpy_unsafe((uintptr_t)&output[i], (uintptr_t)&Branch, 4);
 				break;
 			}
-			case CodeCaveAdjustmentType::Adrp_CodeCave:
-			case CodeCaveAdjustmentType::Adrp_Variables:
+			case CodeCaveAdjustmentType::Adrp_CodeCave: [[fallthrough]];
+			case CodeCaveAdjustmentType::Adrp_Variables: [[fallthrough]];
 			case CodeCaveAdjustmentType::Adrp_MainFromCodeCave: {
 				struct {
 					unsigned int reg: 5;
@@ -417,7 +417,9 @@ void Patcher::copyAddress(Cursor& in, Writer& out) const {
 	uint8_t address_count = in.read<uint8_t>();
 	OUT_VAL(address_count);
 	OUT_TYPE(Region);
-	out.copy(in.take(sizeof(uint32_t)), address_count);
+	for (size_t i = 1; i < address_count; i++) {
+		OUT_TYPE(uint32_t);
+	}
 }
 
 Result Patcher::copyValues(Cursor& in, Writer& out, bool evaluate, uint8_t FPS, uint8_t refreshRate) const {
@@ -450,18 +452,23 @@ Result NOINLINE Patcher::convertPatchToFPSTarget(uint8_t* out_buffer, const uint
 
 	while (true) {
 		auto OPCODE = in.read<AllFpsOpcode>();
+		bool evaluate = false;
 		switch (OPCODE) {
 			case AllFpsOpcode::Eval_Write:
 				OPCODE = AllFpsOpcode::Write;
+				evaluate = true;
+				[[fallthrough]];
 			case AllFpsOpcode::Write: {
 				OUT_VAL(OPCODE);
 				copyAddress(in, out);
-				Result rc = copyValues(in, out, OPCODE == AllFpsOpcode::Eval_Write, FPS, refreshRate);
+				Result rc = copyValues(in, out, evaluate, FPS, refreshRate);
 				if (R_FAILED(rc)) return rc;
 				break;
 			}
 			case AllFpsOpcode::Eval_Compare:
 				OPCODE = AllFpsOpcode::Compare;
+				evaluate = true;
+				[[fallthrough]];
 			case AllFpsOpcode::Compare: {
 				OUT_VAL(OPCODE);
 				copyAddress(in, out);
@@ -471,16 +478,16 @@ Result NOINLINE Patcher::convertPatchToFPSTarget(uint8_t* out_buffer, const uint
 				const auto member_size = memberSize(value_type);
 				out.copy(in.take(member_size), member_size);
 				copyAddress(in, out);
-				Result rc = copyValues(in, out, OPCODE == AllFpsOpcode::Eval_Compare, FPS, refreshRate);
+				Result rc = copyValues(in, out, evaluate, FPS, refreshRate);
 				if (R_FAILED(rc)) return rc;
 				break;
 			}
 			case AllFpsOpcode::Block:
-				OUT_TYPE(AllFpsOpcode);
+				OUT_VAL(OPCODE);
 				OUT_TYPE(BlockOpcodeWhatType);
 				break;
 			case AllFpsOpcode::End:
-				OUT_TYPE(AllFpsOpcode);
+				OUT_VAL(OPCODE);
 				return 0;
 			default:
 				return 0x2002;
@@ -524,7 +531,7 @@ Result Patcher::execCompare(Cursor& cursor) {
 	bool passed = false;
 
 	bool found = [&]<typename... M>(std::tuple<M...>) { 
-		return (... || (value_type == M::val ? (compareValues(*(typename M::type*)(address), cursor.read<typename M::type>(), compare_type), true) : false)); 
+		return (... || (value_type == M::val ? (passed = compareValues(*(typename M::type*)(address), cursor.read<typename M::type>(), compare_type), true) : false)); 
 	} (TypeMappings{});
 	if (!found) return 0x8;
 
