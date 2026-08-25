@@ -88,11 +88,6 @@ namespace {
 		return SaltySD_Memcpy(to, from, size);
 	}
 
-	template <typename E>
-	constexpr auto enum_val(E e) {
-		return static_cast<std::underlying_type_t<E>>(e);
-	}
-
 	template <typename T>
 	void outWriteType (auto& in, auto& out) {
 		out.template write<T>(in.template read<T>());
@@ -376,7 +371,7 @@ Result Patcher::writeExprTo(double value, Writer& out, ValueType value_type) {
 			tmp.f = (float)value;	
 			break;
 		default:
-			switch(enum_val(value_type) >> 4) {
+			switch(uint8_t(value_type) >> 4) {
 				case 0: //unsigned
 					tmp.u = (uint64_t)value;
 					break;
@@ -454,19 +449,21 @@ Result NOINLINE Patcher::convertPatchToFPSTarget(uint8_t* out_buffer, const uint
 	Writer out(out_buffer, header_size);
 
 	while (true) {
-		const auto OPCODE = in.read<AllFpsOpcode>();
+		auto OPCODE = in.read<AllFpsOpcode>();
 		switch (OPCODE) {
-			case AllFpsOpcode::Write:
-			case AllFpsOpcode::Eval_Write: {
-				OUT_VAL(enum_val(OPCODE) & 0x7F);
+			case AllFpsOpcode::Eval_Write:
+				OPCODE = AllFpsOpcode::Write;
+			case AllFpsOpcode::Write: {
+				OUT_VAL(OPCODE);
 				copyAddress(in, out);
 				Result rc = copyValues(in, out, OPCODE == AllFpsOpcode::Eval_Write, FPS, refreshRate);
 				if (R_FAILED(rc)) return rc;
 				break;
 			}
-			case AllFpsOpcode::Compare:
-			case AllFpsOpcode::Eval_Compare: {
-				OUT_VAL(enum_val(OPCODE) & 0x7F);
+			case AllFpsOpcode::Eval_Compare:
+				OPCODE = AllFpsOpcode::Compare;
+			case AllFpsOpcode::Compare: {
+				OUT_VAL(OPCODE);
 				copyAddress(in, out);
 				OUT_TYPE(CompareType);
 				const auto value_type = in.read<ValueType>();
