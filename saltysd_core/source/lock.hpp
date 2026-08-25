@@ -11,6 +11,8 @@
 #include <cstddef>
 #include <cstdint>
 #include <cstdio>
+#include <tuple>
+#include <functional>
 
 #define NOINLINE __attribute__ ((noinline))
 
@@ -28,6 +30,9 @@ namespace nn {
 }
 #endif
 
+#define MIN_SUPPORTED_GEN 3
+#define MAX_SUPPORTED_GEN 4
+
 namespace LOCK {
 
 #if defined(SWITCH) || defined(OUNCE)
@@ -41,11 +46,12 @@ namespace LOCK {
 		Main      = 1,
 		Heap      = 2,
 		Alias     = 3,
-		#if defined(SWITCH) || defined(OUNCE)
+#if defined(SWITCH) || defined(OUNCE)
 		Variables = 4,
 		CodeCave  = 5,
-		#endif
+#endif
 	};
+	static_assert(sizeof(Region) == 1);
 
 	enum class ValueType : uint8_t {
 		U8  = 0x01, U16 = 0x02, U32 = 0x04, U64 = 0x08,
@@ -53,15 +59,31 @@ namespace LOCK {
 		F32 = 0x24, F64 = 0x28,
 		RefreshRate = 0x38,
 	};
+	static_assert(sizeof(ValueType) == 1);
+
+	template<ValueType V, typename T> struct ValueMap { static constexpr ValueType val = V; using type = T; };
+
+	using TypeMappings = std::tuple<
+		ValueMap<ValueType::U8, uint8_t>, ValueMap<ValueType::U16, uint16_t>, ValueMap<ValueType::U32, uint32_t>, ValueMap<ValueType::U64, uint64_t>,
+		ValueMap<ValueType::S8, int8_t>,  ValueMap<ValueType::S16, int16_t>,  ValueMap<ValueType::S32, int32_t>,  ValueMap<ValueType::S64, int64_t>,
+		ValueMap<ValueType::F32, float>,  ValueMap<ValueType::F64, double>
+	>;
 
 	enum class CompareType : uint8_t {
-		GT = 1,
-		GE = 2,
-		LT = 3,
-		LE = 4,
-		EQ = 5,
-		NE = 6,
+		GT = 1, GE = 2, LT = 3, LE = 4, EQ = 5, NE = 6,
 	};
+	static_assert(sizeof(CompareType) == 1);
+
+	template<CompareType C, typename Op> struct CmpMap { static constexpr CompareType val = C; using op = Op; };
+
+	using CompareMappings = std::tuple<
+		CmpMap<CompareType::GT, std::greater<>>,
+		CmpMap<CompareType::GE, std::greater_equal<>>,
+		CmpMap<CompareType::LT, std::less<>>,
+		CmpMap<CompareType::LE, std::less_equal<>>,
+		CmpMap<CompareType::EQ, std::equal_to<>>,
+		CmpMap<CompareType::NE, std::not_equal_to<>>
+	>;
 
 	enum class CodeCaveAdjustmentType : uint8_t {
 		None = 0,
@@ -71,13 +93,17 @@ namespace LOCK {
 		Adrp_MainFromCodeCave = 4,
 		Branch_Relative = 5,
 	};
+	static_assert(sizeof(CodeCaveAdjustmentType) == 1);
 
 	enum class MasterWriteOpcode : uint8_t {
 		Bytes = 1,
+#if defined(SWITCH) || defined(OUNCE)
 		Variables = 2,
 		CodeCave = 3,
+#endif
 		End = 0xFF,
 	};
+	static_assert(sizeof(MasterWriteOpcode) == 1);
 
 	enum class AllFpsOpcode : uint8_t {
 		Write = 1,
@@ -87,10 +113,31 @@ namespace LOCK {
 		Block = 3,
 		End = 0xFF,
 	};
+	static_assert(sizeof(AllFpsOpcode) == 1);
 
 	enum class BlockOpcodeWhatType : uint8_t {
 		Timing = 1,
 	};
+	static_assert(sizeof(BlockOpcodeWhatType) == 1);
+
+	struct OpHeader {
+		uint32_t main_offset;
+		ValueType value_type;
+		uint8_t elements;
+	} PACKED;
+	static_assert(sizeof(OpHeader) == 6);
+
+	struct CodeCaveData {
+		CodeCaveAdjustmentType adjustment_type;
+		uint32_t instruction;
+	} PACKED;
+	static_assert(sizeof(CodeCaveData) == 5);
+
+	struct BranchOp {
+		signed int imm: 26;
+		unsigned int opcode: 6;
+	};
+	static_assert(sizeof(BranchOp) == 4);
 
 	class Patcher {
 	public:
@@ -101,6 +148,19 @@ namespace LOCK {
 			intptr_t  variables_start = 0;
 			intptr_t  codeCave_start  = 0;
 		};
+
+		template<Region R, auto Ptr> struct RegMap { static constexpr Region val = R; static constexpr auto ptr = Ptr; };
+
+		using RegionMappings = std::tuple<
+			RegMap<Region::Main,      &Mappings::main_start>,
+			RegMap<Region::Heap,      &Mappings::heap_start>,
+			RegMap<Region::Alias,     &Mappings::alias_start>
+#if defined(SWITCH) || defined(OUNCE)
+		   	,
+			RegMap<Region::Variables, &Mappings::variables_start>,
+			RegMap<Region::CodeCave,  &Mappings::codeCave_start>
+#endif
+		>;
 
 		// How long to wait for the display to settle when the docked refresh rate changes.
 		static constexpr size_t DockedRefreshRateDelay = 4000000000;
@@ -184,20 +244,36 @@ namespace LOCK {
 		Result processCodeCave(FILE* file);
 #endif
 
-		static double NOINLINE evaluateExpression(const char* equation, double fps_target,
-		                                          double displaySync);
+		template<MasterWriteOpcode C, auto Func> struct MasterWriteOpMap { static constexpr MasterWriteOpcode val = C; static constexpr auto func = Func; };
+
+		using MasterWriteMappings = std::tuple<
+			MasterWriteOpMap<MasterWriteOpcode::Bytes, &Patcher::processBytes>
+#if defined(SWITCH) || defined(OUNCE)
+			,
+			MasterWriteOpMap<MasterWriteOpcode::Variables, &Patcher::processVariables>,
+			MasterWriteOpMap<MasterWriteOpcode::CodeCave, &Patcher::processCodeCave>
+#endif
+		>;
+
+		static double NOINLINE evaluateExpression(const char* equation, double fps_target, double displaySync);
 		static Result writeExprTo(double value, Writer& out, ValueType value_type);
 
 		void copyAddress(Cursor& in, Writer& out) const;
-		Result copyValues(Cursor& in, Writer& out, bool evaluate,
-		                  uint8_t FPS, uint8_t refreshRate) const;
+		Result copyValues(Cursor& in, Writer& out, bool evaluate, uint8_t FPS, uint8_t refreshRate) const;
 
-		Result NOINLINE convertPatchToFPSTarget(uint8_t* out_buffer, const uint8_t* in_buffer,
-		                                        uint8_t FPS, uint8_t refreshRate);
+		Result NOINLINE convertPatchToFPSTarget(uint8_t* out_buffer, const uint8_t* in_buffer, uint8_t FPS, uint8_t refreshRate);
 
 		Result execWrite(Cursor& cursor);
 		Result execCompare(Cursor& cursor);
 		Result execBlock(Cursor& cursor);
+
+		template<AllFpsOpcode C, auto Func> struct AllFpsOpMap { static constexpr AllFpsOpcode val = C; static constexpr auto func = Func; };
+
+		using PostAllFpsMappings = std::tuple<
+			AllFpsOpMap<AllFpsOpcode::Write, &Patcher::execWrite>,
+			AllFpsOpMap<AllFpsOpcode::Compare, &Patcher::execCompare>,
+			AllFpsOpMap<AllFpsOpcode::Block, &Patcher::execBlock>
+		>;
 
 		Mappings m_mappings{};
 

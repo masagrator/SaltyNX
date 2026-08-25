@@ -33,14 +33,6 @@ alignas(0x1000) static uint8_t variables_buffer[0x1000];
 
 namespace LOCK {
 
-static_assert(sizeof(ValueType) == 1);
-static_assert(sizeof(Region) == 1);
-static_assert(sizeof(CompareType) == 1);
-static_assert(sizeof(CodeCaveAdjustmentType) == 1);
-static_assert(sizeof(MasterWriteOpcode) == 1);
-static_assert(sizeof(BlockOpcodeWhatType) == 1);
-static_assert(sizeof(AllFpsOpcode) == 1);
-
 namespace {
 
 	double TruncDec(double value, double truncator) {
@@ -52,7 +44,7 @@ namespace {
 
 		int64_t address = address_in;
 		MemoryInfo memoryinfo = {0};
-		u32 pageinfo = 0;
+		uint32_t pageinfo = 0;
 
 	#if defined(SWITCH) || defined(OUNCE)
 		#define MIN_ASLR_ADDRESS 0x8000000
@@ -95,6 +87,23 @@ namespace {
 	inline Result memcpy_unsafe(uintptr_t to, uintptr_t from, size_t size) {
 		return SaltySD_Memcpy(to, from, size);
 	}
+
+	template <typename E>
+	constexpr auto enum_val(E e) {
+		return static_cast<std::underlying_type_t<E>>(e);
+	}
+
+	template <typename T>
+	void outWriteType (auto& in, auto& out) {
+		out.template write<T>(in.template read<T>());
+	}
+
+	void outWriteVal (auto in, auto& out) {
+		out.template write<decltype(in)>(in);
+	}
+
+	#define OUT_WRITE(T) outWriteType<T>(in, out)
+	#define OUT_VAL(in) outWriteVal(in, out)
 }
 
 
@@ -145,15 +154,9 @@ void Patcher::bindDynamicRegions(uintptr_t alias_start, uintptr_t heap_start) {
 
 template <typename T>
 bool Patcher::compareValues(T value1, T value2, CompareType compare_type) {
-	switch (compare_type) {
-		case CompareType::GT: return (value1 >  value2);
-		case CompareType::GE: return (value1 >= value2);
-		case CompareType::LT: return (value1 <  value2);
-		case CompareType::LE: return (value1 <= value2);
-		case CompareType::EQ: return (value1 == value2);
-		case CompareType::NE: return (value1 != value2);
-	}
-	return false;
+    return [&]<typename... M>(std::tuple<M...>) { 
+        return (... || (compare_type == M::val ? typename M::op{}(value1, value2) : false)); 
+    }(CompareMappings{});
 }
 
 patch_addr_t NOINLINE Patcher::getAddress(Cursor& cursor) const {
@@ -162,30 +165,14 @@ patch_addr_t NOINLINE Patcher::getAddress(Cursor& cursor) const {
 	int8_t offsets_count = cursor.read<int8_t>();
 	Region region = cursor.read<Region>();
 	offsets_count -= 1;
-	int64_t address = 0;
-	switch (region) {
-		case Region::Absolute:
-			break;
-		case Region::Main:
-			address = m_mappings.main_start;
-			break;
-		case Region::Heap:
-			address = m_mappings.heap_start;
-			break;
-		case Region::Alias:
-			address = m_mappings.alias_start;
-			break;
-#if defined(SWITCH) || defined(OUNCE)
-		case Region::Variables:
-			address = m_mappings.variables_start;
-			break;
-		case Region::CodeCave:
-			address = m_mappings.codeCave_start;
-			break;
-#endif
-		default:
-			return -1;
-	}
+
+	if (region > std::tuple_element_t<std::tuple_size_v<RegionMappings> - 1, RegionMappings>::val)
+		return -1;
+	
+	int64_t address = [&]<typename... M>(std::tuple<M...>) {
+		return (... + (region == M::val ? static_cast<int64_t>(m_mappings.*M::ptr) : 0)); 
+	}(RegionMappings{});
+
 	for (int i = 0; i < offsets_count; i++) {
 #if defined(SWITCH32) || defined(OUNCE32)
 		int32_t temp_offset = cursor.read<int32_t>();
@@ -212,7 +199,7 @@ bool Patcher::isHeaderValid(const uint8_t* buffer) {
 	if (memcmp(buffer, MAGIC, sizeof(MAGIC)) != 0)
 		return false;
 	m_gen = buffer[4];
-	if (m_gen != 3 && m_gen != 4)
+	if (m_gen < MIN_SUPPORTED_GEN || m_gen > MAX_SUPPORTED_GEN)
 		return false;
 	m_masterWrite = buffer[5];
 	if (m_masterWrite > 1)
@@ -231,16 +218,12 @@ bool Patcher::isHeaderValid(const uint8_t* buffer) {
 }
 
 Result Patcher::processBytes(FILE* file) {
-	uint32_t main_offset = 0;
-	fread_sdcard(&main_offset, 4, 1, file);
-	ValueType value_type{};
-	fread_sdcard(&value_type, 1, 1, file);
-	uint8_t elements = 0;
-	fread_sdcard(&elements, 1, 1, file);
-	const auto member_size = memberSize(value_type);
-	void* temp_buffer = calloc(elements, member_size);
-	fread_sdcard(temp_buffer, member_size, elements, file);
-	memcpy_unsafe(m_mappings.main_start + main_offset, (u64)temp_buffer, elements * member_size);
+	OpHeader header;
+	fread_sdcard(&header, sizeof(OpHeader), 1, file);
+	const auto member_size = memberSize(header.value_type);
+	void* temp_buffer = calloc(header.elements, member_size);
+	fread_sdcard(temp_buffer, member_size, header.elements, file);
+	memcpy_unsafe(m_mappings.main_start + header.main_offset, (uintptr_t)temp_buffer, member_size * header.elements);
 	free(temp_buffer);
 	return 0;
 }
@@ -248,16 +231,12 @@ Result Patcher::processBytes(FILE* file) {
 #if defined(SWITCH) || defined(OUNCE)
 
 Result Patcher::processVariables(FILE* file) {
-	uint32_t main_offset = 0;
-	fread_sdcard(&main_offset, 4, 1, file);
-	ValueType value_type{};
-	fread_sdcard(&value_type, 1, 1, file);
-	uint8_t elements = 0;
-	fread_sdcard(&elements, 1, 1, file);
-	const auto member_size = memberSize(value_type);
-	void* temp_buffer = calloc(elements, member_size);
-	fread_sdcard(temp_buffer, member_size, elements, file);
-	memcpy_unsafe(m_mappings.variables_start + main_offset, (u64)temp_buffer, elements * member_size);
+	OpHeader header;
+	fread_sdcard(&header, sizeof(OpHeader), 1, file);
+	const auto member_size = memberSize(header.value_type);
+	void* temp_buffer = calloc(header.elements, member_size);
+	fread_sdcard(temp_buffer, member_size, header.elements, file);
+	memcpy_unsafe(m_mappings.variables_start + header.main_offset, (uintptr_t)temp_buffer, member_size * header.elements);
 	free(temp_buffer);
 	return 0;
 }
@@ -265,36 +244,22 @@ Result Patcher::processVariables(FILE* file) {
 Result Patcher::processCodeCave(FILE* file) {
 	Region address_region{};
 	fread_sdcard(&address_region, 1, 1, file);
-	uint32_t main_offset = 0;
-	fread_sdcard(&main_offset, 4, 1, file);
-	[[maybe_unused]] uint8_t value_type = 0;
-	fread_sdcard(&value_type, 1, 1, file);
-	uint8_t elements = 0;
-	fread_sdcard(&elements, 1, 1, file);
+	OpHeader header;
+	fread_sdcard(&header, sizeof(OpHeader), 1, file);
 
-	struct codeCaveData {
-		CodeCaveAdjustmentType adjustment_type;
-		uint32_t instruction;
-	} PACKED;
-	static_assert(sizeof(codeCaveData) == 5);
-
-	codeCaveData* temp_buffer = (codeCaveData*)calloc(elements, sizeof(codeCaveData));
+	CodeCaveData* temp_buffer = (CodeCaveData*)calloc(header.elements, sizeof(CodeCaveData));
 	uint32_t* output = 0;
-	if (address_region == Region::CodeCave) output = (uint32_t*)(m_mappings.codeCave_start + main_offset);
-	else if (address_region == Region::Main) output = (uint32_t*)(m_mappings.main_start + main_offset);
+	if (address_region == Region::CodeCave) output = (uint32_t*)(m_mappings.codeCave_start + header.main_offset);
+	else if (address_region == Region::Main) output = (uint32_t*)(m_mappings.main_start + header.main_offset);
 	else return 0x321;
-	fread_sdcard(temp_buffer, sizeof(codeCaveData), elements, file);
-	for (size_t i = 0; i < elements; i++) {
+	fread_sdcard(temp_buffer, sizeof(CodeCaveData), header.elements, file);
+	for (size_t i = 0; i < header.elements; i++) {
 		switch (temp_buffer[i].adjustment_type) {
 			case CodeCaveAdjustmentType::None:
-				memcpy_unsafe((u64)&output[i], (u64)&temp_buffer[i].instruction, 4);
+				memcpy_unsafe((uintptr_t)&output[i], (uintptr_t)&temp_buffer[i].instruction, 4);
 				break;
 			case CodeCaveAdjustmentType::Branch_Direct: {
-				struct {
-					signed int imm: 26;
-					unsigned int opcode: 6;
-				} Branch;
-				static_assert(sizeof(Branch) == 4);
+				BranchOp Branch;
 				memcpy(&Branch, &temp_buffer[i].instruction, 4);
 				patch_addr_t current_address = (patch_addr_t)&output[i];
 				if (Branch.imm == -1) {
@@ -313,12 +278,12 @@ Result Patcher::processCodeCave(FILE* file) {
 					Branch.imm = offset / 4;
 				}
 				else if (address_region == Region::CodeCave) {
-					patch_addr_t jump_address = (patch_addr_t)(m_mappings.main_start + ((int64_t)(Branch.imm)*4 + (main_offset + (i*4))));
+					patch_addr_t jump_address = (patch_addr_t)(m_mappings.main_start + ((int64_t)(Branch.imm)*4 + (header.main_offset + (i*4))));
 					current_address = (patch_addr_t)&output[i];
 					ptrdiff_t offset = jump_address - current_address;
 					Branch.imm = offset / 4;
 				}
-				memcpy_unsafe((u64)&output[i], (u64)&Branch, 4);
+				memcpy_unsafe((uintptr_t)&output[i], (uintptr_t)&Branch, 4);
 				break;
 			}
 			case CodeCaveAdjustmentType::Adrp_CodeCave:
@@ -332,6 +297,7 @@ Result Patcher::processCodeCave(FILE* file) {
 					bool op: 1;
 				} ADRP;
 				static_assert(sizeof(ADRP) == 4);
+
 				memcpy(&ADRP, &temp_buffer[i].instruction, 4);
 				patch_addr_t current_address = (patch_addr_t)(&output[i]) & ~0xFFF;
 				patch_addr_t jump_address = 0;
@@ -350,21 +316,17 @@ Result Patcher::processCodeCave(FILE* file) {
 				}
 				ADRP.immlo = (offset % 0x4000) >> 12;
 				ADRP.immhi = (offset >> 14);
-				memcpy_unsafe((u64)&output[i], (u64)&ADRP, 4);
+				memcpy_unsafe((uintptr_t)&output[i], (uintptr_t)&ADRP, 4);
 				break;
 			}
 			case CodeCaveAdjustmentType::Branch_Relative: {
-				struct {
-					signed int imm: 26;
-					unsigned int opcode: 6;
-				} Branch;
-				static_assert(sizeof(Branch) == 4);
+				BranchOp Branch;
 				memcpy(&Branch, &temp_buffer[i].instruction, 4);
 				patch_addr_t current_address = (patch_addr_t)&output[i];
 				patch_addr_t jump_address = (patch_addr_t)(m_mappings.main_start + ((int64_t)(Branch.imm)*4) + (i*4));
 				ptrdiff_t offset = jump_address - current_address;
 				Branch.imm = offset / 4;
-				memcpy_unsafe((u64)&output[i], (u64)&Branch, 4);
+				memcpy_unsafe((uintptr_t)&output[i], (uintptr_t)&Branch, 4);
 				break;
 			}
 			default:
@@ -387,19 +349,14 @@ Result Patcher::applyMasterWrite(FILE* file, size_t master_offset) {
 		return 0x312;
 
 	MasterWriteOpcode OPCODE{};
-	Result rc = 0;
 	while (true) {
 		fread_sdcard(&OPCODE, 1, 1, file);
 		printf_sdcard("LOCK: processes opcode: %d, offset: 0x%x\n", OPCODE, ftell_sdcard(file));
-		switch (OPCODE) {
-			case MasterWriteOpcode::Bytes: {rc = processBytes(file); break;}
-#if defined(SWITCH) || defined(OUNCE)
-			case MasterWriteOpcode::Variables: {rc = processVariables(file); break;}
-			case MasterWriteOpcode::CodeCave: {rc = processCodeCave(file); break;}
-#endif
-			case MasterWriteOpcode::End: {m_masterWriteApplied = true; return 0;}
-			default: return 0x355;
-		}
+		if (OPCODE == MasterWriteOpcode::End) {m_masterWriteApplied = true; return 0;}
+		Result rc = 0xFF;
+		[&]<typename... M>(std::tuple<M...>) {
+			((OPCODE == M::val && (rc = (this->*M::func)(file), true)) || ...);
+		}(MasterWriteMappings{});
 		if (R_FAILED(rc)) return rc;
 	}
 }
@@ -421,18 +378,18 @@ Result Patcher::writeExprTo(double value, Writer& out, ValueType value_type) {
 			tmp.f = (float)value;	
 			break;
 		default:
-			switch(uint8_t(value_type) >> 4) {
+			switch(enum_val(value_type) >> 4) {
 				case 0: //unsigned
 					tmp.u = (uint64_t)value;
 					break;
 				case 1: //signed
 					tmp.i = (int64_t)value;
 					break;
-				default: return 4;
+				default: return 0x4;
 			}
 	}
 
-	out.copy(reinterpret_cast<const uint8_t*>(&tmp), memberSize(value_type));
+	out.copy((uint8_t*)(&tmp), memberSize(value_type));
 	return 0;
 }
 
@@ -446,6 +403,7 @@ double NOINLINE Patcher::evaluateExpression(const char* equation, double fps_tar
 	double FRAMETIME_TARGET = 1000.0 / fps_target;
 	double VSYNC_TARGET = (fps_target <= 60) ? trunc(60 / fps_target) : 1.0;
 	double INTERVAL_TARGET = (fps_target <= displaySync) ? trunc(displaySync / fps_target) : 1.0;
+	double REFRESH_RATE = displaySync;
 	te_variable vars[] = {
 		{"TruncDec", (const void*)TruncDec, TE_FUNCTION2},
 		{"FPS_TARGET", &FPS_TARGET, TE_VARIABLE},
@@ -453,7 +411,7 @@ double NOINLINE Patcher::evaluateExpression(const char* equation, double fps_tar
 		{"FRAMETIME_TARGET", &FRAMETIME_TARGET, TE_VARIABLE},
 		{"VSYNC_TARGET", &VSYNC_TARGET, TE_VARIABLE},
 		{"INTERVAL_TARGET", &INTERVAL_TARGET, TE_VARIABLE},
-		{"REFRESH_RATE", &displaySync, TE_VARIABLE}
+		{"REFRESH_RATE", &REFRESH_RATE, TE_VARIABLE}
 	};
 	te_expr *n = te_compile(equation, vars, std::size(vars), 0);
 	double evaluated_value = te_eval(n);
@@ -462,21 +420,18 @@ double NOINLINE Patcher::evaluateExpression(const char* equation, double fps_tar
 }
 
 void Patcher::copyAddress(Cursor& in, Writer& out) const {
-	if (m_gen == 4) out.write<uint8_t>(in.read<uint8_t>());
+	if (m_gen >= MAX_SUPPORTED_GEN) OUT_WRITE(uint8_t);
 	uint8_t address_count = in.read<uint8_t>();
-	out.write<uint8_t>(address_count);
-	out.write<uint8_t>(in.read<uint8_t>()); // address region
-	for (size_t i = 1; i < address_count; i++) {
-		out.write<uint32_t>(in.read<uint32_t>());
-	}
+	OUT_VAL(address_count);
+	OUT_WRITE(Region);
+	out.copy(in.take(sizeof(uint32_t)), address_count);
 }
 
-Result Patcher::copyValues(Cursor& in, Writer& out, bool evaluate,
-                           uint8_t FPS, uint8_t refreshRate) const {
+Result Patcher::copyValues(Cursor& in, Writer& out, bool evaluate, uint8_t FPS, uint8_t refreshRate) const {
 	ValueType value_type = in.read<ValueType>();
-	out.write<uint8_t>((uint8_t)value_type);
+	OUT_VAL(value_type);
 	uint8_t value_count = in.read<uint8_t>();
-	out.write<uint8_t>(value_count);
+	OUT_VAL(value_count);
 
 	if (!evaluate) {
 		const auto array_size = memberSize(value_type) * value_count;
@@ -492,8 +447,7 @@ Result Patcher::copyValues(Cursor& in, Writer& out, bool evaluate,
 	return 0;
 }
 
-Result NOINLINE Patcher::convertPatchToFPSTarget(uint8_t* out_buffer, const uint8_t* in_buffer,
-                                                 uint8_t FPS, uint8_t refreshRate) {
+Result NOINLINE Patcher::convertPatchToFPSTarget(uint8_t* out_buffer, const uint8_t* in_buffer, uint8_t FPS, uint8_t refreshRate) {
 	uint32_t header_size = 0;
 	memcpy(&header_size, &in_buffer[8], 4);
 	memcpy(out_buffer, in_buffer, header_size);
@@ -506,7 +460,7 @@ Result NOINLINE Patcher::convertPatchToFPSTarget(uint8_t* out_buffer, const uint
 		switch (OPCODE) {
 			case AllFpsOpcode::Write:
 			case AllFpsOpcode::Eval_Write: {
-				out.write<uint8_t>((uint8_t)OPCODE & 0x7F);
+				OUT_VAL(enum_val(OPCODE) & 0x7F);
 				copyAddress(in, out);
 				Result rc = copyValues(in, out, OPCODE == AllFpsOpcode::Eval_Write, FPS, refreshRate);
 				if (R_FAILED(rc)) return rc;
@@ -514,11 +468,11 @@ Result NOINLINE Patcher::convertPatchToFPSTarget(uint8_t* out_buffer, const uint
 			}
 			case AllFpsOpcode::Compare:
 			case AllFpsOpcode::Eval_Compare: {
-				out.write<uint8_t>((uint8_t)OPCODE & 0x7F);
+				OUT_VAL(enum_val(OPCODE) & 0x7F);
 				copyAddress(in, out);
-				out.write<uint8_t>(in.read<uint8_t>()); // compare_type
+				OUT_WRITE(CompareType);
 				const auto value_type = in.read<ValueType>();
-				out.write<uint8_t>((uint8_t)value_type);
+				OUT_VAL(value_type);
 				const auto member_size = memberSize(value_type);
 				out.copy(in.take(member_size), member_size);
 				copyAddress(in, out);
@@ -527,11 +481,11 @@ Result NOINLINE Patcher::convertPatchToFPSTarget(uint8_t* out_buffer, const uint
 				break;
 			}
 			case AllFpsOpcode::Block:
-				out.write<uint8_t>((uint8_t)OPCODE);
-				out.write<uint8_t>(in.read<uint8_t>());
+				OUT_WRITE(AllFpsOpcode);
+				OUT_WRITE(BlockOpcodeWhatType);
 				break;
 			case AllFpsOpcode::End:
-				out.write<uint8_t>((uint8_t)OPCODE);
+				OUT_WRITE(AllFpsOpcode);
 				return 0;
 			default:
 				return 0x2002;
@@ -542,7 +496,7 @@ Result NOINLINE Patcher::convertPatchToFPSTarget(uint8_t* out_buffer, const uint
 Result Patcher::execWrite(Cursor& cursor) {
 	patch_addr_t address = getAddress(cursor);
 #if defined(SWITCH) || defined(OUNCE)
-	if (address < 0) return 6;
+	if (address < 0) return 0x6;
 #endif
 
 	const ValueType value_type = cursor.read<LOCK::ValueType>();
@@ -567,35 +521,21 @@ Result Patcher::execWrite(Cursor& cursor) {
 Result Patcher::execCompare(Cursor& cursor) {
 	patch_addr_t address = getAddress(cursor);
 #if defined(SWITCH) || defined(OUNCE)
-	if (address < 0) return 6;
+	if (address < 0) return 0x6;
 #endif
 
 	const auto compare_type = cursor.read<CompareType>();
 	ValueType value_type = cursor.read<ValueType>();
 	bool passed = false;
 
-	auto doCompare = [&]<typename T>(std::in_place_type_t<T>) {
-		passed = compareValues(*reinterpret_cast<const T*>(address), cursor.read<T>(), compare_type);
-	};
-
-	switch (value_type) {
-		case ValueType::U8:  doCompare(std::in_place_type<uint8_t>);  break;
-		case ValueType::U16: doCompare(std::in_place_type<uint16_t>); break;
-		case ValueType::U32: doCompare(std::in_place_type<uint32_t>); break;
-		case ValueType::U64: doCompare(std::in_place_type<uint64_t>); break;
-		case ValueType::S8:  doCompare(std::in_place_type<int8_t>);   break;
-		case ValueType::S16: doCompare(std::in_place_type<int16_t>);  break;
-		case ValueType::S32: doCompare(std::in_place_type<int32_t>);  break;
-		case ValueType::S64: doCompare(std::in_place_type<int64_t>);  break;
-		case ValueType::F32: doCompare(std::in_place_type<float>);    break;
-		case ValueType::F64: doCompare(std::in_place_type<double>);   break;
-		default:
-			return 8;
-	}
+	bool found = [&]<typename... M>(std::tuple<M...>) { 
+		return (... || (value_type == M::val ? (compareValues(*(typename M::type*)(address), cursor.read<typename M::type>(), compare_type), true) : false)); 
+	} (TypeMappings{});
+	if (!found) return 0x8;
 
 	address = getAddress(cursor);
 #if defined(SWITCH) || defined(OUNCE)
-	if (address < 0) return 6;
+	if (address < 0) return 0x6;
 #endif
 	value_type = cursor.read<ValueType>();
 	const auto loops = cursor.read<uint8_t>();
@@ -611,7 +551,7 @@ Result Patcher::execCompare(Cursor& cursor) {
 	if (!address) return 0x3007;
 	const auto member_size = memberSize(value_type);
 	if (!validMemberSize(member_size))
-		return 9;
+		return 0x9;
 	const auto array_size = member_size * loops;
 	const auto source = cursor.take(array_size);
 	if (passed) memcpy((void*)address, source, array_size);
@@ -624,7 +564,7 @@ Result Patcher::execBlock(Cursor& cursor) {
 			m_blockDelayFPS = true;
 			return 0;
 		default:
-			return 7;
+			return 0x7;
 	}
 }
 
@@ -654,17 +594,13 @@ Result Patcher::applyPatch(uint8_t FPS, uint8_t refreshRate) {
 	uint32_t start_offset = 0;
 	memcpy(&start_offset, &m_compiled[0x8], sizeof(start_offset));
 	Cursor cursor(m_compiled, start_offset);
-
 	while (true) {
 		const auto OPCODE = cursor.read<AllFpsOpcode>();
-		Result rc = 0;
-		switch (OPCODE) {
-			case AllFpsOpcode::Write:  rc = execWrite(cursor);   break;
-			case AllFpsOpcode::Compare:  rc = execCompare(cursor); break;
-			case AllFpsOpcode::Block:  rc = execBlock(cursor);   break;
-			case AllFpsOpcode::End: return 0;
-			default: return 255;
-		}
+		if (OPCODE == AllFpsOpcode::End) return 0;
+		Result rc = 0xFF;
+		[&]<typename... M>(std::tuple<M...>) {
+			((OPCODE == M::val && (rc = (this->*M::func)(cursor), true)) || ...);
+		}(PostAllFpsMappings{});
 		if (R_FAILED(rc)) return rc;
 	}
 }
