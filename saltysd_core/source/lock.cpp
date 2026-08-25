@@ -166,7 +166,7 @@ patch_addr_t NOINLINE Patcher::getAddress(Cursor& cursor) const {
 	Region region = cursor.read<Region>();
 	offsets_count -= 1;
 
-	if (region > std::tuple_element_t<std::tuple_size_v<RegionMappings> - 1, RegionMappings>::val)
+	if (region >= Region::Total)
 		return -1;
 	
 	int64_t address = [&]<typename... M>(std::tuple<M...>) {

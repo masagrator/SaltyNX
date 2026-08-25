@@ -42,14 +42,15 @@ namespace LOCK {
 #endif
 
 	enum class Region : uint8_t {
-		Absolute  = 0,
-		Main      = 1,
-		Heap      = 2,
-		Alias     = 3,
+		Absolute,
+		Main,
+		Heap,
+		Alias,
 #if defined(SWITCH) || defined(OUNCE)
-		Variables = 4,
-		CodeCave  = 5,
+		Variables,
+		CodeCave,
 #endif
+		Total
 	};
 	static_assert(sizeof(Region) == 1);
 
