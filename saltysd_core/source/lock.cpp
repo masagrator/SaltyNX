@@ -102,7 +102,7 @@ namespace {
 		out.template write<decltype(in)>(in);
 	}
 
-	#define OUT_WRITE(T) outWriteType<T>(in, out)
+	#define OUT_TYPE(T) outWriteType<T>(in, out)
 	#define OUT_VAL(in) outWriteVal(in, out)
 }
 
@@ -302,17 +302,15 @@ Result Patcher::processCodeCave(FILE* file) {
 				patch_addr_t current_address = (patch_addr_t)(&output[i]) & ~0xFFF;
 				patch_addr_t jump_address = 0;
 				ptrdiff_t offset = 0;
-				if (temp_buffer[i].adjustment_type == CodeCaveAdjustmentType::Adrp_CodeCave) {
-					jump_address = (patch_addr_t)m_mappings.codeCave_start;
-					offset = jump_address - current_address;
-				}
-				else if (temp_buffer[i].adjustment_type == CodeCaveAdjustmentType::Adrp_Variables) {
-					jump_address = (patch_addr_t)m_mappings.variables_start;
-					offset = jump_address - current_address;
-				}
-				else if (temp_buffer[i].adjustment_type == CodeCaveAdjustmentType::Adrp_MainFromCodeCave) {
-					jump_address = (patch_addr_t)(((uintptr_t)ADRP.immlo << 12) + ((uintptr_t)ADRP.immhi << 14));
-					offset = jump_address + (m_mappings.main_start - m_mappings.codeCave_start);
+				switch(temp_buffer[i].adjustment_type) {
+					case CodeCaveAdjustmentType::Adrp_CodeCave: 
+						jump_address = (patch_addr_t)m_mappings.codeCave_start; offset = jump_address - current_address; break;
+					case CodeCaveAdjustmentType::Adrp_Variables: 
+						jump_address = (patch_addr_t)m_mappings.variables_start; offset = jump_address - current_address; break;
+					case CodeCaveAdjustmentType::Adrp_MainFromCodeCave:
+						jump_address = (patch_addr_t)(((uintptr_t)ADRP.immlo << 12) + ((uintptr_t)ADRP.immhi << 14)); 
+						offset = jump_address + (m_mappings.main_start - m_mappings.codeCave_start); break;
+					default: return 0x346;
 				}
 				ADRP.immlo = (offset % 0x4000) >> 12;
 				ADRP.immhi = (offset >> 14);
@@ -420,10 +418,10 @@ double NOINLINE Patcher::evaluateExpression(const char* equation, double fps_tar
 }
 
 void Patcher::copyAddress(Cursor& in, Writer& out) const {
-	if (m_gen >= MAX_SUPPORTED_GEN) OUT_WRITE(uint8_t);
+	if (m_gen >= MAX_SUPPORTED_GEN) OUT_TYPE(uint8_t);
 	uint8_t address_count = in.read<uint8_t>();
 	OUT_VAL(address_count);
-	OUT_WRITE(Region);
+	OUT_TYPE(Region);
 	out.copy(in.take(sizeof(uint32_t)), address_count);
 }
 
@@ -470,7 +468,7 @@ Result NOINLINE Patcher::convertPatchToFPSTarget(uint8_t* out_buffer, const uint
 			case AllFpsOpcode::Eval_Compare: {
 				OUT_VAL(enum_val(OPCODE) & 0x7F);
 				copyAddress(in, out);
-				OUT_WRITE(CompareType);
+				OUT_TYPE(CompareType);
 				const auto value_type = in.read<ValueType>();
 				OUT_VAL(value_type);
 				const auto member_size = memberSize(value_type);
@@ -481,11 +479,11 @@ Result NOINLINE Patcher::convertPatchToFPSTarget(uint8_t* out_buffer, const uint
 				break;
 			}
 			case AllFpsOpcode::Block:
-				OUT_WRITE(AllFpsOpcode);
-				OUT_WRITE(BlockOpcodeWhatType);
+				OUT_TYPE(AllFpsOpcode);
+				OUT_TYPE(BlockOpcodeWhatType);
 				break;
 			case AllFpsOpcode::End:
-				OUT_WRITE(AllFpsOpcode);
+				OUT_TYPE(AllFpsOpcode);
 				return 0;
 			default:
 				return 0x2002;
