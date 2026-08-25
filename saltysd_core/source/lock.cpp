@@ -421,6 +421,7 @@ void Patcher::copyAddress(Cursor& in, Writer& out) const {
 		OUT_TYPE(uint32_t);
 	}
 }
+#define OUT_ADDRESS() copyAddress(in, out)
 
 Result Patcher::copyValues(Cursor& in, Writer& out, bool evaluate, uint8_t FPS, uint8_t refreshRate) const {
 	ValueType value_type = in.read<ValueType>();
@@ -460,7 +461,7 @@ Result NOINLINE Patcher::convertPatchToFPSTarget(uint8_t* out_buffer, const uint
 				[[fallthrough]];
 			case AllFpsOpcode::Write: {
 				OUT_VAL(OPCODE);
-				copyAddress(in, out);
+				OUT_ADDRESS();
 				Result rc = copyValues(in, out, evaluate, FPS, refreshRate);
 				if (R_FAILED(rc)) return rc;
 				break;
@@ -471,13 +472,13 @@ Result NOINLINE Patcher::convertPatchToFPSTarget(uint8_t* out_buffer, const uint
 				[[fallthrough]];
 			case AllFpsOpcode::Compare: {
 				OUT_VAL(OPCODE);
-				copyAddress(in, out);
+				OUT_ADDRESS();
 				OUT_TYPE(CompareType);
 				const auto value_type = in.read<ValueType>();
 				OUT_VAL(value_type);
 				const auto member_size = memberSize(value_type);
 				out.copy(in.take(member_size), member_size);
-				copyAddress(in, out);
+				OUT_ADDRESS();
 				Result rc = copyValues(in, out, evaluate, FPS, refreshRate);
 				if (R_FAILED(rc)) return rc;
 				break;
