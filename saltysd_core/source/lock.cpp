@@ -363,7 +363,7 @@ Result Patcher::writeExprTo(double value, Writer& out, ValueType value_type) {
 	} tmp;
 
 	switch (value_type) {
-		case ValueType::F64:
+		case ValueType::F64: [[fallthrough]];
 		case ValueType::RefreshRate:
 			tmp.d = value;
 			break;
