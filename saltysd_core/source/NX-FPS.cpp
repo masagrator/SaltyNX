@@ -18,7 +18,7 @@
 #include "nanoprintf.h"
 
 namespace LOCK {
-	constinit Patcher patcher;
+	constinit LOCK::Patcher patcher;
 }
 
 struct runtime_replace {
@@ -110,7 +110,7 @@ struct NxFpsSharedBlock {
 			char reserved[8];
 		} Vulkan;
 	} PerfCounters;
-} PACKED;
+} NX_PACKED;
 
 static_assert(sizeof(NxFpsSharedBlock) == 310);
 

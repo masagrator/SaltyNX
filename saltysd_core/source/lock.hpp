@@ -14,6 +14,12 @@
 	#error "Unsupported base architecture!"
 #endif
 
+#if !defined(HOST_BUILD) && !defined(SWITCH_BUILD)
+#define SWITCH_BUILD
+#define SWITCH_64BIT
+#define SWITCH
+#endif
+
 #if defined(SWITCH32)
 #include <switch_min.h>
 #elif defined(SWITCH)
@@ -77,10 +83,10 @@ namespace Host {
 #define NOINLINE __attribute__ ((noinline))
 #endif
 
-#if defined(SWITCH)
-#define PACKED NX_PACKED
+#if defined(SWITCH32)
+#define NX_PACKED PACKED
 #elif defined(HOST_BUILD)
-#define PACKED __attribute__((packed))
+#define NX_PACKED __attribute__((packed))
 #endif
 
 #ifdef LOCK_ABI64
@@ -188,13 +194,13 @@ namespace LOCK {
 		uint32_t main_offset;
 		ValueType value_type;
 		uint8_t elements;
-	} PACKED;
+	} NX_PACKED;
 	static_assert(sizeof(OpHeader) == 6);
 
 	struct CodeCaveData {
 		CodeCaveAdjustmentType adjustment_type;
 		uint32_t instruction;
-	} PACKED;
+	} NX_PACKED;
 	static_assert(sizeof(CodeCaveData) == 5);
 
 	struct BranchOp {

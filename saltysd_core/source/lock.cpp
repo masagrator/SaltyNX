@@ -7,6 +7,11 @@
 #include <cstring>
 #include <utility>
 
+#if !defined(HOST_BUILD) && !defined(SWITCH_BUILD)
+#define SWITCH_BUILD
+#define SWITCH_64BIT
+#endif
+
 #ifdef SWITCH_BUILD
 #include "saltysd_core.h"
 #include "saltysd_ipc.h"
