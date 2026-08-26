@@ -11,7 +11,19 @@
 #include "saltysd_ipc.h"
 #include "useful.h"
 
+#if defined(SWITCH) || defined(OUNCE) || defined(SWITCH32) || defined(OUNCE32)
+#define SWITCH_BUILD
+#else
+#error "Undefined architecture!"
+#endif
+
 #if defined(SWITCH) || defined(OUNCE)
+#define SWITCH_64BIT
+#elif defined(OUNCE32) || defined(SWITCH32)
+#define SWITCH_32BIT
+#endif
+
+#ifdef SWITCH_64BIT
 extern "C" void codeCave();
 //We need to define something in that section and reference its pointer to not get whole section discarded by garbage collector
 //Trick to get section page aligned to 0x1000 with size 0x1000 without using linker script
@@ -42,14 +54,15 @@ namespace {
 
 	bool NOINLINE isAddressValid(patch_addr_t address_in) {
 
+#ifdef SWITCH_BUILD
 		int64_t address = address_in;
 		MemoryInfo memoryinfo = {0};
 		uint32_t pageinfo = 0;
 
-	#if defined(SWITCH) || defined(OUNCE)
+	#if defined(SWITCH_64BIT)
 		#define MIN_ASLR_ADDRESS 0x8000000
 		#define MAX_ASLR_ADDRESS 0x7FFFFFFFFF
-	#else
+	#elif defined(SWITCH_32BIT)
 		#define MIN_ASLR_ADDRESS 0x200000
 		#define MAX_ASLR_ADDRESS 0xFFFFFFFF
 	#endif
@@ -60,32 +73,59 @@ namespace {
 		if ((memoryinfo.perm & Perm_Rw) && ((address - memoryinfo.addr >= 0) && (address - memoryinfo.addr <= memoryinfo.size)))
 			return true;
 		return false;
+#else
+		#error "isAddressValid function is not defined!"
+#endif
 	}
 
 	inline FILE* fopen_sdcard(const char* path, const char* mode) {
+		#ifdef SWITCH_BUILD
 		return SaltySDCore_fopen(path, mode);
+		#else
+		return fopen(path, mode);
+		#endif
 	}
 
 	inline size_t fread_sdcard(void* ptr, size_t size, size_t count, FILE* stream) {
+		#ifdef SWITCH_BUILD
 		return SaltySDCore_fread(ptr, size, count, stream);
+		#else
+		return fread(ptr, size, count, stream);
+		#endif
 	}
 
 	inline int fseek_sdcard(FILE* stream, int64_t offset, int origin) {
+		#ifdef SWITCH_BUILD
 		return SaltySDCore_fseek(stream, offset, origin);
+		#else
+		return fseek(stream, offset, origin);
+		#endif
 	}
 
 	inline size_t ftell_sdcard(FILE* stream) {
+		#ifdef SWITCH_BUILD
 		return SaltySDCore_ftell(stream); 
+		#else
+		return ftell(stream);
+		#endif
 	}
 
 	inline int fclose_sdcard(FILE* stream) {
+		#ifdef SWITCH_BUILD
 		return SaltySDCore_fclose(stream); 
+		#else
+		return fclose(stream);
+		#endif
 	}
 
 	#define printf_sdcard SaltySDCore_printf
 
 	inline Result memcpy_unsafe(uintptr_t to, uintptr_t from, size_t size) {
+		#ifdef SWITCH_BUILD
 		return SaltySD_Memcpy(to, from, size);
+		#else
+		#error "memcpy_unsafe function is not defined!"
+		#endif
 	}
 
 	template <typename T>
@@ -136,7 +176,7 @@ void Patcher::Writer::copy(const uint8_t* src, size_t bytes) {
 
 void Patcher::bindMainRegion(intptr_t main_start) {
 	m_mappings.main_start = main_start;
-#if defined(SWITCH) || defined(OUNCE)
+#ifdef SWITCH_64BIT
 	m_mappings.variables_start = (intptr_t)&variables_buffer[0];
 	m_mappings.codeCave_start  = (intptr_t)&codeCave;
 #endif
@@ -169,10 +209,10 @@ patch_addr_t NOINLINE Patcher::getAddress(Cursor& cursor) const {
 	}(RegionMappings{});
 
 	for (int i = 0; i < offsets_count; i++) {
-#if defined(SWITCH32) || defined(OUNCE32)
+#if defined(SWITCH_32BIT)
 		int32_t temp_offset = cursor.read<int32_t>();
 		address += temp_offset;
-#else
+#elif defined(SWITCH_64BIT)
 		uint32_t temp_offset = cursor.read<uint32_t>();
 		if (region > Region::Absolute && region < Region::Variables) {
 			int32_t temp_offset_int = 0;
@@ -223,7 +263,7 @@ Result Patcher::processBytes(FILE* file) {
 	return 0;
 }
 
-#if defined(SWITCH) || defined(OUNCE)
+#ifdef SWITCH_64BIT
 
 Result Patcher::processVariables(FILE* file) {
 	OpHeader header;
@@ -498,7 +538,7 @@ Result NOINLINE Patcher::convertPatchToFPSTarget(uint8_t* out_buffer, const uint
 
 Result Patcher::execWrite(Cursor& cursor) {
 	patch_addr_t address = getAddress(cursor);
-#if defined(SWITCH) || defined(OUNCE)
+#ifdef SWITCH_64BIT
 	if (address < 0) return 0x6;
 #endif
 
@@ -523,7 +563,7 @@ Result Patcher::execWrite(Cursor& cursor) {
 
 Result Patcher::execCompare(Cursor& cursor) {
 	patch_addr_t address = getAddress(cursor);
-#if defined(SWITCH) || defined(OUNCE)
+#ifdef SWITCH_64BIT
 	if (address < 0) return 0x6;
 #endif
 
@@ -537,7 +577,7 @@ Result Patcher::execCompare(Cursor& cursor) {
 	if (!found) return 0x8;
 
 	address = getAddress(cursor);
-#if defined(SWITCH) || defined(OUNCE)
+#ifdef SWITCH_64BIT
 	if (address < 0) return 0x6;
 #endif
 	value_type = cursor.read<ValueType>();
