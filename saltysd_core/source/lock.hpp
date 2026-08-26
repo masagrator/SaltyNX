@@ -19,9 +19,6 @@
 #elif defined(SWITCH)
 #include <switch.h>
 #elif defined(SWITCH_BUILD)
-// OUNCE / OUNCE32 are placeholders: they select the right ABI above but there is
-// no platform header for them yet. Fail here with something readable rather than
-// letting Result, PACKED and the static_asserts collapse one after another.
 #error "OUNCE/OUNCE32 are placeholders and cannot be built yet!"
 #endif
 
