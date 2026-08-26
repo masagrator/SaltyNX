@@ -1,26 +1,5 @@
 #pragma once
 
-// ---------------------------------------------------------------------------
-// Platform / ABI selection
-// ---------------------------------------------------------------------------
-// Two independent axes:
-//
-//   SWITCH_BUILD  - we are building for real hardware, so the SaltySD services
-//                   (SaltySDCore_f*, SaltySD_Memcpy, svcQueryMemory, ...) exist.
-//   HOST_BUILD    - we are building the offline patch validator that runs on a
-//                   normal desktop/CI machine. There is no game process, so the
-//                   host shim in "lock_host.hpp" supplies a sandboxed stand-in
-//                   for the game's address space.
-//
-//   LOCK_ABI64    - the patch file ABI to speak: 64-bit addresses plus the
-//                   Variables and CodeCave regions. HOST_BUILD always emulates a
-//                   64-bit Switch, because that is the ABI FPSLocker emits.
-//   LOCK_ABI32    - the 32-bit (A32 title) patch file ABI.
-//
-// Keeping this derivation in the header means lock.hpp and lock.cpp can never
-// disagree about which fields exist in the structures they share.
-// ---------------------------------------------------------------------------
-
 #if defined(SWITCH32) || defined(OUNCE32)
 	#define SWITCH_BUILD
 	#define SWITCH_32BIT
