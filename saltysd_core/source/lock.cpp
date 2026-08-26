@@ -691,13 +691,13 @@ double NOINLINE Patcher::evaluateExpression(const char* equation, double fps_tar
 	double INTERVAL_TARGET = (fps_target <= displaySync) ? trunc(displaySync / fps_target) : 1.0;
 	double REFRESH_RATE = displaySync;
 	te_variable vars[] = {
-		{"TruncDec", (const void*)TruncDec, TE_FUNCTION2},
-		{"FPS_TARGET", &FPS_TARGET, TE_VARIABLE},
-		{"FPS_LOCK_TARGET", &FPS_LOCK_TARGET, TE_VARIABLE},
-		{"FRAMETIME_TARGET", &FRAMETIME_TARGET, TE_VARIABLE},
-		{"VSYNC_TARGET", &VSYNC_TARGET, TE_VARIABLE},
-		{"INTERVAL_TARGET", &INTERVAL_TARGET, TE_VARIABLE},
-		{"REFRESH_RATE", &REFRESH_RATE, TE_VARIABLE}
+		{"TruncDec", (const void*)TruncDec, TE_FUNCTION2, nullptr},
+		{"FPS_TARGET", &FPS_TARGET, TE_VARIABLE, nullptr},
+		{"FPS_LOCK_TARGET", &FPS_LOCK_TARGET, TE_VARIABLE, nullptr},
+		{"FRAMETIME_TARGET", &FRAMETIME_TARGET, TE_VARIABLE, nullptr},
+		{"VSYNC_TARGET", &VSYNC_TARGET, TE_VARIABLE, nullptr},
+		{"INTERVAL_TARGET", &INTERVAL_TARGET, TE_VARIABLE, nullptr},
+		{"REFRESH_RATE", &REFRESH_RATE, TE_VARIABLE, nullptr}
 	};
 #ifdef HOST_BUILD
 	int error_pos = 0;
