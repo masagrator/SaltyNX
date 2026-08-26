@@ -94,16 +94,8 @@ namespace {
 
 	std::vector<std::string> g_errors;
 
-	// Slot address -> the target that slot dereferences to. See loadPointer().
 	std::unordered_map<intptr_t, intptr_t> g_pointees;
 
-	// Materialised targets are spread across the pointee arena rather than
-	// stacked on one address, so that data written through one chain does not
-	// sit on top of another chain's target. The observed corpus applies offsets
-	// of -27.5 MiB to +916 KiB after a dereference; a 4 MiB stride plus 64 MiB
-	// of headroom below the first target keeps those landing inside the
-	// reservation. The index wraps, which is harmless: colliding *data* is fine,
-	// only colliding pointer bookkeeping was ever the problem.
 	constexpr size_t POINTEE_HEADROOM = 64 * MiB;
 	constexpr size_t POINTEE_STRIDE   = 4 * MiB;
 	constexpr size_t POINTEE_SLOTS    = 96;
@@ -113,16 +105,11 @@ namespace {
 			g_base + POINTEE_OFF + POINTEE_HEADROOM +
 			(index % POINTEE_SLOTS) * POINTEE_STRIDE);
 	}
-
-	// Cap the log so one pathological file cannot produce unbounded output.
 	constexpr size_t MAX_ERRORS = 64;
 
 	std::set<std::string> g_seen;
 
 	void record(const std::string& msg) {
-		// The patch is applied once per FPS/refresh-rate combination, so the same
-		// underlying defect surfaces several times. Report each distinct problem
-		// once; the count of combinations it affects adds nothing.
 		if (!g_seen.insert(msg).second)
 			return;
 		if (g_errors.size() < MAX_ERRORS)
@@ -150,10 +137,6 @@ namespace {
 	}
 }
 
-// -------------------------------------------------------------------------
-// Lifecycle
-// -------------------------------------------------------------------------
-
 bool createSandbox() {
 	if (g_base) return true;
 	void* p = mmap(nullptr, TOTAL_SIZE, PROT_READ | PROT_WRITE,
@@ -179,10 +162,6 @@ uintptr_t aliasRegion()     { return reinterpret_cast<uintptr_t>(g_base + ALIAS_
 intptr_t  variablesRegion() { return reinterpret_cast<intptr_t>(g_base + VARS_OFF); }
 intptr_t  codeCaveRegion()  { return reinterpret_cast<intptr_t>(g_base + CAVE_OFF); }
 
-// -------------------------------------------------------------------------
-// Hooks used by lock.cpp
-// -------------------------------------------------------------------------
-
 bool isMapped(intptr_t addr, size_t len) {
 	return inSandbox(static_cast<uintptr_t>(addr), len);
 }
@@ -199,21 +178,9 @@ Result writeMemory(uintptr_t to, uintptr_t from, size_t size) {
 intptr_t loadPointer(intptr_t addr) {
 	if (!inSandbox(static_cast<uintptr_t>(addr), sizeof(intptr_t))) {
 		reportBadRead(addr);
-		// Hand back a usable target anyway: the caller may not be validating
-		// this link, and returning garbage would turn a reportable problem into
-		// a segfault that hides every later finding in the same file.
 		return pointeeTarget(0);
 	}
 
-	// Deliberately NOT read out of sandbox memory.
-	//
-	// On hardware the game has already stored a real pointer at this slot, and
-	// the patch's own writes never land on the game's pointer tables. Here the
-	// slot starts out zeroed and the patch *does* write through these chains, so
-	// reading memory back would let one chain's data (an evaluated FPS double,
-	// say) be re-read as another chain's pointer. Keeping the mapping in a side
-	// table makes every chain resolve to a stable, distinct target that patch
-	// data can never clobber.
 	auto it = g_pointees.find(addr);
 	if (it != g_pointees.end())
 		return it->second;
@@ -230,10 +197,6 @@ void logf(const char* fmt, ...) {
 	vfprintf(stderr, fmt, ap);
 	va_end(ap);
 }
-
-// -------------------------------------------------------------------------
-// Diagnostics
-// -------------------------------------------------------------------------
 
 void reportExpressionError(const char* equation, int error_pos) {
 	recordf("expression does not parse (at character %d): \"%s\"", error_pos, equation);
@@ -274,11 +237,6 @@ void resetErrors() { g_errors.clear(); g_seen.clear(); }
 
 }
 
-
-// Symbols processCodeCave() takes the address of when relocating CodeCave
-// branches. On hardware these are real SaltyNX routines; the validator only
-// needs them to exist so that `&Utils::_convertToTimeSpan` and friends yield a
-// sane address for the branch-offset arithmetic. Nothing calls them.
 namespace Utils {
 	uint64_t _convertToTimeSpan(uint64_t tick) { return tick; }
 }
@@ -320,8 +278,6 @@ namespace {
 			return true;
 		return false;
 #elif defined(HOST_BUILD)
-		// The sandbox is the stand-in for the game's address space: an address is
-		// valid exactly when it lands inside one of the emulated regions.
 		return Host::isMapped(address_in, sizeof(patch_addr_t));
 #else
 		#error "isAddressValid function is not defined!"
@@ -387,12 +343,6 @@ namespace {
 	}
 
 #ifdef HOST_BUILD
-	// execWrite/execCompare touch the target directly (on hardware the plugin
-	// lives in the game's own address space, so there is no IPC involved). In
-	// the validator a resolved address can fall outside the emulated space -
-	// through a corrupt file, or simply an offset larger than the window we
-	// reserve - and a raw memcpy would segfault with no diagnostic. Report and
-	// bail instead.
 	#define HOST_REQUIRE_MAPPED(addr, len) \
 		do { \
 			if (!Host::isMapped((intptr_t)(addr), (len))) { \
@@ -892,7 +842,6 @@ Result Patcher::execCompare(Cursor& cursor) {
 	ValueType value_type = cursor.read<ValueType>();
 	bool passed = false;
 
-	// The fold below dereferences `address`; make sure that is safe first.
 	HOST_REQUIRE_MAPPED(address, memberSize(value_type) ? memberSize(value_type) : 1);
 
 	bool found = [&]<typename... M>(std::tuple<M...>) { 
@@ -948,7 +897,6 @@ Result Patcher::applyPatch(uint8_t FPS, uint8_t refreshRate) {
 			free(m_compiled);
 		}
 #ifdef HOST_BUILD
-		// Padding so that an undersized m_compiledSize is reported rather than smashing the heap.
 		m_compiled = (uint8_t*)malloc(m_compiledSize + HOST_COMPILED_SLACK);
 #else
 		m_compiled = (uint8_t*)malloc(m_compiledSize);
