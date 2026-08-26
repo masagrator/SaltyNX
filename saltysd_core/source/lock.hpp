@@ -1,11 +1,49 @@
 #pragma once
 
+// ---------------------------------------------------------------------------
+// Platform / ABI selection
+// ---------------------------------------------------------------------------
+// Two independent axes:
+//
+//   SWITCH_BUILD  - we are building for real hardware, so the SaltySD services
+//                   (SaltySDCore_f*, SaltySD_Memcpy, svcQueryMemory, ...) exist.
+//   HOST_BUILD    - we are building the offline patch validator that runs on a
+//                   normal desktop/CI machine. There is no game process, so the
+//                   host shim in "lock_host.hpp" supplies a sandboxed stand-in
+//                   for the game's address space.
+//
+//   LOCK_ABI64    - the patch file ABI to speak: 64-bit addresses plus the
+//                   Variables and CodeCave regions. HOST_BUILD always emulates a
+//                   64-bit Switch, because that is the ABI FPSLocker emits.
+//   LOCK_ABI32    - the 32-bit (A32 title) patch file ABI.
+//
+// Keeping this derivation in the header means lock.hpp and lock.cpp can never
+// disagree about which fields exist in the structures they share.
+// ---------------------------------------------------------------------------
+
+#if defined(SWITCH32) || defined(OUNCE32)
+	#define SWITCH_BUILD
+	#define SWITCH_32BIT
+	#define LOCK_ABI32
+#elif defined(SWITCH) || defined(OUNCE)
+	#define SWITCH_BUILD
+	#define SWITCH_64BIT
+	#define LOCK_ABI64
+#elif defined(HOST_BUILD)
+	#define LOCK_ABI64
+#else
+	#error "Unsupported base architecture!"
+#endif
+
 #if defined(SWITCH32)
 #include <switch_min.h>
 #elif defined(SWITCH)
 #include <switch.h>
-#else
-#error "Unsupported base architecture!"
+#elif defined(SWITCH_BUILD)
+// OUNCE / OUNCE32 are placeholders: they select the right ABI above but there is
+// no platform header for them yet. Fail here with something readable rather than
+// letting Result, PACKED and the static_asserts collapse one after another.
+#error "OUNCE/OUNCE32 are placeholders and cannot be built yet!"
 #endif
 
 #include <cstddef>
@@ -14,13 +52,62 @@
 #include <tuple>
 #include <functional>
 
+#ifdef HOST_BUILD
+#ifndef LOCK_HOST_RESULT_DEFINED
+#define LOCK_HOST_RESULT_DEFINED
+typedef uint32_t Result;
+#endif
+#ifndef R_FAILED
+#define R_FAILED(res)      ((res)!=0)
+#endif
+#ifndef R_SUCCEEDED
+#define R_SUCCEEDED(res)   ((res)==0)
+#endif
+
+namespace Host {
+
+	bool createSandbox();
+	void destroySandbox();
+
+	intptr_t  mainRegion();
+	uintptr_t heapRegion();
+	uintptr_t aliasRegion();
+	intptr_t  variablesRegion();
+	intptr_t  codeCaveRegion();
+
+	bool isMapped(intptr_t addr, size_t len);
+	Result writeMemory(uintptr_t to, uintptr_t from, size_t size);
+	intptr_t loadPointer(intptr_t addr);
+
+	__attribute__((format(printf, 1, 2)))
+	void logf(const char* fmt, ...);
+
+	void reportExpressionError(const char* equation, int error_pos);
+	void reportExpressionNotFinite(const char* equation, double value);
+	void reportCompiledOverflow(size_t offset, size_t bytes, size_t capacity);
+	void reportBadWrite(uintptr_t to, size_t size);
+	void reportBadRead(intptr_t addr);
+
+	void setVerbose(bool on);
+	bool verbose();
+
+	size_t errorCount();
+	void printErrors(FILE* out, const char* prefix);
+	void resetErrors();
+}
+#endif
+
+#ifndef NOINLINE
 #define NOINLINE __attribute__ ((noinline))
+#endif
 
 #if defined(SWITCH)
 #define PACKED NX_PACKED
+#elif defined(HOST_BUILD)
+#define PACKED __attribute__((packed))
 #endif
 
-#if defined(SWITCH) || defined(OUNCE)
+#ifdef LOCK_ABI64
 namespace Utils {
 	uint64_t _convertToTimeSpan(uint64_t tick);
 }
@@ -35,7 +122,7 @@ namespace nn {
 
 namespace LOCK {
 
-#if defined(SWITCH) || defined(OUNCE)
+#ifdef LOCK_ABI64
 	using patch_addr_t = intptr_t;
 #else
 	using patch_addr_t = uintptr_t;
@@ -46,7 +133,7 @@ namespace LOCK {
 		Main,
 		Heap,
 		Alias,
-#if defined(SWITCH) || defined(OUNCE)
+#ifdef LOCK_ABI64
 		Variables,
 		CodeCave,
 #endif
@@ -98,7 +185,7 @@ namespace LOCK {
 
 	enum class MasterWriteOpcode : uint8_t {
 		Bytes = 1,
-#if defined(SWITCH) || defined(OUNCE)
+#ifdef LOCK_ABI64
 		Variables = 2,
 		CodeCave = 3,
 #endif
@@ -140,6 +227,11 @@ namespace LOCK {
 	};
 	static_assert(sizeof(BranchOp) == 4);
 
+#ifdef HOST_BUILD
+	// Padding added to the compiled buffer by the validator only.
+	static constexpr size_t HOST_COMPILED_SLACK = 64 * 1024;
+#endif
+
 	class Patcher {
 	public:
 		struct Mappings {
@@ -156,7 +248,7 @@ namespace LOCK {
 			RegMap<Region::Main,      &Mappings::main_start>,
 			RegMap<Region::Heap,      &Mappings::heap_start>,
 			RegMap<Region::Alias,     &Mappings::alias_start>
-#if defined(SWITCH) || defined(OUNCE)
+#ifdef LOCK_ABI64
 		   	,
 			RegMap<Region::Variables, &Mappings::variables_start>,
 			RegMap<Region::CodeCave,  &Mappings::codeCave_start>
@@ -217,6 +309,12 @@ namespace LOCK {
 			constexpr Writer() = default;
 			constexpr Writer(uint8_t* data, size_t offset)
 				: m_data(data), m_offset(offset) {}
+#ifdef HOST_BUILD
+			constexpr Writer(uint8_t* data, size_t offset, size_t capacity)
+				: m_data(data), m_offset(offset), m_capacity(capacity) {}
+
+			bool checkRoom(size_t bytes);
+#endif
 
 			template <typename T> void write(T value);
 
@@ -227,6 +325,10 @@ namespace LOCK {
 		private:
 			uint8_t* m_data = nullptr;
 			size_t m_offset = 0;
+#ifdef HOST_BUILD
+			size_t m_capacity = SIZE_MAX;
+			bool   m_overflowed = false;
+#endif
 		};
 
 		static constexpr uint8_t memberSize(ValueType value_type) { return (uint8_t)value_type % 0x10; }
@@ -240,7 +342,7 @@ namespace LOCK {
 		patch_addr_t NOINLINE getAddress(Cursor& cursor) const;
 
 		Result processBytes(FILE* file);
-#if defined(SWITCH) || defined(OUNCE)
+#ifdef LOCK_ABI64
 		Result processVariables(FILE* file);
 		Result processCodeCave(FILE* file);
 #endif
@@ -249,7 +351,7 @@ namespace LOCK {
 
 		using MasterWriteMappings = std::tuple<
 			MasterWriteOpMap<MasterWriteOpcode::Bytes, &Patcher::processBytes>
-#if defined(SWITCH) || defined(OUNCE)
+#ifdef LOCK_ABI64
 			,
 			MasterWriteOpMap<MasterWriteOpcode::Variables, &Patcher::processVariables>,
 			MasterWriteOpMap<MasterWriteOpcode::CodeCave, &Patcher::processCodeCave>

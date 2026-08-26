@@ -7,20 +7,10 @@
 #include <cstring>
 #include <utility>
 
+#ifdef SWITCH_BUILD
 #include "saltysd_core.h"
 #include "saltysd_ipc.h"
 #include "useful.h"
-
-#if defined(SWITCH) || defined(OUNCE) || defined(SWITCH32) || defined(OUNCE32)
-#define SWITCH_BUILD
-#else
-#error "Undefined architecture!"
-#endif
-
-#if defined(SWITCH) || defined(OUNCE)
-#define SWITCH_64BIT
-#elif defined(OUNCE32) || defined(SWITCH32)
-#define SWITCH_32BIT
 #endif
 
 #ifdef SWITCH_64BIT
@@ -42,6 +32,262 @@ __asm__(
 
 alignas(0x1000) static uint8_t variables_buffer[0x1000];
 #endif
+
+#ifdef HOST_BUILD
+// ---------------------------------------------------------------------------
+// Host validator sandbox - compiled only with -DHOST_BUILD, absent on hardware.
+//
+// Layout (one MAP_NORESERVE reservation; untouched pages cost nothing):
+//
+//   offset        size       purpose
+//   0x00000000    256 MiB    low guard - absorbs negative offsets
+//   0x10000000      2 GiB    Region::Main
+//   0x90000000    256 MiB    Region::Heap
+//   0xA0000000    256 MiB    Region::Alias
+//   0xB0000000    512 MiB    pointee arena for materialised pointer targets
+//   0xD0000000      4 KiB    Region::Variables (page aligned)
+//   0xD0001000      4 KiB    Region::CodeCave  (page aligned; the Variables page
+//                            below it keeps codeCave_start - 0x100 mapped)
+//   0xD0002000    256 MiB    high guard
+// ---------------------------------------------------------------------------
+
+#include <sys/mman.h>
+#include <cstdarg>
+#include <set>
+#include <string>
+#include <unordered_map>
+#include <vector>
+
+namespace Host {
+namespace {
+
+	constexpr size_t MiB = 1024ull * 1024ull;
+
+	constexpr size_t GUARD_LO_OFF  = 0;
+	constexpr size_t GUARD_LO_SIZE = 256 * MiB;
+
+	constexpr size_t MAIN_OFF      = GUARD_LO_OFF + GUARD_LO_SIZE;   // 0x10000000
+	constexpr size_t MAIN_SIZE     = 2048 * MiB;
+
+	constexpr size_t HEAP_OFF      = MAIN_OFF + MAIN_SIZE;           // 0x90000000
+	constexpr size_t HEAP_SIZE     = 256 * MiB;
+
+	constexpr size_t ALIAS_OFF     = HEAP_OFF + HEAP_SIZE;           // 0xA0000000
+	constexpr size_t ALIAS_SIZE    = 256 * MiB;
+
+	constexpr size_t POINTEE_OFF   = ALIAS_OFF + ALIAS_SIZE;         // 0xB0000000
+	constexpr size_t POINTEE_SIZE  = 512 * MiB;
+
+	constexpr size_t VARS_OFF      = POINTEE_OFF + POINTEE_SIZE;     // 0xD0000000
+	constexpr size_t VARS_SIZE     = 0x1000;
+
+	constexpr size_t CAVE_OFF      = VARS_OFF + VARS_SIZE;           // 0xD0001000
+	constexpr size_t CAVE_SIZE     = 0x1000;
+
+	constexpr size_t GUARD_HI_OFF  = CAVE_OFF + CAVE_SIZE;
+	constexpr size_t GUARD_HI_SIZE = 256 * MiB;
+
+	constexpr size_t TOTAL_SIZE    = GUARD_HI_OFF + GUARD_HI_SIZE;
+
+	uint8_t* g_base = nullptr;
+	bool     g_verbose = false;
+
+	std::vector<std::string> g_errors;
+
+	// Slot address -> the target that slot dereferences to. See loadPointer().
+	std::unordered_map<intptr_t, intptr_t> g_pointees;
+
+	// Materialised targets are spread across the pointee arena rather than
+	// stacked on one address, so that data written through one chain does not
+	// sit on top of another chain's target. The observed corpus applies offsets
+	// of -27.5 MiB to +916 KiB after a dereference; a 4 MiB stride plus 64 MiB
+	// of headroom below the first target keeps those landing inside the
+	// reservation. The index wraps, which is harmless: colliding *data* is fine,
+	// only colliding pointer bookkeeping was ever the problem.
+	constexpr size_t POINTEE_HEADROOM = 64 * MiB;
+	constexpr size_t POINTEE_STRIDE   = 4 * MiB;
+	constexpr size_t POINTEE_SLOTS    = 96;
+
+	inline intptr_t pointeeTarget(size_t index) {
+		return reinterpret_cast<intptr_t>(
+			g_base + POINTEE_OFF + POINTEE_HEADROOM +
+			(index % POINTEE_SLOTS) * POINTEE_STRIDE);
+	}
+
+	// Cap the log so one pathological file cannot produce unbounded output.
+	constexpr size_t MAX_ERRORS = 64;
+
+	std::set<std::string> g_seen;
+
+	void record(const std::string& msg) {
+		// The patch is applied once per FPS/refresh-rate combination, so the same
+		// underlying defect surfaces several times. Report each distinct problem
+		// once; the count of combinations it affects adds nothing.
+		if (!g_seen.insert(msg).second)
+			return;
+		if (g_errors.size() < MAX_ERRORS)
+			g_errors.push_back(msg);
+		else if (g_errors.size() == MAX_ERRORS)
+			g_errors.push_back("(further problems suppressed)");
+	}
+
+	__attribute__((format(printf, 1, 2)))
+	void recordf(const char* fmt, ...) {
+		char buf[512];
+		va_list ap;
+		va_start(ap, fmt);
+		vsnprintf(buf, sizeof(buf), fmt, ap);
+		va_end(ap);
+		record(buf);
+	}
+
+	inline bool inSandbox(uintptr_t addr, size_t len) {
+		if (!g_base) return false;
+		const uintptr_t lo = reinterpret_cast<uintptr_t>(g_base);
+		const uintptr_t hi = lo + TOTAL_SIZE;
+		if (addr < lo || addr >= hi) return false;
+		return len <= hi - addr;
+	}
+}
+
+// -------------------------------------------------------------------------
+// Lifecycle
+// -------------------------------------------------------------------------
+
+bool createSandbox() {
+	if (g_base) return true;
+	void* p = mmap(nullptr, TOTAL_SIZE, PROT_READ | PROT_WRITE,
+	               MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE, -1, 0);
+	if (p == MAP_FAILED) {
+		g_base = nullptr;
+		return false;
+	}
+	g_base = static_cast<uint8_t*>(p);
+	return true;
+}
+
+void destroySandbox() {
+	if (g_base) {
+		munmap(g_base, TOTAL_SIZE);
+		g_base = nullptr;
+	}
+}
+
+intptr_t  mainRegion()      { return reinterpret_cast<intptr_t>(g_base + MAIN_OFF); }
+uintptr_t heapRegion()      { return reinterpret_cast<uintptr_t>(g_base + HEAP_OFF); }
+uintptr_t aliasRegion()     { return reinterpret_cast<uintptr_t>(g_base + ALIAS_OFF); }
+intptr_t  variablesRegion() { return reinterpret_cast<intptr_t>(g_base + VARS_OFF); }
+intptr_t  codeCaveRegion()  { return reinterpret_cast<intptr_t>(g_base + CAVE_OFF); }
+
+// -------------------------------------------------------------------------
+// Hooks used by lock.cpp
+// -------------------------------------------------------------------------
+
+bool isMapped(intptr_t addr, size_t len) {
+	return inSandbox(static_cast<uintptr_t>(addr), len);
+}
+
+Result writeMemory(uintptr_t to, uintptr_t from, size_t size) {
+	if (!inSandbox(to, size)) {
+		reportBadWrite(to, size);
+		return 0x1;
+	}
+	memcpy(reinterpret_cast<void*>(to), reinterpret_cast<const void*>(from), size);
+	return 0;
+}
+
+intptr_t loadPointer(intptr_t addr) {
+	if (!inSandbox(static_cast<uintptr_t>(addr), sizeof(intptr_t))) {
+		reportBadRead(addr);
+		// Hand back a usable target anyway: the caller may not be validating
+		// this link, and returning garbage would turn a reportable problem into
+		// a segfault that hides every later finding in the same file.
+		return pointeeTarget(0);
+	}
+
+	// Deliberately NOT read out of sandbox memory.
+	//
+	// On hardware the game has already stored a real pointer at this slot, and
+	// the patch's own writes never land on the game's pointer tables. Here the
+	// slot starts out zeroed and the patch *does* write through these chains, so
+	// reading memory back would let one chain's data (an evaluated FPS double,
+	// say) be re-read as another chain's pointer. Keeping the mapping in a side
+	// table makes every chain resolve to a stable, distinct target that patch
+	// data can never clobber.
+	auto it = g_pointees.find(addr);
+	if (it != g_pointees.end())
+		return it->second;
+
+	const intptr_t target = pointeeTarget(g_pointees.size());
+	g_pointees.emplace(addr, target);
+	return target;
+}
+
+void logf(const char* fmt, ...) {
+	if (!g_verbose) return;
+	va_list ap;
+	va_start(ap, fmt);
+	vfprintf(stderr, fmt, ap);
+	va_end(ap);
+}
+
+// -------------------------------------------------------------------------
+// Diagnostics
+// -------------------------------------------------------------------------
+
+void reportExpressionError(const char* equation, int error_pos) {
+	recordf("expression does not parse (at character %d): \"%s\"", error_pos, equation);
+}
+
+void reportExpressionNotFinite(const char* equation, double value) {
+	recordf("expression evaluates to %s: \"%s\"",
+	        (value != value) ? "NaN" : (value > 0 ? "+infinity" : "-infinity"), equation);
+}
+
+void reportCompiledOverflow(size_t offset, size_t bytes, size_t capacity) {
+	recordf("compiled patch overflows its buffer: writing %zu byte(s) at offset "
+	        "%zu exceeds the %zu bytes reserved by the header",
+	        bytes, offset, capacity);
+}
+
+void reportBadWrite(uintptr_t to, size_t size) {
+	recordf("patch writes %zu byte(s) to 0x%llx, outside the emulated address space",
+	        size, (unsigned long long)to);
+}
+
+void reportBadRead(intptr_t addr) {
+	recordf("patch dereferences 0x%llx, outside the emulated address space",
+	        (unsigned long long)addr);
+}
+
+void setVerbose(bool on) { g_verbose = on; }
+bool verbose()           { return g_verbose; }
+
+size_t errorCount() { return g_errors.size(); }
+
+void printErrors(FILE* out, const char* prefix) {
+	for (const auto& e : g_errors)
+		fprintf(out, "%s%s\n", prefix, e.c_str());
+}
+
+void resetErrors() { g_errors.clear(); g_seen.clear(); }
+
+}
+
+
+// Symbols processCodeCave() takes the address of when relocating CodeCave
+// branches. On hardware these are real SaltyNX routines; the validator only
+// needs them to exist so that `&Utils::_convertToTimeSpan` and friends yield a
+// sane address for the branch-offset arithmetic. Nothing calls them.
+namespace Utils {
+	uint64_t _convertToTimeSpan(uint64_t tick) { return tick; }
+}
+
+namespace nn {
+	Result SetUserInactivityDetectionTimeExtended(bool isTrue) { (void)isTrue; return 0; }
+}
+
+#endif // HOST_BUILD
 
 namespace LOCK {
 
@@ -73,6 +319,10 @@ namespace {
 		if ((memoryinfo.perm & Perm_Rw) && ((address - memoryinfo.addr >= 0) && (address - memoryinfo.addr <= memoryinfo.size)))
 			return true;
 		return false;
+#elif defined(HOST_BUILD)
+		// The sandbox is the stand-in for the game's address space: an address is
+		// valid exactly when it lands inside one of the emulated regions.
+		return Host::isMapped(address_in, sizeof(patch_addr_t));
 #else
 		#error "isAddressValid function is not defined!"
 #endif
@@ -118,15 +368,41 @@ namespace {
 		#endif
 	}
 
+	#ifdef SWITCH_BUILD
 	#define printf_sdcard SaltySDCore_printf
+	#elif defined(HOST_BUILD)
+	#define printf_sdcard Host::logf
+	#else
+	#error "printf_sdcard is not defined!"
+	#endif
 
 	inline Result memcpy_unsafe(uintptr_t to, uintptr_t from, size_t size) {
 		#ifdef SWITCH_BUILD
 		return SaltySD_Memcpy(to, from, size);
+		#elif defined(HOST_BUILD)
+		return Host::writeMemory(to, from, size);
 		#else
-		#error "memcpy_unsafe function is not defined!"
+		#error "memcpy_unsafe is not defined!"
 		#endif
 	}
+
+#ifdef HOST_BUILD
+	// execWrite/execCompare touch the target directly (on hardware the plugin
+	// lives in the game's own address space, so there is no IPC involved). In
+	// the validator a resolved address can fall outside the emulated space -
+	// through a corrupt file, or simply an offset larger than the window we
+	// reserve - and a raw memcpy would segfault with no diagnostic. Report and
+	// bail instead.
+	#define HOST_REQUIRE_MAPPED(addr, len) \
+		do { \
+			if (!Host::isMapped((intptr_t)(addr), (len))) { \
+				Host::reportBadWrite((uintptr_t)(addr), (len)); \
+				return 0x3008; \
+			} \
+		} while (0)
+#else
+	#define HOST_REQUIRE_MAPPED(addr, len) ((void)0)
+#endif
 
 	template <typename T>
 	void outWriteType (auto& in, auto& out) {
@@ -139,6 +415,7 @@ namespace {
 
 	#define OUT_TYPE(T) outWriteType<T>(in, out)
 	#define OUT_VAL(in) outWriteVal(in, out)
+	#define OUT_ADDRESS() copyAddress(in, out)
 }
 
 
@@ -162,13 +439,30 @@ const char* Patcher::Cursor::readString() {
 	return str;
 }
 
+#ifdef HOST_BUILD
+bool Patcher::Writer::checkRoom(size_t bytes) {
+	if (m_offset + bytes <= m_capacity)
+		return true;
+	if (!m_overflowed) {
+		m_overflowed = true;
+		Host::reportCompiledOverflow(m_offset, bytes, m_capacity);
+	}
+	return m_offset + bytes <= m_capacity + HOST_COMPILED_SLACK;
+}
+#define WRITER_CHECK(n) if (!checkRoom(n)) { m_offset += (n); return; }
+#else
+#define WRITER_CHECK(n) ((void)0)
+#endif
+
 template <typename T>
 void Patcher::Writer::write(T value) {
+	WRITER_CHECK(sizeof(T));
 	memcpy(&m_data[m_offset], &value, sizeof(T));
 	m_offset += sizeof(T);
 }
 
 void Patcher::Writer::copy(const uint8_t* src, size_t bytes) {
+	WRITER_CHECK(bytes);
 	// HOS requires from SIMD load/store instructions to have aligned pointers in A32 mode, so we must avoid using VSTR here
 	memcpy(&m_data[m_offset], src, bytes);
 	m_offset += bytes;
@@ -176,9 +470,12 @@ void Patcher::Writer::copy(const uint8_t* src, size_t bytes) {
 
 void Patcher::bindMainRegion(intptr_t main_start) {
 	m_mappings.main_start = main_start;
-#ifdef SWITCH_64BIT
+#if defined(SWITCH_64BIT)
 	m_mappings.variables_start = (intptr_t)&variables_buffer[0];
 	m_mappings.codeCave_start  = (intptr_t)&codeCave;
+#elif defined(HOST_BUILD)
+	m_mappings.variables_start = Host::variablesRegion();
+	m_mappings.codeCave_start  = Host::codeCaveRegion();
 #endif
 }
 
@@ -209,10 +506,10 @@ patch_addr_t NOINLINE Patcher::getAddress(Cursor& cursor) const {
 	}(RegionMappings{});
 
 	for (int i = 0; i < offsets_count; i++) {
-#if defined(SWITCH_32BIT)
+#if defined(LOCK_ABI32)
 		int32_t temp_offset = cursor.read<int32_t>();
 		address += temp_offset;
-#elif defined(SWITCH_64BIT)
+#elif defined(LOCK_ABI64)
 		uint32_t temp_offset = cursor.read<uint32_t>();
 		if (region > Region::Absolute && region < Region::Variables) {
 			int32_t temp_offset_int = 0;
@@ -222,8 +519,13 @@ patch_addr_t NOINLINE Patcher::getAddress(Cursor& cursor) const {
 		else address += (int64_t)temp_offset;
 #endif
 		if (i + 1 < offsets_count) {
-			if (unsafe_address && !isAddressValid(*(patch_addr_t*)address)) return -2;
-			address = *(patch_addr_t*)address;
+#ifdef HOST_BUILD
+			const patch_addr_t next = Host::loadPointer(address);
+#else
+			const patch_addr_t next = *(patch_addr_t*)address;
+#endif
+			if (unsafe_address && !isAddressValid(next)) return -2;
+			address = next;
 		}
 	}
 	return address;
@@ -263,7 +565,7 @@ Result Patcher::processBytes(FILE* file) {
 	return 0;
 }
 
-#ifdef SWITCH_64BIT
+#ifdef LOCK_ABI64
 
 Result Patcher::processVariables(FILE* file) {
 	OpHeader header;
@@ -383,8 +685,9 @@ Result Patcher::applyMasterWrite(FILE* file, size_t master_offset) {
 
 	MasterWriteOpcode OPCODE{};
 	while (true) {
-		fread_sdcard(&OPCODE, 1, 1, file);
-		printf_sdcard("LOCK: processes opcode: %d, offset: 0x%x\n", OPCODE, ftell_sdcard(file));
+		if (fread_sdcard(&OPCODE, 1, 1, file) != 1)
+			return 0x313;
+		printf_sdcard("LOCK: processes opcode: %d, offset: 0x%lx\n", (int)OPCODE, (unsigned long)ftell_sdcard(file));
 		if (OPCODE == MasterWriteOpcode::End) {m_masterWriteApplied = true; return 0;}
 		Result rc = 0xFF;
 		[&]<typename... M>(std::tuple<M...>) {
@@ -446,10 +749,24 @@ double NOINLINE Patcher::evaluateExpression(const char* equation, double fps_tar
 		{"INTERVAL_TARGET", &INTERVAL_TARGET, TE_VARIABLE},
 		{"REFRESH_RATE", &REFRESH_RATE, TE_VARIABLE}
 	};
+#ifdef HOST_BUILD
+	int error_pos = 0;
+	te_expr *n = te_compile(equation, vars, std::size(vars), &error_pos);
+	if (!n) {
+		Host::reportExpressionError(equation, error_pos);
+		return 0;
+	}
+	double evaluated_value = te_eval(n);
+	te_free(n);
+	if (!std::isfinite(evaluated_value))
+		Host::reportExpressionNotFinite(equation, evaluated_value);
+	return evaluated_value;
+#else
 	te_expr *n = te_compile(equation, vars, std::size(vars), 0);
 	double evaluated_value = te_eval(n);
 	te_free(n);
 	return evaluated_value;
+#endif
 }
 
 void Patcher::copyAddress(Cursor& in, Writer& out) const {
@@ -461,7 +778,6 @@ void Patcher::copyAddress(Cursor& in, Writer& out) const {
 		OUT_TYPE(uint32_t);
 	}
 }
-#define OUT_ADDRESS() copyAddress(in, out)
 
 Result Patcher::copyValues(Cursor& in, Writer& out, bool evaluate, uint8_t FPS, uint8_t refreshRate) const {
 	ValueType value_type = in.read<ValueType>();
@@ -489,7 +805,11 @@ Result NOINLINE Patcher::convertPatchToFPSTarget(uint8_t* out_buffer, const uint
 	memcpy(out_buffer, in_buffer, header_size);
 
 	Cursor in(in_buffer, header_size);
+#ifdef HOST_BUILD
+	Writer out(out_buffer, header_size, m_compiledSize);
+#else
 	Writer out(out_buffer, header_size);
+#endif
 
 	while (true) {
 		auto OPCODE = in.read<AllFpsOpcode>();
@@ -538,7 +858,7 @@ Result NOINLINE Patcher::convertPatchToFPSTarget(uint8_t* out_buffer, const uint
 
 Result Patcher::execWrite(Cursor& cursor) {
 	patch_addr_t address = getAddress(cursor);
-#ifdef SWITCH_64BIT
+#ifdef LOCK_ABI64
 	if (address < 0) return 0x6;
 #endif
 
@@ -557,13 +877,14 @@ Result Patcher::execWrite(Cursor& cursor) {
 	if (!validMemberSize(member_size))
 		return 3;
 	const auto array_size = member_size * loops;
+	HOST_REQUIRE_MAPPED(address, array_size);
 	memcpy((void*)address, cursor.take(array_size), array_size);
 	return 0;
 }
 
 Result Patcher::execCompare(Cursor& cursor) {
 	patch_addr_t address = getAddress(cursor);
-#ifdef SWITCH_64BIT
+#ifdef LOCK_ABI64
 	if (address < 0) return 0x6;
 #endif
 
@@ -571,13 +892,16 @@ Result Patcher::execCompare(Cursor& cursor) {
 	ValueType value_type = cursor.read<ValueType>();
 	bool passed = false;
 
+	// The fold below dereferences `address`; make sure that is safe first.
+	HOST_REQUIRE_MAPPED(address, memberSize(value_type) ? memberSize(value_type) : 1);
+
 	bool found = [&]<typename... M>(std::tuple<M...>) { 
 		return (... || (value_type == M::val ? (passed = compareValues(*(typename M::type*)(address), cursor.read<typename M::type>(), compare_type), true) : false)); 
 	} (TypeMappings{});
 	if (!found) return 0x8;
 
 	address = getAddress(cursor);
-#ifdef SWITCH_64BIT
+#ifdef LOCK_ABI64
 	if (address < 0) return 0x6;
 #endif
 	value_type = cursor.read<ValueType>();
@@ -597,7 +921,10 @@ Result Patcher::execCompare(Cursor& cursor) {
 		return 0x9;
 	const auto array_size = member_size * loops;
 	const auto source = cursor.take(array_size);
-	if (passed) memcpy((void*)address, source, array_size);
+	if (passed) {
+		HOST_REQUIRE_MAPPED(address, array_size);
+		memcpy((void*)address, source, array_size);
+	}
 	return 0;
 }
 
@@ -620,7 +947,12 @@ Result Patcher::applyPatch(uint8_t FPS, uint8_t refreshRate) {
 		if (m_compiled != nullptr) {
 			free(m_compiled);
 		}
+#ifdef HOST_BUILD
+		// Padding so that an undersized m_compiledSize is reported rather than smashing the heap.
+		m_compiled = (uint8_t*)malloc(m_compiledSize + HOST_COMPILED_SLACK);
+#else
 		m_compiled = (uint8_t*)malloc(m_compiledSize);
+#endif
 		if (!m_compiled)
 			return 0x3004;
 		if (R_FAILED(convertPatchToFPSTarget(m_compiled, m_configBuffer, FPS, refreshRate))) {
@@ -650,6 +982,10 @@ Result Patcher::applyPatch(uint8_t FPS, uint8_t refreshRate) {
 
 Result Patcher::loadFromFile(const char* path) {
 	FILE* patch_file = fopen_sdcard(path, "rb");
+	if (!patch_file) {
+		printf_sdcard("LOCK: could not open patch file!\n");
+		return 0x1200;
+	}
 	fseek_sdcard(patch_file, 0, 2);
 	size_t configSize = ftell_sdcard(patch_file);
 	fseek_sdcard(patch_file, 8, 0);
@@ -661,7 +997,7 @@ Result Patcher::loadFromFile(const char* path) {
 	bool error = false;
 	size_t tell = ftell_sdcard(patch_file);
 	if (tell != header_size) {
-		printf_sdcard("LOCK: wrong header! Expected: 0x%lx, got: 0x%lx\n", header_size, tell);
+		printf_sdcard("LOCK: wrong header! Expected: 0x%lx, got: 0x%lx\n", (unsigned long)header_size, (unsigned long)tell);
 		error = true;
 	}
 	else if (!isHeaderValid(buffer)) {
