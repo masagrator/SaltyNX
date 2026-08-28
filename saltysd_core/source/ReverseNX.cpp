@@ -31,13 +31,6 @@ struct ReverseNX_save {
 
 static_assert(sizeof(ReverseNX_save) == 6);
 
-struct runtime_replace {
-	const char* name;
-	void** orig_ptr;
-	void* hook_ptr;
-	void (*cond_check)(bool* check);
-};
-
 namespace nn { 
 	namespace os {
 		struct SystemEvent {
