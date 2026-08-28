@@ -193,16 +193,8 @@ namespace nn {
 
 namespace Utils {
 
-	static void (*osGetSystemTick_1)(u64* tick);
-
 	inline uint64_t _getSystemTick() {
-		#if defined(SWITCH) || defined(OUNCE)
-			return armGetSystemTick();
-		#elif defined(SWITCH32) || defined(OUNCE32)
-			u64 tick = 0;
-			osGetSystemTick_1(&tick);
-			return tick;
-		#endif
+		return armGetSystemTick();
 	}
 
 	uint64_t _convertToTimeSpan(uint64_t tick) {
@@ -1415,7 +1407,6 @@ extern "C" {
 				runtime_replace{"_ZN11NvSwapchain18CreateSwapchainKHREP10VkDevice_TPK24VkSwapchainCreateInfoKHRPK21VkAllocationCallbacksPP16VkSwapchainKHR_T", (uintptr_t*)&vk::nvSwapchainCreateSwapchainKHR_0, nullptr, nullptr},
 
 				runtime_replace{"_ZN2nn2oe20SetFocusHandlingModeENS0_17FocusHandlingModeE", (uintptr_t*)&nn::SetFocusHandlingMode_0, (void*)nn::setFocusHandlingMode, nullptr},
-				runtime_replace{"_ZN2nn2os13GetSystemTickEv", (uintptr_t*)&Utils::osGetSystemTick_1, nullptr, nullptr},
 				runtime_replace{"_ZN2nn2oe44SetUserInactivityDetectionTimeExtendedUnsafeEb", (uintptr_t*)&nn::SetUserInactivityDetectionTimeExtended_0, nullptr, nullptr},
 				runtime_replace{
 					#if defined(SWITCH32) || defined(OUNCE32)
