@@ -16,7 +16,6 @@
 #include <cerrno>
 #include <utility>
 #include "nanoprintf.h"
-#include <array>
 
 enum ReverseNX_state : int8_t {
 	ReverseNX_Switch_Invalid = -1,
@@ -383,22 +382,6 @@ void* WaitAny(nn::os::MultiWaitType* MultiWaitType) {
 	multiWaitHack = true;
 	return multiWaitHolderCopy;
 }
-
-std::array replacements = {
-	runtime_replace{"_ZN2nn2oe18GetPerformanceModeEv", (void**)&nn::oe::GetPerformanceMode, (void*)GetPerformanceMode, nullptr},
-	runtime_replace{"_ZN2nn2oe16GetOperationModeEv", (void**)&nn::oe::GetOperationMode, (void*)GetOperationMode, nullptr},
-	runtime_replace{"_ZN2nn2oe25TryPopNotificationMessageEPj", (void**)&nn::oe::TryPopNotificationMessage, (void*)TryPopNotificationMessage, nullptr},
-	runtime_replace{"_ZN2nn2oe22PopNotificationMessageEv", (void**)&nn::oe::PopNotificationMessage, (void*)PopNotificationMessage, nullptr},
-	runtime_replace{"_ZN2nn2oe27GetDefaultDisplayResolutionEPiS1_", (void**)&nn::oe::GetDefaultDisplayResolution, (void*)GetDefaultDisplayResolution, nullptr},
-	runtime_replace{"_ZN2nn2oe38GetDefaultDisplayResolutionChangeEventEPNS_2os11SystemEventE", (void**)&nn::oe::GetDefaultDisplayResolutionChangeEvent, (void*)GetDefaultDisplayResolutionChangeEvent, nullptr},
-	runtime_replace{"_ZN2nn2os18TryWaitSystemEventEPNS0_15SystemEventTypeE", (void**)&nn::os::TryWaitSystemEvent, (void*)TryWaitSystemEvent, nullptr},
-	runtime_replace{"_ZN2nn2os15WaitSystemEventEPNS0_15SystemEventTypeE", (void**)&nn::os::WaitSystemEvent, (void*)WaitSystemEvent, nullptr},
-	runtime_replace{"_ZN2nn2os25InitializeMultiWaitHolderEPNS0_19MultiWaitHolderTypeEPNS0_15SystemEventTypeE", (void**)&nn::os::InitializeMultiWaitHolder, (void*)InitializeMultiWaitHolder, nullptr},
-	runtime_replace{"_ZN2nn2os19LinkMultiWaitHolderEPNS0_13MultiWaitTypeEPNS0_19MultiWaitHolderTypeE", (void**)&nn::os::LinkMultiWaitHolder, (void*)LinkMultiWaitHolder, nullptr},
-	runtime_replace{"_ZN2nn2os7WaitAnyEPNS0_13MultiWaitTypeE", (void**)&nn::os::WaitAny, (void*)WaitAny, nullptr},
-	runtime_replace{"_ZN2nn2os12TimedWaitAnyEPNS0_13MultiWaitTypeENS_8TimeSpanE", (void**)&nn::os::TimedWaitAny, nullptr, nullptr},
-	runtime_replace{"_ZN2nn2oe27GetNotificationMessageEventEv", (void**)&nn::oe::GetNotificationMessageEvent, (void*)GetNotificationMessageEvent, nullptr},
-};
 
 extern "C" {
 	void ReverseNX(SharedMemory* _sharedmemory, uint32_t* _sharedOperationMode) {
