@@ -1104,7 +1104,7 @@ namespace NVN {
 
 				nvnCommandBufferBeginRecording_0(&tsCmdBuf);
 
-				for (size_t counter = 0; counter < 1; counter++) {
+				for (size_t counter = 0; counter < 0x10; counter++) {
 					BufferAddress currentFrameOffset = dataGpuAddress + (counter * COUNTER_ALIGNMENT);
 					nvnCommandBufferReportCounter_0(&tsCmdBuf, counter, currentFrameOffset);
 					nvnCommandBufferResetCounter_0(&tsCmdBuf, counter);			
