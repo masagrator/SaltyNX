@@ -422,26 +422,51 @@ namespace vk {
 		uint32_t     minImageCount;
 	} VkSwapchainCreateInfoKHR;
 
-	static void* (*vkGetInstanceProcAddr_0)(void* instance, const char* vkFunction);
-	static void* (*vkGetDeviceProcAddr_0)(void* device, const char* vkFunction);
-	static void (*vkCmdSetViewport_0)(void* commandBuffer, uint32_t firstViewport, uint32_t viewportCount, const VkViewport* pViewports);
-	static void (*vkCmdSetViewportWithCount_0)(void* commandBuffer, uint32_t viewportCount, const VkViewport* pViewports);
-	static void (*vkCmdSetScissor_0)(void* commandBuffer, uint32_t firstScissor, uint32_t scissorCount, const VkRect2D* pScissors);
-	static void (*vkCmdSetScissorWithCount_0)(void* commandBuffer, uint32_t scissorCount, const VkRect2D* pScissors);
-	static int32_t (*vkCreateSwapchainKHR_0)(void* Device, VkSwapchainCreateInfoKHR* pCreateInfo, const void* pAllocator, const void** pSwapchain);
-	static int32_t (*vkGetSwapchainImagesKHR_0)(void* Device, void* VkSwapchainKHR, uint32_t* pSwapchainImageCount, int** pSwapchainImages);
-	static int32_t (*vkQueuePresentKHR_0)(const void* vkQueue, const void* VkPresentInfoKHR);
-	static int32_t (*nvSwapchainQueuePresentKHR_0)(const void* VkQueue_T, const void* VkPresentInfoKHR);
-	static int32_t (*nvSwapchainCreateSwapchainKHR_0)(void* Device, VkSwapchainCreateInfoKHR* pCreateInfo, const void* pAllocator, const void** pSwapchain);
-	static void* (*nvSwapchainGetDeviceProcAddr_0)(void* device, const char* vkFunction);
-	static void* (*nvSwapchainGetInstanceProcAddr_0)(void* instance, const char* vkFunction);
+	struct VkDevice {
+		char reserved[8];
+	};
+	struct VkInstance {
+		char reserved[8];
+	};
+	struct VkCommandBuffer {
+		char reserved[8];
+	};
+	struct VkAllocationCallbacks{
+		char reserved[8];
+	};
+	struct VkSwapchainKHR {
+		char reserved[8];
+	};
+	struct VkImage {
+		char reserved[8];
+	};
+	struct VkQueue {
+		char reserved[8];
+	};
+	struct VkPresentInfoKHR {
+		char reserved[8];
+	};
 
-	int32_t QueuePresent (const void* VkQueue, const void* VkPresentInfoKHR);
-	int32_t CreateSwapchain(void* Device, VkSwapchainCreateInfoKHR* pCreateInfo, const void* pAllocator, const void** pSwapchain);
-	void* GetDeviceProcAddr(void* device, const char* vkFunction);
-	void* GetInstanceProcAddr(void* instance, const char* vkFunction);
+	static void* (*vkGetInstanceProcAddr_0)(VkInstance* instance, const char* vkFunction);
+	static void* (*vkGetDeviceProcAddr_0)(VkDevice* device, const char* vkFunction);
+	static void (*vkCmdSetViewport_0)(VkCommandBuffer* commandBuffer, uint32_t firstViewport, uint32_t viewportCount, const VkViewport* pViewports);
+	static void (*vkCmdSetViewportWithCount_0)(VkCommandBuffer* commandBuffer, uint32_t viewportCount, const VkViewport* pViewports);
+	static void (*vkCmdSetScissor_0)(VkCommandBuffer* commandBuffer, uint32_t firstScissor, uint32_t scissorCount, const VkRect2D* pScissors);
+	static void (*vkCmdSetScissorWithCount_0)(VkCommandBuffer* commandBuffer, uint32_t scissorCount, const VkRect2D* pScissors);
+	static int32_t (*vkCreateSwapchainKHR_0)(VkDevice* Device, const VkSwapchainCreateInfoKHR* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSwapchainKHR** pSwapchain);
+	static int32_t (*vkGetSwapchainImagesKHR_0)(VkDevice* Device, VkSwapchainKHR* Swapchain, uint32_t* pSwapchainImageCount, VkImage* pSwapchainImages);
+	static int32_t (*vkQueuePresentKHR_0)(VkQueue* vkQueue, VkPresentInfoKHR* VkPresentInfoKHR);
+	static int32_t (*nvSwapchainQueuePresentKHR_0)(VkQueue* VkQueue_T, VkPresentInfoKHR* VkPresentInfoKHR);
+	static int32_t (*nvSwapchainCreateSwapchainKHR_0)(VkDevice* Device, const VkSwapchainCreateInfoKHR* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSwapchainKHR** pSwapchain);
+	static void* (*nvSwapchainGetDeviceProcAddr_0)(VkDevice* device, const char* vkFunction);
+	static void* (*nvSwapchainGetInstanceProcAddr_0)(VkInstance* instance, const char* vkFunction);
 
-	void CmdSetViewport(void* commandBuffer, uint32_t firstViewport, uint32_t viewportCount, const VkViewport* pViewports) {
+	int32_t QueuePresent (VkQueue* VkQueue, VkPresentInfoKHR* PresentInfoKHR);
+	int32_t CreateSwapchain(VkDevice* Device, const VkSwapchainCreateInfoKHR* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSwapchainKHR** pSwapchain);
+	void* GetDeviceProcAddr(VkDevice* device, const char* vkFunction);
+	void* GetInstanceProcAddr(VkInstance* instance, const char* vkFunction);
+
+	void CmdSetViewport(VkCommandBuffer* commandBuffer, uint32_t firstViewport, uint32_t viewportCount, const VkViewport* pViewports) {
 		if (resolutionLookup) for (uint i = firstViewport; i < firstViewport+viewportCount; i++) {
 			if (pViewports[i].height > 1.f && pViewports[i].width > 1.f && pViewports[i].x == 0.f && pViewports[i].y == 0.f) {
 				uint32_t width = (uint32_t)pViewports[i].width;
@@ -453,7 +478,7 @@ namespace vk {
 		return vkCmdSetViewport_0(commandBuffer, firstViewport, viewportCount, pViewports);
 	}
 
-	void CmdSetViewportWithCount(void* commandBuffer, uint32_t viewportCount, const VkViewport* pViewports) {
+	void CmdSetViewportWithCount(VkCommandBuffer* commandBuffer, uint32_t viewportCount, const VkViewport* pViewports) {
 		if (resolutionLookup) for (uint i = 0; i < viewportCount; i++) {
 			if (pViewports[i].height > 1.f && pViewports[i].width > 1.f && pViewports[i].x == 0.f && pViewports[i].y == 0.f) {
 				uint32_t width = (uint32_t)pViewports[i].width;
@@ -465,7 +490,7 @@ namespace vk {
 		return vkCmdSetViewportWithCount_0(commandBuffer, viewportCount, pViewports);
 	}
 
-	void CmdSetScissor(void* commandBuffer, uint32_t firstScissor, uint32_t ScissorCount, const VkRect2D* pScissors) {
+	void CmdSetScissor(VkCommandBuffer* commandBuffer, uint32_t firstScissor, uint32_t ScissorCount, const VkRect2D* pScissors) {
 		if (resolutionLookup) for (uint i = firstScissor; i < firstScissor+ScissorCount; i++) {
 			if (pScissors[i].height > 1 && pScissors[i].width > 1 && pScissors[i].x == 0 && pScissors[i].y == 0 && pScissors[i].width != last_viewport.first && pScissors[i].height != last_viewport.second) {
 				NX_FPS_Math::addResToViewports(pScissors[i].width, pScissors[i].height);
@@ -474,7 +499,7 @@ namespace vk {
 		return vkCmdSetScissor_0(commandBuffer, firstScissor, ScissorCount, pScissors);
 	}
 
-	void CmdSetScissorWithCount(void* commandBuffer, uint32_t ScissorCount, const VkRect2D* pScissors) {
+	void CmdSetScissorWithCount(VkCommandBuffer* commandBuffer, uint32_t ScissorCount, const VkRect2D* pScissors) {
 		if (resolutionLookup) for (uint i = 0; i < ScissorCount; i++) {
 			if (pScissors[i].height > 1 && pScissors[i].width > 1 && pScissors[i].x == 0 && pScissors[i].y == 0 && pScissors[i].width != last_viewport.first && pScissors[i].height != last_viewport.second) {
 				NX_FPS_Math::addResToViewports(pScissors[i].width, pScissors[i].height);
@@ -484,12 +509,12 @@ namespace vk {
 	}
 
 	namespace Common {
-		NOINLINE int32_t QueuePresent(const void* VkQueue_T, const void* VkPresentInfoKHR, int32_t (*pointer)(const void*, const void*)) {
+		NOINLINE int32_t QueuePresent(VkQueue* VkQueue_T, VkPresentInfoKHR* VkPresentInfoKHR_T, int32_t (*pointer)(VkQueue*, VkPresentInfoKHR*)) {
 
 			static bool check_redirection = false;
 			//Fix for games in which subsdk redirects internally vkQueuePresentKHR to nv::Swapchain
 			if (check_redirection == true) {
-				return pointer(VkQueue_T, VkPresentInfoKHR);
+				return pointer(VkQueue_T, VkPresentInfoKHR_T);
 			}
 			if (NX_FPS_Math::starttick == 0) [[unlikely]] {
 				(Shared -> API) = 3;
@@ -499,7 +524,7 @@ namespace vk {
 			
 			NX_FPS_Math::PreFrame();
 			check_redirection = true;
-			const int32_t vulkanResult = pointer(VkQueue_T, VkPresentInfoKHR);
+			const int32_t vulkanResult = pointer(VkQueue_T, VkPresentInfoKHR_T);
 			check_redirection = false;
 			if (vulkanResult >= 0) NX_FPS_Math::PostFrame();
 
@@ -519,14 +544,15 @@ namespace vk {
 			return vulkanResult;
 		}
 
-		NOINLINE int32_t CreateSwapchain(void* Device, VkSwapchainCreateInfoKHR* pCreateInfo, const void* pAllocator, const void** pSwapchain, int32_t (*pointer)(void*, VkSwapchainCreateInfoKHR*, const void*, const void**)) {
+		NOINLINE int32_t CreateSwapchain(VkDevice* Device, const VkSwapchainCreateInfoKHR* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSwapchainKHR** pSwapchain, int32_t (*pointer)(VkDevice*, const VkSwapchainCreateInfoKHR*, const VkAllocationCallbacks*, VkSwapchainKHR**)) {
 			if ((Shared -> SetBuffers) > 0) {
-				pCreateInfo -> minImageCount = (Shared -> SetBuffers);
+				VkSwapchainCreateInfoKHR* m_createInfo = (VkSwapchainCreateInfoKHR*)pCreateInfo;
+				m_createInfo->minImageCount = (Shared -> SetBuffers);
 			}
 			int32_t vulkanResult = pointer(Device, pCreateInfo, pAllocator, pSwapchain);
 			if (vulkanResult >= 0) {
 				uint32_t numBuffers = 0;
-				vkGetSwapchainImagesKHR_0(Device, (void*)pSwapchain[0], &numBuffers, nullptr);
+				vkGetSwapchainImagesKHR_0(Device, pSwapchain[0], &numBuffers, nullptr);
 				(Shared -> Buffers) = numBuffers;
 			}
 			return vulkanResult;
@@ -543,7 +569,7 @@ namespace vk {
 			runtime_replace{"vkGetSwapchainImagesKHR", (uintptr_t*)&vkGetSwapchainImagesKHR_0}
 		};
 
-		NOINLINE void* GetDeviceProcAddr(void* device, const char* vkFunction, void* (*pointer)(void*, const char*)) {
+		NOINLINE void* GetDeviceProcAddr(VkDevice* device, const char* vkFunction, void* (*pointer)(VkDevice*, const char*)) {
 			uintptr_t address = (uintptr_t)pointer(device, vkFunction);
 			if (!strcmp("vkGetDeviceProcAddr", vkFunction)) {
 				if (!vkGetDeviceProcAddr_0) {
@@ -562,7 +588,7 @@ namespace vk {
 			return (void*)address;
 		}
 
-		NOINLINE void* GetInstanceProcAddr(void* instance, const char* vkFunction, void* (*pointer)(void*, const char*)) {
+		NOINLINE void* GetInstanceProcAddr(VkInstance* instance, const char* vkFunction, void* (*pointer)(VkInstance*, const char*)) {
 			uintptr_t address = (uintptr_t)pointer(instance, vkFunction);
 			
 			for (const auto& replacement : vk_replacements) {
@@ -577,36 +603,36 @@ namespace vk {
 	}
 
 	namespace nvSwapchain { 
-		int32_t QueuePresent (const void* VkQueue_T, const void* VkPresentInfoKHR) {
-			return vk::Common::QueuePresent(VkQueue_T, VkPresentInfoKHR, nvSwapchainQueuePresentKHR_0);
+		int32_t QueuePresent (VkQueue* VkQueue_T, VkPresentInfoKHR* PresentInfoKHR) {
+			return vk::Common::QueuePresent(VkQueue_T, PresentInfoKHR, nvSwapchainQueuePresentKHR_0);
 		}
 
-		int32_t CreateSwapchain(void* Device, VkSwapchainCreateInfoKHR* pCreateInfo, const void* pAllocator, const void** pSwapchain) {
+		int32_t CreateSwapchain(VkDevice* Device, const VkSwapchainCreateInfoKHR* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSwapchainKHR** pSwapchain) {
 			return vk::Common::CreateSwapchain(Device, pCreateInfo, pAllocator, pSwapchain, nvSwapchainCreateSwapchainKHR_0);
 		}
 
-		void* GetDeviceProcAddr(void* device, const char* vkFunction) {
+		void* GetDeviceProcAddr(VkDevice* device, const char* vkFunction) {
 			return vk::Common::GetDeviceProcAddr(device, vkFunction, nvSwapchainGetDeviceProcAddr_0);
 		}
 
-		void* GetInstanceProcAddr(void* instance, const char* vkFunction) {
+		void* GetInstanceProcAddr(VkInstance* instance, const char* vkFunction) {
 			return vk::Common::GetInstanceProcAddr(instance, vkFunction, nvSwapchainGetInstanceProcAddr_0);
 		}
 	}
 
-	int32_t QueuePresent (const void* VkQueue, const void* VkPresentInfoKHR) {
-		return vk::Common::QueuePresent(VkQueue, VkPresentInfoKHR, vkQueuePresentKHR_0);
+	int32_t QueuePresent (VkQueue* VkQueue_T, VkPresentInfoKHR* PresentInfoKHR) {
+		return vk::Common::QueuePresent(VkQueue_T, PresentInfoKHR, vkQueuePresentKHR_0);
 	}
 
-	int32_t CreateSwapchain(void* Device, VkSwapchainCreateInfoKHR* pCreateInfo, const void* pAllocator, const void** pSwapchain) {
+	int32_t CreateSwapchain(VkDevice* Device, const VkSwapchainCreateInfoKHR* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSwapchainKHR** pSwapchain) {
 		return vk::Common::CreateSwapchain(Device, pCreateInfo, pAllocator, pSwapchain, vkCreateSwapchainKHR_0);
 	}
 
-	void* GetDeviceProcAddr(void* device, const char* vkFunction) {
+	void* GetDeviceProcAddr(VkDevice* device, const char* vkFunction) {
 		return vk::Common::GetDeviceProcAddr(device, vkFunction, vkGetDeviceProcAddr_0);
 	}
 
-	void* GetInstanceProcAddr(void* instance, const char* vkFunction) {
+	void* GetInstanceProcAddr(VkInstance* instance, const char* vkFunction) {
 		return vk::Common::GetInstanceProcAddr(instance, vkFunction, vkGetInstanceProcAddr_0);
 	}
 
@@ -639,8 +665,15 @@ namespace EGL {
 		float height;
 	};
 
-	static bool (*eglSwapBuffers_0)(const void* EGLDisplay, const void* EGLSurface);
-	static bool (*eglSwapInterval_0)(const void* EGLDisplay, int interval);
+	struct EGLDisplay {
+		char reserved[8];
+	};
+	struct EGLSurface {
+		char reserved[8];
+	};
+
+	static bool (*eglSwapBuffers_0)(EGLDisplay*, EGLSurface*);
+	static bool (*eglSwapInterval_0)(EGLDisplay*, int interval);
 	static void (*glViewport_0)(int x, int y, uint width, uint height);
 	static void (*glViewportArrayv_0)(uint firstViewport, uint viewportCount, const glViewportArray* pViewports);
 	static void (*glViewportArrayvNV_0)(uint firstViewport, uint viewportCount, const glViewportArray* pViewports);
@@ -653,10 +686,10 @@ namespace EGL {
 	static void (*glViewportIndexedfvOES_0)(uint index, const glViewportArray* pViewports);
 	static u64 (*eglGetProcAddress_0)(const char* eglName);
 
-	bool Interval(const void* EGLDisplay, int interval) {
+	bool Interval(EGLDisplay* display, int interval) {
 		bool result = false;
 		if (!changeFPS) {
-			result = eglSwapInterval_0(EGLDisplay, interval);
+			result = eglSwapInterval_0(display, interval);
 			changedFPS = false;
 			if (result == true) {
 				(Shared -> FPSmode) = std::clamp(interval, EGL_MIN_SWAP_INTERVAL, EGL_MAX_SWAP_INTERVAL);
@@ -665,7 +698,7 @@ namespace EGL {
 		else if (interval < 0) {
 			interval *= -1;
 			if ((Shared -> FPSmode) != interval) {
-				result = eglSwapInterval_0(EGLDisplay, interval);
+				result = eglSwapInterval_0(display, interval);
 				if (result == true)
 					(Shared -> FPSmode) = interval;
 			}
@@ -674,7 +707,7 @@ namespace EGL {
 		return result;
 	}
 
-	bool Swap (const void* EGLDisplay, const void* EGLSurface) {
+	bool Swap (EGLDisplay* display, EGLSurface* surface) {
 
 		if (NX_FPS_Math::starttick == 0) [[unlikely]] {
 			(Shared -> API) = 2;
@@ -684,7 +717,7 @@ namespace EGL {
 
 		NX_FPS_Math::PreFrame();
 		
-		const bool result = eglSwapBuffers_0(EGLDisplay, EGLSurface);
+		const bool result = eglSwapBuffers_0(display, surface);
 		if (result == true)
 			 NX_FPS_Math::PostFrame();
 		
@@ -709,7 +742,7 @@ namespace EGL {
 			else                            {interval = 1; threshold = rr;    }
 
 			if (FPSmode != interval) {
-				EGL::Interval(EGLDisplay, interval * -1);
+				EGL::Interval(display, interval * -1);
 			}
 			if (new_fpslock != threshold) {
 				NX_FPS_Math::FPStiming = (systemtickfrequency/new_fpslock) - 6000;
