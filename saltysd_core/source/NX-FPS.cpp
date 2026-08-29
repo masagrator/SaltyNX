@@ -850,6 +850,9 @@ namespace NVN {
 	struct Sync {
 		char reserved[0x40];
 	};
+	struct QueueBuilder {
+    	char reserved[0x40];
+	};
 	struct Queue {
 		char reserved[0x2000];
 	};
@@ -983,6 +986,7 @@ namespace NVN {
 	alignas(0x1000) char dataPoolHostPtr[0x1000]{};
 	alignas(0x1000) char cmdPoolHostPtr[0x1000]{};
 	CommandHandle cmdHandles{};
+	bool enableCounters = false;
 
 	bool WindowInitialize(const Window* nvnWindow, struct WindowBuilder* windowBuilder) {
 		if (Shared->Buffers == 0) {
@@ -1069,96 +1073,101 @@ namespace NVN {
 	void PresentTexture(const Queue* queue, const Window* nvnWindow, int index) {
 
 		//Initialize time calculation;
+		bool m_enableCounters = enableCounters;
 		if (NX_FPS_Math::starttick == 0) [[unlikely]] {
 			NX_FPS_Math::starttick = Utils::_getSystemTick();
 			NX_FPS_Math::starttick2 = NX_FPS_Math::starttick;
 
-			MemoryPoolBuilder dataPoolBuilder{};
-			nvnMemoryPoolBuilderSetDefaults_0(&dataPoolBuilder);
-			nvnMemoryPoolBuilderSetDevice_0(&dataPoolBuilder, mainDevice);
-			nvnMemoryPoolBuilderSetFlags_0(&dataPoolBuilder, BIT(1) | BIT(5));
-			nvnMemoryPoolBuilderSetStorage_0(&dataPoolBuilder, (void*)&dataPoolHostPtr, sizeof(dataPoolHostPtr));
-			nvnMemoryPoolInitialize_0(&timestampDataPool, &dataPoolBuilder);
-			timestampDataCPU = (nvnCounterData*)nvnMemoryPoolMap_0(&timestampDataPool);
-			BufferAddress dataGpuAddress = nvnMemoryPoolGetBufferAddress_0(&timestampDataPool);
+			if (m_enableCounters) {
+				MemoryPoolBuilder dataPoolBuilder{};
+				nvnMemoryPoolBuilderSetDefaults_0(&dataPoolBuilder);
+				nvnMemoryPoolBuilderSetDevice_0(&dataPoolBuilder, mainDevice);
+				nvnMemoryPoolBuilderSetFlags_0(&dataPoolBuilder, BIT(1) | BIT(5));
+				nvnMemoryPoolBuilderSetStorage_0(&dataPoolBuilder, (void*)&dataPoolHostPtr, sizeof(dataPoolHostPtr));
+				nvnMemoryPoolInitialize_0(&timestampDataPool, &dataPoolBuilder);
+				timestampDataCPU = (nvnCounterData*)nvnMemoryPoolMap_0(&timestampDataPool);
+				BufferAddress dataGpuAddress = nvnMemoryPoolGetBufferAddress_0(&timestampDataPool);
 
-			MemoryPoolBuilder cmdPoolBuilder{};
-			nvnMemoryPoolBuilderSetDefaults_0(&cmdPoolBuilder);
-			nvnMemoryPoolBuilderSetDevice_0(&cmdPoolBuilder, mainDevice);
-			nvnMemoryPoolBuilderSetFlags_0(&cmdPoolBuilder, BIT(1) | BIT(5));
-			nvnMemoryPoolBuilderSetStorage_0(&cmdPoolBuilder, (void*)&cmdPoolHostPtr, sizeof(cmdPoolHostPtr));
-			nvnMemoryPoolInitialize_0(&profilingCmdMemoryPool, &cmdPoolBuilder);
+				MemoryPoolBuilder cmdPoolBuilder{};
+				nvnMemoryPoolBuilderSetDefaults_0(&cmdPoolBuilder);
+				nvnMemoryPoolBuilderSetDevice_0(&cmdPoolBuilder, mainDevice);
+				nvnMemoryPoolBuilderSetFlags_0(&cmdPoolBuilder, BIT(1) | BIT(5));
+				nvnMemoryPoolBuilderSetStorage_0(&cmdPoolBuilder, (void*)&cmdPoolHostPtr, sizeof(cmdPoolHostPtr));
+				nvnMemoryPoolInitialize_0(&profilingCmdMemoryPool, &cmdPoolBuilder);
 
-			//nvnDeviceGetInteger_0(mainDevice, 10, &COUNTER_ALIGNMENT);
+				//nvnDeviceGetInteger_0(mainDevice, 10, &COUNTER_ALIGNMENT);
 
-			nvnCommandBufferInitialize_0(&tsCmdBuf, mainDevice);
-			
-			nvnCommandBufferAddCommandMemory_0(&tsCmdBuf, &profilingCmdMemoryPool, 0, COMMAND_MEMORY_PER_BUF);
-			nvnCommandBufferAddControlMemory_0(&tsCmdBuf, controlMemoryStorage, CONTROL_MEMORY_PER_BUF);
+				nvnCommandBufferInitialize_0(&tsCmdBuf, mainDevice);
+				
+				nvnCommandBufferAddCommandMemory_0(&tsCmdBuf, &profilingCmdMemoryPool, 0, COMMAND_MEMORY_PER_BUF);
+				nvnCommandBufferAddControlMemory_0(&tsCmdBuf, controlMemoryStorage, CONTROL_MEMORY_PER_BUF);
 
-			nvnCommandBufferBeginRecording_0(&tsCmdBuf);
+				nvnCommandBufferBeginRecording_0(&tsCmdBuf);
 
-			for (size_t counter = 0; counter < 0x10; counter++) {
-				BufferAddress currentFrameOffset = dataGpuAddress + (counter * COUNTER_ALIGNMENT);
-				nvnCommandBufferReportCounter_0(&tsCmdBuf, counter, currentFrameOffset);
-				nvnCommandBufferResetCounter_0(&tsCmdBuf, counter);			
+				for (size_t counter = 0; counter < 1; counter++) {
+					BufferAddress currentFrameOffset = dataGpuAddress + (counter * COUNTER_ALIGNMENT);
+					nvnCommandBufferReportCounter_0(&tsCmdBuf, counter, currentFrameOffset);
+					nvnCommandBufferResetCounter_0(&tsCmdBuf, counter);			
+				}
+				
+				cmdHandles = nvnCommandBufferEndRecording_0(&tsCmdBuf);
 			}
-			
-			cmdHandles = nvnCommandBufferEndRecording_0(&tsCmdBuf);
 		}
 		NX_FPS_Math::PreFrame();
 		nvnQueuePresentTexture_0(queue, nvnWindow, index);
-		Shared->PerfCounters.NVN.timestamp = timestampDataCPU->timestamp;
-		#if defined(SWITCH) || defined(OUNCE)
-		uint64x2x4_t loaded_data1 = vld1q_u64_x4(&timestampDataCPU->samplesPassed);
-		uint64x2x4_t loaded_data2 = vld1q_u64_x4(&timestampDataCPU->tessControlShaderInvocations);
-		uint64x2x4_t loaded_data3 = vld1q_u64_x4(&timestampDataCPU->tessEvaluationShaderPrimitives);
-		uint64x2x2_t loaded_data4 = vld1q_u64_x2(&timestampDataCPU->primitivesGenerated);
-		uint32x4_t loaded_data5 = vld1q_u32(&timestampDataCPU->tilesProcessedByZcull);
+		if (m_enableCounters) {
+			Shared->PerfCounters.NVN.timestamp = timestampDataCPU->timestamp;
+			#if defined(SWITCH) || defined(OUNCE)
+			uint64x2x4_t loaded_data1 = vld1q_u64_x4(&timestampDataCPU->samplesPassed);
+			uint64x2x4_t loaded_data2 = vld1q_u64_x4(&timestampDataCPU->tessControlShaderInvocations);
+			uint64x2x4_t loaded_data3 = vld1q_u64_x4(&timestampDataCPU->tessEvaluationShaderPrimitives);
+			uint64x2x2_t loaded_data4 = vld1q_u64_x2(&timestampDataCPU->primitivesGenerated);
+			uint32x4_t loaded_data5 = vld1q_u32(&timestampDataCPU->tilesProcessedByZcull);
 
-		Shared->PerfCounters.NVN.samplesPassed = loaded_data1.val[0][0];
-		Shared->PerfCounters.NVN.inputVertices = loaded_data1.val[1][0];
-		Shared->PerfCounters.NVN.inputPrimitives = loaded_data1.val[2][0];
-		Shared->PerfCounters.NVN.vertexShaderInvocations = loaded_data1.val[3][0];
+			Shared->PerfCounters.NVN.samplesPassed = loaded_data1.val[0][0];
+			Shared->PerfCounters.NVN.inputVertices = loaded_data1.val[1][0];
+			Shared->PerfCounters.NVN.inputPrimitives = loaded_data1.val[2][0];
+			Shared->PerfCounters.NVN.vertexShaderInvocations = loaded_data1.val[3][0];
 
-		Shared->PerfCounters.NVN.tessControlShaderInvocations = loaded_data2.val[0][0];
-		Shared->PerfCounters.NVN.tessEvaluationShaderInvocations = loaded_data2.val[1][0];
-		Shared->PerfCounters.NVN.geometryShaderInvocations = loaded_data2.val[2][0];
-		Shared->PerfCounters.NVN.fragmentShaderInvocations = loaded_data2.val[3][0];
+			Shared->PerfCounters.NVN.tessControlShaderInvocations = loaded_data2.val[0][0];
+			Shared->PerfCounters.NVN.tessEvaluationShaderInvocations = loaded_data2.val[1][0];
+			Shared->PerfCounters.NVN.geometryShaderInvocations = loaded_data2.val[2][0];
+			Shared->PerfCounters.NVN.fragmentShaderInvocations = loaded_data2.val[3][0];
 
-		Shared->PerfCounters.NVN.tessEvaluationShaderPrimitives = loaded_data3.val[0][0];
-		Shared->PerfCounters.NVN.geometryShaderPrimitives = loaded_data3.val[1][0];
-		Shared->PerfCounters.NVN.clipperInputPrimitives = loaded_data3.val[2][0];
-		Shared->PerfCounters.NVN.clipperOutputPrimitives = loaded_data3.val[3][0];
+			Shared->PerfCounters.NVN.tessEvaluationShaderPrimitives = loaded_data3.val[0][0];
+			Shared->PerfCounters.NVN.geometryShaderPrimitives = loaded_data3.val[1][0];
+			Shared->PerfCounters.NVN.clipperInputPrimitives = loaded_data3.val[2][0];
+			Shared->PerfCounters.NVN.clipperOutputPrimitives = loaded_data3.val[3][0];
 
-		Shared->PerfCounters.NVN.primitivesGenerated = loaded_data4.val[0][0];
-		Shared->PerfCounters.NVN.transformFeedbackPrimitivesWritten = loaded_data4.val[1][0];
+			Shared->PerfCounters.NVN.primitivesGenerated = loaded_data4.val[0][0];
+			Shared->PerfCounters.NVN.transformFeedbackPrimitivesWritten = loaded_data4.val[1][0];
 
-		Shared->PerfCounters.NVN.tilesProcessedByZcull = loaded_data5[0];
-		Shared->PerfCounters.NVN.pixelBlocksBehindPrimitivesAndCulled = loaded_data5[1];
-		Shared->PerfCounters.NVN.pixelBlocksInFrontOfPrimitivesCulled = loaded_data5[2];
-		Shared->PerfCounters.NVN.pixelBlocksFailedStencilTestAndCulled = loaded_data5[3];
-		#else
-		Shared->PerfCounters.NVN.samplesPassed = timestampDataCPU->samplesPassed;
-		Shared->PerfCounters.NVN.inputVertices = timestampDataCPU->inputVertices;
-		Shared->PerfCounters.NVN.inputPrimitives = timestampDataCPU->inputPrimitives;
-		Shared->PerfCounters.NVN.vertexShaderInvocations = timestampDataCPU->vertexShaderInvocations;
-		Shared->PerfCounters.NVN.tessControlShaderInvocations = timestampDataCPU->tessControlShaderInvocations;
-		Shared->PerfCounters.NVN.tessEvaluationShaderInvocations = timestampDataCPU->tessEvaluationShaderInvocations;
-		Shared->PerfCounters.NVN.geometryShaderInvocations = timestampDataCPU->geometryShaderInvocations;
-		Shared->PerfCounters.NVN.fragmentShaderInvocations = timestampDataCPU->fragmentShaderInvocations;
-		Shared->PerfCounters.NVN.tessEvaluationShaderPrimitives = timestampDataCPU->tessEvaluationShaderPrimitives;
-		Shared->PerfCounters.NVN.geometryShaderPrimitives = timestampDataCPU->geometryShaderPrimitives;
-		Shared->PerfCounters.NVN.clipperInputPrimitives = timestampDataCPU->clipperInputPrimitives;
-		Shared->PerfCounters.NVN.clipperOutputPrimitives = timestampDataCPU->clipperOutputPrimitives;
-		Shared->PerfCounters.NVN.primitivesGenerated = timestampDataCPU->primitivesGenerated;
-		Shared->PerfCounters.NVN.transformFeedbackPrimitivesWritten = timestampDataCPU->transformFeedbackPrimitivesWritten;
-		Shared->PerfCounters.NVN.tilesProcessedByZcull = timestampDataCPU->tilesProcessedByZcull;
-		Shared->PerfCounters.NVN.pixelBlocksBehindPrimitivesAndCulled = timestampDataCPU->pixelBlocksBehindPrimitivesAndCulled;
-		Shared->PerfCounters.NVN.pixelBlocksInFrontOfPrimitivesCulled = timestampDataCPU->pixelBlocksInFrontOfPrimitivesCulled;
-		Shared->PerfCounters.NVN.pixelBlocksFailedStencilTestAndCulled = timestampDataCPU->pixelBlocksFailedStencilTestAndCulled;
-		#endif
-		nvnQueueSubmitCommands_0(queue, 1, &cmdHandles);
+			Shared->PerfCounters.NVN.tilesProcessedByZcull = loaded_data5[0];
+			Shared->PerfCounters.NVN.pixelBlocksBehindPrimitivesAndCulled = loaded_data5[1];
+			Shared->PerfCounters.NVN.pixelBlocksInFrontOfPrimitivesCulled = loaded_data5[2];
+			Shared->PerfCounters.NVN.pixelBlocksFailedStencilTestAndCulled = loaded_data5[3];
+			#else
+			Shared->PerfCounters.NVN.samplesPassed = timestampDataCPU->samplesPassed;
+			Shared->PerfCounters.NVN.inputVertices = timestampDataCPU->inputVertices;
+			Shared->PerfCounters.NVN.inputPrimitives = timestampDataCPU->inputPrimitives;
+			Shared->PerfCounters.NVN.vertexShaderInvocations = timestampDataCPU->vertexShaderInvocations;
+			Shared->PerfCounters.NVN.tessControlShaderInvocations = timestampDataCPU->tessControlShaderInvocations;
+			Shared->PerfCounters.NVN.tessEvaluationShaderInvocations = timestampDataCPU->tessEvaluationShaderInvocations;
+			Shared->PerfCounters.NVN.geometryShaderInvocations = timestampDataCPU->geometryShaderInvocations;
+			Shared->PerfCounters.NVN.fragmentShaderInvocations = timestampDataCPU->fragmentShaderInvocations;
+			Shared->PerfCounters.NVN.tessEvaluationShaderPrimitives = timestampDataCPU->tessEvaluationShaderPrimitives;
+			Shared->PerfCounters.NVN.geometryShaderPrimitives = timestampDataCPU->geometryShaderPrimitives;
+			Shared->PerfCounters.NVN.clipperInputPrimitives = timestampDataCPU->clipperInputPrimitives;
+			Shared->PerfCounters.NVN.clipperOutputPrimitives = timestampDataCPU->clipperOutputPrimitives;
+			Shared->PerfCounters.NVN.primitivesGenerated = timestampDataCPU->primitivesGenerated;
+			Shared->PerfCounters.NVN.transformFeedbackPrimitivesWritten = timestampDataCPU->transformFeedbackPrimitivesWritten;
+			Shared->PerfCounters.NVN.tilesProcessedByZcull = timestampDataCPU->tilesProcessedByZcull;
+			Shared->PerfCounters.NVN.pixelBlocksBehindPrimitivesAndCulled = timestampDataCPU->pixelBlocksBehindPrimitivesAndCulled;
+			Shared->PerfCounters.NVN.pixelBlocksInFrontOfPrimitivesCulled = timestampDataCPU->pixelBlocksInFrontOfPrimitivesCulled;
+			Shared->PerfCounters.NVN.pixelBlocksFailedStencilTestAndCulled = timestampDataCPU->pixelBlocksFailedStencilTestAndCulled;
+			#endif
+			nvnQueueSubmitCommands_0(queue, 1, &cmdHandles);
+		}
 		NX_FPS_Math::PostFrame();
 
 		if (setNumActiveTexturesDetected) {
@@ -1282,6 +1291,8 @@ namespace NVN {
 
 		std::array nvn_replacements = {
 			runtime_replace{"nvnDeviceGetProcAddress", nullptr, (void*)GetProcAddress0},
+			runtime_replace{"nvnDeviceInitialize", (uintptr_t*)&nvnDeviceInitialize_0, (void*)DeviceInitialize},
+			runtime_replace{"nvnDeviceGetInteger", (uintptr_t*)&nvnDeviceGetInteger_0},
 			runtime_replace{"nvnQueuePresentTexture", (uintptr_t*)&nvnQueuePresentTexture_0, (void*)PresentTexture},
 			runtime_replace{"nvnWindowAcquireTexture", (uintptr_t*)&nvnWindowAcquireTexture_0, (void*)AcquireTexture},
 			runtime_replace{"nvnWindowSetPresentInterval", (uintptr_t*)&nvnWindowSetPresentInterval_0, (void*)SetPresentInterval},
@@ -1316,8 +1327,6 @@ namespace NVN {
 			runtime_replace{"nvnCommandBufferEndRecording", (uintptr_t*)&nvnCommandBufferEndRecording_0},
 			runtime_replace{"nvnQueueSubmitCommands", (uintptr_t*)&nvnQueueSubmitCommands_0},
 			runtime_replace{"nvnQueueFenceSync", (uintptr_t*)&nvnQueueFenceSync_0},
-			runtime_replace{"nvnDeviceGetInteger", (uintptr_t*)&nvnDeviceGetInteger_0},
-			runtime_replace{"nvnDeviceInitialize", (uintptr_t*)&nvnDeviceInitialize_0, (void*)DeviceInitialize},
 			runtime_replace{"nvnCommandBufferResetCounter", (uintptr_t*)&nvnCommandBufferResetCounter_0}
 		};
 
@@ -1381,7 +1390,6 @@ extern "C" {
 			//Putting this inside doesn't generate bloat in .init_array
 			std::array replacements = {
 				runtime_replace{"nvnBootstrapLoader", (uintptr_t*)&NVN::nvnBootstrapLoader_0, (void*)NVN::BootstrapLoader_1, nullptr},
-
 				runtime_replace{"eglGetProcAddress", (uintptr_t*)&EGL::eglGetProcAddress_0, (void*)EGL::GetProc, nullptr},
 				runtime_replace{"eglSwapBuffers", (uintptr_t*)&EGL::eglSwapBuffers_0, (void*)EGL::Swap, nullptr},
 				runtime_replace{"eglSwapInterval", (uintptr_t*)&EGL::eglSwapInterval_0, (void*)EGL::Interval, nullptr},
@@ -1441,6 +1449,12 @@ extern "C" {
 					}
 					else SaltySDCore_ReplaceImport(replacement.name, replacement.hook_ptr);
 				}
+			}
+
+			FILE* nvn_file = SaltySDCore_fopen("sdmc:/SaltySD/flags/nvncounters.flag", "rb");
+			if  (nvn_file) {
+				SaltySDCore_fclose(nvn_file);
+				NVN::enableCounters = true;
 			}
 
 			uint64_t titleid = 0;
