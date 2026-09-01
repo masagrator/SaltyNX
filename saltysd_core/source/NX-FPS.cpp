@@ -941,6 +941,7 @@ namespace NVN {
 	static void (*nvnQueuePresentTexture_0)(const Queue* queue, const Window* nvnWindow, int index);
 	static uintptr_t (*nvnDeviceGetProcAddress_0)(const void* unk1_a, const char* nvnFunction_a);
 	static void (*nvnWindowBuilderSetTextures_0)(const WindowBuilder* nvnWindowBuilder, int buffers, const Texture** texturesBuffer);
+	static int (*nvnWindowBuilderGetNumTextures_0)(const WindowBuilder* nvnWindowBuilder);
 	static void (*nvnWindowSetNumActiveTextures_0)(const Window* nvnWindow, int buffers);
 	static int (*nvnWindowGetNumActiveTextures_0)(const Window* nvnWindow);
 	static bool (*nvnWindowInitialize_0)(const Window* nvnWindow, struct WindowBuilder* windowBuilder);
@@ -1022,12 +1023,16 @@ namespace NVN {
 	bool enableCounters = false;
 
 	bool WindowInitialize(const Window* nvnWindow, struct WindowBuilder* windowBuilder) {
-		if (Shared->Buffers == 0) {
-			(Shared -> Buffers) = windowBuilder -> numBufferedFrames;
-			if ((Shared -> SetBuffers) >= 2 && (Shared -> SetBuffers) <= windowBuilder -> numBufferedFrames) {
+		auto numTextures = nvnWindowBuilderGetNumTextures_0(windowBuilder);
+		if (numTextures == windowBuilder -> numBufferedFrames) {
+			(Shared -> Buffers) = numTextures;
+			if ((Shared -> SetBuffers) >= 2 && (Shared -> SetBuffers) <= numTextures) {
 				windowBuilder -> numBufferedFrames = (Shared -> SetBuffers);
 			}
-			(Shared -> ActiveBuffers) = windowBuilder -> numBufferedFrames;	
+			(Shared -> ActiveBuffers) = windowBuilder -> numBufferedFrames;
+		}
+		else {
+			
 		}
 		return nvnWindowInitialize_0(nvnWindow, windowBuilder);
 	}
@@ -1360,7 +1365,8 @@ namespace NVN {
 			runtime_replace{"nvnCommandBufferEndRecording", (uintptr_t*)&nvnCommandBufferEndRecording_0},
 			runtime_replace{"nvnQueueSubmitCommands", (uintptr_t*)&nvnQueueSubmitCommands_0},
 			runtime_replace{"nvnQueueFenceSync", (uintptr_t*)&nvnQueueFenceSync_0},
-			runtime_replace{"nvnCommandBufferResetCounter", (uintptr_t*)&nvnCommandBufferResetCounter_0}
+			runtime_replace{"nvnCommandBufferResetCounter", (uintptr_t*)&nvnCommandBufferResetCounter_0},
+			runtime_replace{"nvnWindowBuilderGetNumTextures", (uintptr_t*)&nvnWindowBuilderGetNumTextures_0}
 		};
 
 		for (const auto& replacement : nvn_replacements) {
