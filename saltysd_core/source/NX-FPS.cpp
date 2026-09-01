@@ -943,7 +943,7 @@ namespace NVN {
 	static void (*nvnWindowBuilderSetTextures_0)(const WindowBuilder* nvnWindowBuilder, int buffers, const Texture** texturesBuffer);
 	static void (*nvnWindowSetNumActiveTextures_0)(const Window* nvnWindow, int buffers);
 	static int (*nvnWindowGetNumActiveTextures_0)(const Window* nvnWindow);
-	static bool (*nvnWindowInitialize_0)(const Window* nvnWindow, struct WindowBuilder* windowBuilder);
+	static bool (*nvnWindowInitialize_0)(const Window* nvnWindow, WindowBuilder* windowBuilder);
 	static Result (*nvnWindowAcquireTexture_0)(const Window* nvnWindow, const Sync* nvnSync, const int* index);
 	static void (*nvnWindowSetPresentInterval_0)(const Window* nvnWindow, int mode);
 	static int (*nvnWindowGetPresentInterval_0)(const Window* nvnWindow);
@@ -1021,7 +1021,7 @@ namespace NVN {
 	CommandHandle cmdHandles{};
 	bool enableCounters = false;
 
-	bool WindowInitialize(const Window* nvnWindow, struct WindowBuilder* windowBuilder) {
+	bool WindowInitialize(const Window* nvnWindow, WindowBuilder* windowBuilder) {
 		if (Shared->Buffers == 0) {
 			(Shared -> Buffers) = windowBuilder -> numBufferedFrames;
 			if ((Shared -> SetBuffers) >= 2 && (Shared -> SetBuffers) <= windowBuilder -> numBufferedFrames) {
