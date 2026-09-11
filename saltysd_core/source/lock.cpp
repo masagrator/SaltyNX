@@ -270,12 +270,12 @@ namespace {
 
 	#if defined(SWITCH_64BIT)
 		#define MIN_ASLR_ADDRESS 0x8000000
-		#define MAX_ASLR_ADDRESS 0x7FFFFFFFFF
+		#define MAX_ASLR_ADDRESS 0x3FFF8000000
 	#elif defined(SWITCH_32BIT)
 		#define MIN_ASLR_ADDRESS 0x200000
 		#define MAX_ASLR_ADDRESS 0xFFFFFFFF
 	#endif
-		if (address < MIN_ASLR_ADDRESS || address > MAX_ASLR_ADDRESS) return false;
+		if (address < MIN_ASLR_ADDRESS || address >= MAX_ASLR_ADDRESS) return false;
 
 		Result rc = svcQueryMemory(&memoryinfo, &pageinfo, address);
 		if (R_FAILED(rc)) return false;
