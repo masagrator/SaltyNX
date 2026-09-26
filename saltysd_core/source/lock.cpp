@@ -18,8 +18,12 @@
 #include "useful.h"
 #endif
 
-#ifdef SWITCH_64BIT
+#ifdef defined(SWITCH_64BIT) || defined(SWITCH_32BIT)
+alignas(0x1000) static uint8_t variables_buffer[0x1000];
 extern "C" void codeCave();
+#endif
+
+#ifdef defined(SWITCH_64BIT)
 //We need to define something in that section and reference its pointer to not get whole section discarded by garbage collector
 //Trick to get section page aligned to 0x1000 with size 0x1000 without using linker script
 __asm__(
@@ -35,9 +39,7 @@ __asm__(
     ".align 12\n"
 );
 
-alignas(0x1000) static uint8_t variables_buffer[0x1000];
 #elif defined(SWITCH_32BIT)
-extern "C" void codeCave();
 //Same trick as in 64-bit build, codeCave is A32 code (Thumb is not supported)
 __asm__(
     ".section .codecave, \"ax\", %progbits\n"
@@ -52,8 +54,6 @@ __asm__(
 
     ".align 12\n"
 );
-
-alignas(0x1000) static uint8_t variables_buffer[0x1000];
 #endif
 
 #ifdef HOST_BUILD
