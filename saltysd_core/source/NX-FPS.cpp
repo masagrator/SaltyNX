@@ -1070,11 +1070,6 @@ namespace NVN {
 
 		// State
 		bool requested = false;              // Flag detected and memory reserved at boot.
-		// Temporary debug stages:
-		// triplebuffer_noswap.flag - only reserve memory, game's textures are passed to window
-		// triplebuffer_nocopy.flag - our textures are passed to window, but nothing is copied to them
-		bool debugNoSwap = false;
-		bool debugNoCopy = false;
 		bool poolInitialized = false;
 		bool texturesInitialized = false;
 		bool cmdBufInitialized = false;
@@ -1225,7 +1220,7 @@ namespace NVN {
 
 		// Returns textures that should be passed to window or nullptr if emulation can't be used.
 		const Texture** setup(const WindowBuilder* builder, int numTextures, const Texture** textures) {
-			if (!requested || debugNoSwap || numTextures != GAME_TEXTURES || !textures || !textures[0] || !textures[1]) return nullptr;
+			if (!requested || numTextures != GAME_TEXTURES || !textures || !textures[0] || !textures[1]) return nullptr;
 			if (!memory) {
 				memory = SaltySDCore_GetReservedMemory(&memorySize);
 				if (!memory || memorySize < RESERVED_MEMORY_SIZE) {
@@ -1405,7 +1400,7 @@ namespace NVN {
 		}
 		NX_FPS_Math::PreFrame();
 		if (TripleBuffer::activeWindow && nvnWindow == TripleBuffer::activeWindow && TripleBuffer::acquired && (index == 0 || index == 1)) {
-			if (!TripleBuffer::debugNoCopy) nvnQueueSubmitCommands_0(queue, 1, &TripleBuffer::copyHandles[index][TripleBuffer::windowIndex]);
+			nvnQueueSubmitCommands_0(queue, 1, &TripleBuffer::copyHandles[index][TripleBuffer::windowIndex]);
 			// Signaled when game's frame rendered to this index and our copy from it are finished.
 			// No flags needed, present right after flushes queue.
 			nvnQueueFenceSync_0(queue, &TripleBuffer::frameSyncs[index], TripleBuffer::SYNC_CONDITION_ALL_GPU_COMMANDS_COMPLETE, 0);
@@ -1780,20 +1775,21 @@ extern "C" {
 				}
 			}
 
-			FILE* tb_file = SaltySDCore_fopen("sdmc:/SaltySD/flags/triplebuffer.flag", "rb");
+			uint64_t titleid = 0;
+			svcGetInfo(&titleid, InfoType_ProgramId, CUR_PROCESS_HANDLE, 0);
+			char path[128];
+
+			#if defined(SWITCH32) || defined(OUNCE32)
+			npf_snprintf(path, sizeof(path), "sdmc:/SaltySD/triple_buffer/%016llX.flag", titleid);
+			#else
+			npf_snprintf(path, sizeof(path), "sdmc:/SaltySD/triple_buffer/%016lX.flag", titleid);
+			#endif
+			FILE* tb_file = SaltySDCore_fopen(path, "rb");
 			if (tb_file) {
 				SaltySDCore_fclose(tb_file);
 				// Must be done before game starts, otherwise game can take whole available heap.
 				NVN::TripleBuffer::requested = SaltySDCore_ReserveMemory(NVN::TripleBuffer::RESERVED_MEMORY_SIZE);
 				SaltySDCore_printf("NX-FPS: TripleBuffer: memory reservation requested: %d\n", NVN::TripleBuffer::requested);
-				auto flagExists = [](const char* path) {
-					FILE* file = SaltySDCore_fopen(path, "rb");
-					if (file) SaltySDCore_fclose(file);
-					return file != nullptr;
-				};
-				NVN::TripleBuffer::debugNoSwap = flagExists("sdmc:/SaltySD/flags/triplebuffer_noswap.flag");
-				NVN::TripleBuffer::debugNoCopy = flagExists("sdmc:/SaltySD/flags/triplebuffer_nocopy.flag");
-				SaltySDCore_printf("NX-FPS: TripleBuffer: debug noswap: %d, nocopy: %d\n", NVN::TripleBuffer::debugNoSwap, NVN::TripleBuffer::debugNoCopy);
 			}
 
 			FILE* nvn_file = SaltySDCore_fopen("sdmc:/SaltySD/flags/nvncounters.flag", "rb");
@@ -1802,9 +1798,6 @@ extern "C" {
 				NVN::enableCounters = true;
 			}
 
-			uint64_t titleid = 0;
-			svcGetInfo(&titleid, InfoType_ProgramId, CUR_PROCESS_HANDLE, 0);
-			char path[128];
 			#if defined(SWITCH32) || defined(OUNCE32)
 			npf_snprintf(path, sizeof(path), "sdmc:/SaltySD/plugins/FPSLocker/%016llX.dat", titleid);
 			#else
