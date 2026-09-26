@@ -863,7 +863,7 @@ namespace NVN {
 		char reserved[0x28];
 	};
 	struct TextureBuilder {
-		char reserved[0x40];
+		char reserved[0x80];
 	};
 	struct Window {
 		char reserved[0x180];
@@ -911,12 +911,12 @@ namespace NVN {
 		int height;
 	};
 	struct CopyRegion {
-		int depth;
-		int height;
-		int width;
 		int x;
 		int y;
 		int z;
+		int width;
+		int height;
+		int depth;
 	};
 
 	Sync* WindowSync = 0;
@@ -968,6 +968,21 @@ namespace NVN {
 	static BufferAddress (*nvnMemoryPoolGetBufferAddress_0)(const MemoryPool* nvnMemPool);
 	static void (*nvnDeviceGetInteger_0)(const Device* nvnDevice, int info, int* out);
 	static bool (*nvnDeviceInitialize_0)(Device* nvnDevice, const DeviceBuilder* nvnDeviceBuilder);
+	static void (*nvnTextureBuilderSetDevice_0)(TextureBuilder* builder, Device* device);
+	static void (*nvnTextureBuilderSetDefaults_0)(TextureBuilder* builder);
+	static void (*nvnTextureBuilderSetFlags_0)(TextureBuilder* builder, int flags);
+	static void (*nvnTextureBuilderSetTarget_0)(TextureBuilder* builder, int target);
+	static void (*nvnTextureBuilderSetFormat_0)(TextureBuilder* builder, int format);
+	static void (*nvnTextureBuilderSetSize2D_0)(TextureBuilder* builder, int width, int height);
+	static size_t (*nvnTextureBuilderGetStorageSize_0)(const TextureBuilder* builder);
+	static size_t (*nvnTextureBuilderGetStorageAlignment_0)(const TextureBuilder* builder);
+	static void (*nvnTextureBuilderSetStorage_0)(TextureBuilder* builder, const MemoryPool* pool, ptrdiff_t offset);
+	static bool (*nvnTextureInitialize_0)(Texture* texture, const TextureBuilder* builder);
+	static int (*nvnTextureGetFlags_0)(const Texture* texture);
+	static int (*nvnTextureGetTarget_0)(const Texture* texture);
+	static void (*nvnCommandBufferFinalize_0)(const CommandBuffer* nvnCmdBuf);
+	static void (*nvnCommandBufferBarrier_0)(const CommandBuffer* nvnCmdBuf, int barrier);
+	static void (*nvnCommandBufferCopyTextureToTexture_0)(const CommandBuffer* nvnCmdBuf, const Texture* src, const TextureView* srcView, const CopyRegion* srcRegion, const Texture* dst, const TextureView* dstView, const CopyRegion* dstRegion, int flags);
 
 	constexpr size_t COMMAND_MEMORY_PER_BUF = 0x1000; 
 	constexpr size_t CONTROL_MEMORY_PER_BUF = 0x1000;
@@ -1021,7 +1036,242 @@ namespace NVN {
 	CommandHandle cmdHandles{};
 	bool enableCounters = false;
 
+
+	/*
+		Triple buffer emulation for games that use only 2 window textures.
+
+		Memory for 3 display textures is reserved at the start of heap before the game starts (the game can take
+		all available heap for itself). When the game passes 2 textures to nvnWindowBuilderSetTextures, 3 textures
+		with the same properties are created in reserved memory and passed to the window instead.
+		The game keeps rendering into its own 2 textures (it gets only indexes 0 and 1 from nvnWindowAcquireTexture,
+		alternating with each present), and before each present its texture is copied into the window texture
+		returned by the real nvnWindowAcquireTexture, which is then presented.
+	*/
+	namespace TripleBuffer {
+		// Reserved memory layout: [textures pool | command memory pool | control memory]
+		// 3 x 1920x1080 RGBA8 block linear textures (height aligned up to 1152 rows) + alignment.
+		constexpr size_t TEXTURE_MEMORY_SIZE = 0x1C00000;
+		// Copies of full screen textures need a lot of command memory. Running out of it would call
+		// command buffer memory callback, which we don't set.
+		constexpr size_t COMMAND_MEMORY_SIZE = 0x100000;
+		constexpr size_t CONTROL_MEMORY_SIZE = 0x100000;
+		constexpr size_t RESERVED_MEMORY_SIZE = TEXTURE_MEMORY_SIZE + COMMAND_MEMORY_SIZE + CONTROL_MEMORY_SIZE;
+		constexpr int GAME_TEXTURES = 2;
+		constexpr int WINDOW_TEXTURES = 3;
+
+		constexpr int MEMORY_POOL_FLAGS_CPU_NO_ACCESS = 0x1;
+		constexpr int MEMORY_POOL_FLAGS_CPU_UNCACHED = 0x2;
+		constexpr int MEMORY_POOL_FLAGS_GPU_CACHED = 0x20;
+		constexpr int MEMORY_POOL_FLAGS_COMPRESSIBLE = 0x80;
+		constexpr int BARRIER_ORDER_FRAGMENTS = 0x2;
+		constexpr int BARRIER_INVALIDATE_TEXTURE = 0x10;
+		constexpr int SYNC_CONDITION_ALL_GPU_COMMANDS_COMPLETE = 0;
+		constexpr uint64_t WAIT_TIMEOUT_MAXIMUM = UINT64_MAX;
+
+		// State
+		bool requested = false;              // Flag detected and memory reserved at boot.
+		// Temporary debug stages:
+		// triplebuffer_noswap.flag - only reserve memory, game's textures are passed to window
+		// triplebuffer_nocopy.flag - our textures are passed to window, but nothing is copied to them
+		bool debugNoSwap = false;
+		bool debugNoCopy = false;
+		bool poolInitialized = false;
+		bool texturesInitialized = false;
+		bool cmdBufInitialized = false;
+		bool cmdPoolInitialized = false;
+
+		uintptr_t memory = 0;
+		size_t memorySize = 0;
+
+		MemoryPool texturePool{};
+		Texture textures[WINDOW_TEXTURES]{};
+		const Texture* windowTextures[WINDOW_TEXTURES]{};
+		const Texture* gameTextures[GAME_TEXTURES]{};
+		int texWidth = 0, texHeight = 0, texFormat = 0, texFlags = 0, texTarget = 0;
+
+		TextureBuilder textureBuilder{};
+		MemoryPoolBuilder memoryPoolBuilder{};
+
+		MemoryPool cmdPool{};
+		CommandBuffer cmdBuf{};
+		CommandHandle copyHandles[GAME_TEXTURES][WINDOW_TEXTURES]{};
+
+		// Game with 2 textures has usually only 2 sets of per-frame resources indexed by texture index.
+		// With 2 window textures, acquire sync guaranteed that frame which used the same index is finished on GPU.
+		// With 3 window textures it doesn't, so we fence each frame and wait for it before giving its index back to game.
+		Sync frameSyncs[GAME_TEXTURES]{};
+		bool frameSyncPending[GAME_TEXTURES]{};
+		bool frameSyncsInitialized = false;
+
+		const WindowBuilder* activeBuilder = nullptr; // Builder that got our textures.
+		const Window* activeWindow = nullptr;         // Window created from that builder, emulation is active for it.
+		int gameIndex = 0;                            // Index returned to the game (0 or 1).
+		int windowIndex = 0;                          // Index returned by real nvnWindowAcquireTexture.
+		bool acquired = false;
+
+		bool functionsAvailable() {
+			return mainDevice && nvnTextureBuilderSetDevice_0 && nvnTextureBuilderSetDefaults_0 && nvnTextureBuilderSetFlags_0 && nvnTextureBuilderSetTarget_0
+				&& nvnTextureBuilderSetFormat_0 && nvnTextureBuilderSetSize2D_0 && nvnTextureBuilderGetStorageSize_0 && nvnTextureBuilderGetStorageAlignment_0
+				&& nvnTextureBuilderSetStorage_0 && nvnTextureInitialize_0 && nvnTextureGetWidth_0 && nvnTextureGetHeight_0 && nvnTextureGetFormat_0
+				&& nvnTextureGetFlags_0 && nvnTextureGetTarget_0 && nvnMemoryPoolBuilderSetDefaults_0 && nvnMemoryPoolBuilderSetDevice_0
+				&& nvnMemoryPoolBuilderSetFlags_0 && nvnMemoryPoolBuilderSetStorage_0 && nvnMemoryPoolInitialize_0 && nvnCommandBufferInitialize_0
+				&& nvnCommandBufferFinalize_0 && nvnCommandBufferAddCommandMemory_0 && nvnCommandBufferAddControlMemory_0 && nvnCommandBufferBeginRecording_0
+				&& nvnCommandBufferEndRecording_0 && nvnCommandBufferBarrier_0 && nvnCommandBufferCopyTextureToTexture_0 && nvnQueueSubmitCommands_0
+				&& nvnSyncInitialize_0 && nvnQueueFenceSync_0 && nvnSyncWait_0;
+		}
+
+		// Prepares a texture builder for our window texture.
+		void setupBuilder(TextureBuilder* builder) {
+			nvnTextureBuilderSetDefaults_0(builder);
+			nvnTextureBuilderSetDevice_0(builder, mainDevice);
+			nvnTextureBuilderSetFlags_0(builder, texFlags);
+			nvnTextureBuilderSetTarget_0(builder, texTarget);
+			nvnTextureBuilderSetFormat_0(builder, texFormat);
+			nvnTextureBuilderSetSize2D_0(builder, texWidth, texHeight);
+		}
+
+		// Memory pool over whole reserved memory. It's created independently of textures,
+		// so it's always compressible to be able to hold both compressible and non-compressible textures.
+		bool createPool() {
+			if (poolInitialized) return true;
+			MemoryPoolBuilder* poolBuilder = &memoryPoolBuilder;
+			nvnMemoryPoolBuilderSetDefaults_0(poolBuilder);
+			nvnMemoryPoolBuilderSetDevice_0(poolBuilder, mainDevice);
+			nvnMemoryPoolBuilderSetFlags_0(poolBuilder, MEMORY_POOL_FLAGS_CPU_NO_ACCESS | MEMORY_POOL_FLAGS_GPU_CACHED | MEMORY_POOL_FLAGS_COMPRESSIBLE);
+			nvnMemoryPoolBuilderSetStorage_0(poolBuilder, (void*)memory, TEXTURE_MEMORY_SIZE);
+			poolInitialized = nvnMemoryPoolInitialize_0(&texturePool, poolBuilder);
+			if (!poolInitialized) requested = false;
+			return poolInitialized;
+		}
+
+		// Creates 3 textures with the same properties as game's texture in reserved memory.
+		bool createTextures(const Texture* reference) {
+			const int width = nvnTextureGetWidth_0(reference);
+			const int height = nvnTextureGetHeight_0(reference);
+			const int format = nvnTextureGetFormat_0(reference);
+			const int flags = nvnTextureGetFlags_0(reference);
+			const int target = nvnTextureGetTarget_0(reference);
+
+			if (texturesInitialized)
+				return (width == texWidth && height == texHeight && format == texFormat && flags == texFlags && target == texTarget);
+
+			texWidth = width; texHeight = height; texFormat = format; texFlags = flags; texTarget = target;
+
+			TextureBuilder* builder = &textureBuilder;
+			setupBuilder(builder);
+			const size_t storageSize = nvnTextureBuilderGetStorageSize_0(builder);
+			size_t alignment = nvnTextureBuilderGetStorageAlignment_0(builder);
+			if (!alignment) alignment = 0x1000;
+			const size_t stride = (storageSize + alignment - 1) & ~(alignment - 1);
+			if (!storageSize || stride * WINDOW_TEXTURES > TEXTURE_MEMORY_SIZE) {
+				return false;
+			}
+
+			for (int i = 0; i < WINDOW_TEXTURES; i++) {
+				setupBuilder(builder);
+				nvnTextureBuilderSetStorage_0(builder, &texturePool, (ptrdiff_t)(stride * i));
+				if (!nvnTextureInitialize_0(&textures[i], builder)) {
+					requested = false;
+					return false;
+				}
+				windowTextures[i] = &textures[i];
+			}
+			texturesInitialized = true;
+			return true;
+		}
+
+		// Records all 6 possible copies (game texture -> window texture).
+		bool recordCopies() {
+			if (cmdBufInitialized) {
+				nvnCommandBufferFinalize_0(&cmdBuf);
+				cmdBufInitialized = false;
+			}
+			if (!cmdPoolInitialized) {
+				MemoryPoolBuilder* poolBuilder = &memoryPoolBuilder;
+				nvnMemoryPoolBuilderSetDefaults_0(poolBuilder);
+				nvnMemoryPoolBuilderSetDevice_0(poolBuilder, mainDevice);
+				nvnMemoryPoolBuilderSetFlags_0(poolBuilder, MEMORY_POOL_FLAGS_CPU_UNCACHED | MEMORY_POOL_FLAGS_GPU_CACHED);
+				nvnMemoryPoolBuilderSetStorage_0(poolBuilder, (void*)(memory + TEXTURE_MEMORY_SIZE), COMMAND_MEMORY_SIZE);
+				if (!nvnMemoryPoolInitialize_0(&cmdPool, poolBuilder)) {
+					return false;
+				}
+				cmdPoolInitialized = true;
+			}
+			if (!nvnCommandBufferInitialize_0(&cmdBuf, mainDevice)) {
+				return false;
+			}
+			cmdBufInitialized = true;
+			nvnCommandBufferAddCommandMemory_0(&cmdBuf, &cmdPool, 0, COMMAND_MEMORY_SIZE);
+			nvnCommandBufferAddControlMemory_0(&cmdBuf, (void*)(memory + TEXTURE_MEMORY_SIZE + COMMAND_MEMORY_SIZE), CONTROL_MEMORY_SIZE);
+
+			CopyRegion region{};
+			region.x = 0;
+			region.y = 0;
+			region.z = 0;
+			region.width = texWidth;
+			region.height = texHeight;
+			region.depth = 1;
+			for (int src = 0; src < GAME_TEXTURES; src++) {
+				for (int dst = 0; dst < WINDOW_TEXTURES; dst++) {
+					nvnCommandBufferBeginRecording_0(&cmdBuf);
+					// Game's rendering into its texture must be finished before it's read by copy.
+					nvnCommandBufferBarrier_0(&cmdBuf, BARRIER_ORDER_FRAGMENTS | BARRIER_INVALIDATE_TEXTURE);
+					nvnCommandBufferCopyTextureToTexture_0(&cmdBuf, gameTextures[src], nullptr, &region, &textures[dst], nullptr, &region, 0);
+					copyHandles[src][dst] = nvnCommandBufferEndRecording_0(&cmdBuf);
+				}
+			}
+			return true;
+		}
+
+		// Returns textures that should be passed to window or nullptr if emulation can't be used.
+		const Texture** setup(const WindowBuilder* builder, int numTextures, const Texture** textures) {
+			if (!requested || debugNoSwap || numTextures != GAME_TEXTURES || !textures || !textures[0] || !textures[1]) return nullptr;
+			if (!memory) {
+				memory = SaltySDCore_GetReservedMemory(&memorySize);
+				if (!memory || memorySize < RESERVED_MEMORY_SIZE) {
+					requested = false;
+					return nullptr;
+				}
+			}
+			if (!functionsAvailable()) {
+				requested = false;
+				return nullptr;
+			}
+			if (!frameSyncsInitialized) {
+				for (int i = 0; i < GAME_TEXTURES; i++) {
+					if (!nvnSyncInitialize_0(&frameSyncs[i], mainDevice)) {
+						requested = false;
+						return nullptr;
+					}
+				}
+				frameSyncsInitialized = true;
+			}
+			if (!createPool() || !createTextures(textures[0])) return nullptr;
+			// Copies are recorded again only for new game textures. Otherwise command memory
+			// that GPU may still be reading would be overwritten.
+			if (!cmdBufInitialized || gameTextures[0] != textures[0] || gameTextures[1] != textures[1]) {
+				gameTextures[0] = textures[0];
+				gameTextures[1] = textures[1];
+				if (!recordCopies()) return nullptr;
+			}
+			activeBuilder = builder;
+			activeWindow = nullptr;
+			gameIndex = 0;
+			acquired = false;
+			frameSyncPending[0] = false;
+			frameSyncPending[1] = false;
+			return windowTextures;
+		}
+	}
+
 	bool WindowInitialize(const Window* nvnWindow, WindowBuilder* windowBuilder) {
+		if (TripleBuffer::activeBuilder && windowBuilder == TripleBuffer::activeBuilder) {
+			bool ret = nvnWindowInitialize_0(nvnWindow, windowBuilder);
+			if (ret) TripleBuffer::activeWindow = nvnWindow;
+			return ret;
+		}
+		// Window initialized without our textures (f.e. object reused after finalize), don't emulate it.
+		if (nvnWindow == TripleBuffer::activeWindow) TripleBuffer::activeWindow = nullptr;
 		if (Shared->Buffers == 0) {
 			(Shared -> Buffers) = windowBuilder -> numBufferedFrames;
 			if ((Shared -> SetBuffers) >= 2 && (Shared -> SetBuffers) <= windowBuilder -> numBufferedFrames) {
@@ -1033,6 +1283,13 @@ namespace NVN {
 	}
 
 	void WindowBuilderSetTextures(const WindowBuilder* nvnWindowBuilder, int numBufferedFrames, const Texture** nvnTextures) {
+		if (const Texture** emulated = TripleBuffer::setup(nvnWindowBuilder, numBufferedFrames, nvnTextures)) {
+			(Shared -> Buffers) = TripleBuffer::WINDOW_TEXTURES;
+			(Shared -> ActiveBuffers) = TripleBuffer::WINDOW_TEXTURES;
+			amountOfAvailableBuffers = TripleBuffer::WINDOW_TEXTURES;
+			return nvnWindowBuilderSetTextures_0(nvnWindowBuilder, TripleBuffer::WINDOW_TEXTURES, emulated);
+		}
+		if (TripleBuffer::activeBuilder == nvnWindowBuilder) TripleBuffer::activeBuilder = nullptr;
 		(Shared -> Buffers) = numBufferedFrames;
 		amountOfAvailableBuffers = numBufferedFrames;
 		if ((Shared -> SetBuffers) >= 2 && (Shared -> SetBuffers) <= numBufferedFrames) {
@@ -1147,7 +1404,17 @@ namespace NVN {
 			}
 		}
 		NX_FPS_Math::PreFrame();
-		nvnQueuePresentTexture_0(queue, nvnWindow, index);
+		if (TripleBuffer::activeWindow && nvnWindow == TripleBuffer::activeWindow && TripleBuffer::acquired && (index == 0 || index == 1)) {
+			if (!TripleBuffer::debugNoCopy) nvnQueueSubmitCommands_0(queue, 1, &TripleBuffer::copyHandles[index][TripleBuffer::windowIndex]);
+			// Signaled when game's frame rendered to this index and our copy from it are finished.
+			// No flags needed, present right after flushes queue.
+			nvnQueueFenceSync_0(queue, &TripleBuffer::frameSyncs[index], TripleBuffer::SYNC_CONDITION_ALL_GPU_COMMANDS_COMPLETE, 0);
+			TripleBuffer::frameSyncPending[index] = true;
+			nvnQueuePresentTexture_0(queue, nvnWindow, TripleBuffer::windowIndex);
+			TripleBuffer::gameIndex ^= 1;
+			TripleBuffer::acquired = false;
+		}
+		else nvnQueuePresentTexture_0(queue, nvnWindow, index);
 		if (m_enableCounters) {
 			Shared->PerfCounters.NVN.timestamp = timestampDataCPU->timestamp;
 			#if defined(SWITCH) || defined(OUNCE)
@@ -1257,6 +1524,20 @@ namespace NVN {
 			WindowSync = (Sync*)nvnSync;
 		}
 		Result ret = nvnWindowAcquireTexture_0(nvnWindow, nvnSync, index);
+		if (TripleBuffer::activeWindow && nvnWindow == TripleBuffer::activeWindow && index) {
+			// Game gets only its own 2 textures, alternating with each present. Real window texture is used as copy target.
+			// Index must be replaced even when acquire failed (f.e. when returning from home menu),
+			// because game uses it as offset to its own 2 textures.
+			const int realIndex = *index;
+			TripleBuffer::acquired = (ret == 0 && realIndex >= 0 && realIndex < TripleBuffer::WINDOW_TEXTURES);
+			if (TripleBuffer::acquired) TripleBuffer::windowIndex = realIndex;
+			const int gameIndex = TripleBuffer::gameIndex;
+			if (TripleBuffer::frameSyncPending[gameIndex]) {
+				nvnSyncWait_0(&TripleBuffer::frameSyncs[gameIndex], TripleBuffer::WAIT_TIMEOUT_MAXIMUM);
+				TripleBuffer::frameSyncPending[gameIndex] = false;
+			}
+			*(int*)index = gameIndex;
+		}
 		
 		startFrameTick = Utils::_getSystemTick();
 		return ret;
@@ -1360,7 +1641,22 @@ namespace NVN {
 			runtime_replace{"nvnCommandBufferEndRecording", (uintptr_t*)&nvnCommandBufferEndRecording_0},
 			runtime_replace{"nvnQueueSubmitCommands", (uintptr_t*)&nvnQueueSubmitCommands_0},
 			runtime_replace{"nvnQueueFenceSync", (uintptr_t*)&nvnQueueFenceSync_0},
-			runtime_replace{"nvnCommandBufferResetCounter", (uintptr_t*)&nvnCommandBufferResetCounter_0}
+			runtime_replace{"nvnCommandBufferResetCounter", (uintptr_t*)&nvnCommandBufferResetCounter_0},
+			runtime_replace{"nvnTextureBuilderSetDevice", (uintptr_t*)&nvnTextureBuilderSetDevice_0},
+			runtime_replace{"nvnTextureBuilderSetDefaults", (uintptr_t*)&nvnTextureBuilderSetDefaults_0},
+			runtime_replace{"nvnTextureBuilderSetFlags", (uintptr_t*)&nvnTextureBuilderSetFlags_0},
+			runtime_replace{"nvnTextureBuilderSetTarget", (uintptr_t*)&nvnTextureBuilderSetTarget_0},
+			runtime_replace{"nvnTextureBuilderSetFormat", (uintptr_t*)&nvnTextureBuilderSetFormat_0},
+			runtime_replace{"nvnTextureBuilderSetSize2D", (uintptr_t*)&nvnTextureBuilderSetSize2D_0},
+			runtime_replace{"nvnTextureBuilderGetStorageSize", (uintptr_t*)&nvnTextureBuilderGetStorageSize_0},
+			runtime_replace{"nvnTextureBuilderGetStorageAlignment", (uintptr_t*)&nvnTextureBuilderGetStorageAlignment_0},
+			runtime_replace{"nvnTextureBuilderSetStorage", (uintptr_t*)&nvnTextureBuilderSetStorage_0},
+			runtime_replace{"nvnTextureInitialize", (uintptr_t*)&nvnTextureInitialize_0},
+			runtime_replace{"nvnTextureGetFlags", (uintptr_t*)&nvnTextureGetFlags_0},
+			runtime_replace{"nvnTextureGetTarget", (uintptr_t*)&nvnTextureGetTarget_0},
+			runtime_replace{"nvnCommandBufferFinalize", (uintptr_t*)&nvnCommandBufferFinalize_0},
+			runtime_replace{"nvnCommandBufferBarrier", (uintptr_t*)&nvnCommandBufferBarrier_0},
+			runtime_replace{"nvnCommandBufferCopyTextureToTexture", (uintptr_t*)&nvnCommandBufferCopyTextureToTexture_0}
 		};
 
 		for (const auto& replacement : nvn_replacements) {
@@ -1484,6 +1780,22 @@ extern "C" {
 				}
 			}
 
+			FILE* tb_file = SaltySDCore_fopen("sdmc:/SaltySD/flags/triplebuffer.flag", "rb");
+			if (tb_file) {
+				SaltySDCore_fclose(tb_file);
+				// Must be done before game starts, otherwise game can take whole available heap.
+				NVN::TripleBuffer::requested = SaltySDCore_ReserveMemory(NVN::TripleBuffer::RESERVED_MEMORY_SIZE);
+				SaltySDCore_printf("NX-FPS: TripleBuffer: memory reservation requested: %d\n", NVN::TripleBuffer::requested);
+				auto flagExists = [](const char* path) {
+					FILE* file = SaltySDCore_fopen(path, "rb");
+					if (file) SaltySDCore_fclose(file);
+					return file != nullptr;
+				};
+				NVN::TripleBuffer::debugNoSwap = flagExists("sdmc:/SaltySD/flags/triplebuffer_noswap.flag");
+				NVN::TripleBuffer::debugNoCopy = flagExists("sdmc:/SaltySD/flags/triplebuffer_nocopy.flag");
+				SaltySDCore_printf("NX-FPS: TripleBuffer: debug noswap: %d, nocopy: %d\n", NVN::TripleBuffer::debugNoSwap, NVN::TripleBuffer::debugNoCopy);
+			}
+
 			FILE* nvn_file = SaltySDCore_fopen("sdmc:/SaltySD/flags/nvncounters.flag", "rb");
 			if  (nvn_file) {
 				SaltySDCore_fclose(nvn_file);
@@ -1557,6 +1869,10 @@ extern "C" {
 						uint64_t heap_start = 0;
 						svcGetInfo(&alias_start, InfoType_AliasRegionAddress, CUR_PROCESS_HANDLE, 0);
 						svcGetInfo(&heap_start, InfoType_HeapRegionAddress, CUR_PROCESS_HANDLE, 0);
+						// Game's heap is moved by memory reserved for Core, keep heap offsets same as without it.
+						size_t reserved_size = 0;
+						SaltySDCore_GetReservedMemory(&reserved_size);
+						heap_start += reserved_size;
 
 						LOCK::patcher.bindDynamicRegions((uintptr_t)alias_start, (uintptr_t)heap_start);
 					}
