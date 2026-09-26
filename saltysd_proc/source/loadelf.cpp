@@ -376,15 +376,25 @@ Result load_elf32_proc(Handle proc, uint64_t pid, uint32_t heap, uint32_t* start
 	
 	// Unmap heap, map new code
 	
-	u32 load_addr;
-	SaltyNX_printf(APP_NAME ": Search for size %lx\n", (max_vaddr - min_vaddr));
-	do
-	{	
-		randomGet(&load_addr, 4);
-		load_addr &= 0xFFFF000ul;
-		ret = svcMapProcessCodeMemory(proc, load_addr, heap, (max_vaddr - min_vaddr));
+	// Try to place Core32 right below the game (like the 64-bit loader does), so A32 branches (+-32 MiB)
+	// from the game's code can reach the code cave inside Core32. Fall back to a random address.
+	u32 load_size = (max_vaddr - min_vaddr);
+	u32 load_addr = 0;
+	ret = 1;
+	if (game_start_address > ((load_size + 0xFFFF) & ~0xFFFF) && game_start_address <= 0xFFFFFFFF) {
+		load_addr = (u32)(game_start_address - ((load_size + 0xFFFF) & ~0xFFFF));
+		ret = svcMapProcessCodeMemory(proc, load_addr, heap, load_size);
 	}
-	while (ret == 0xDC01 || ret == 0xD401);
+	if (R_FAILED(ret)) {
+		SaltyNX_printf(APP_NAME ": Search for size %lx\n", load_size);
+		do
+		{	
+			randomGet(&load_addr, 4);
+			load_addr &= 0xFFFF000ul;
+			ret = svcMapProcessCodeMemory(proc, load_addr, heap, load_size);
+		}
+		while (ret == 0xDC01 || ret == 0xD401);
+	}
 	if (ret) {
 		svcUnmapProcessMemory(elf_data, proc, map_addr, 0x200000);
 		svcUnmapProcessCodeMemory(proc, map_addr, heap_buffer_address, 0x200000);

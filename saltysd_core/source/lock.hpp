@@ -8,6 +8,8 @@
 	#define SWITCH_BUILD
 	#define SWITCH_64BIT
 	#define LOCK_ABI64
+#elif defined(HOST_BUILD) && defined(HOST_ABI32)
+	#define LOCK_ABI32
 #elif defined(HOST_BUILD)
 	#define LOCK_ABI64
 #else
@@ -115,10 +117,8 @@ namespace LOCK {
 		Main,
 		Heap,
 		Alias,
-#ifdef LOCK_ABI64
 		Variables,
 		CodeCave,
-#endif
 		Total
 	};
 	static_assert(sizeof(Region) == 1);
@@ -162,15 +162,18 @@ namespace LOCK {
 		Adrp_Variables = 3,
 		Adrp_MainFromCodeCave = 4,
 		Branch_Relative = 5,
+		// AArch32 only - MOVW/MOVT of an absolute address, the instruction's imm16 holds the offset in the region.
+		Movw_Variables = 6,
+		Movt_Variables = 7,
+		Movw_CodeCave = 8,
+		Movt_CodeCave = 9,
 	};
 	static_assert(sizeof(CodeCaveAdjustmentType) == 1);
 
 	enum class MasterWriteOpcode : uint8_t {
 		Bytes = 1,
-#ifdef LOCK_ABI64
 		Variables = 2,
 		CodeCave = 3,
-#endif
 		End = 0xFF,
 	};
 	static_assert(sizeof(MasterWriteOpcode) == 1);
@@ -229,12 +232,9 @@ namespace LOCK {
 		using RegionMappings = std::tuple<
 			RegMap<Region::Main,      &Mappings::main_start>,
 			RegMap<Region::Heap,      &Mappings::heap_start>,
-			RegMap<Region::Alias,     &Mappings::alias_start>
-#ifdef LOCK_ABI64
-		   	,
+			RegMap<Region::Alias,     &Mappings::alias_start>,
 			RegMap<Region::Variables, &Mappings::variables_start>,
 			RegMap<Region::CodeCave,  &Mappings::codeCave_start>
-#endif
 		>;
 
 		// How long to wait for the display to settle when the docked refresh rate changes.
@@ -324,20 +324,15 @@ namespace LOCK {
 		patch_addr_t NOINLINE getAddress(Cursor& cursor) const;
 
 		Result processBytes(FILE* file);
-#ifdef LOCK_ABI64
 		Result processVariables(FILE* file);
 		Result processCodeCave(FILE* file);
-#endif
 
 		template<MasterWriteOpcode C, auto Func> struct MasterWriteOpMap { static constexpr MasterWriteOpcode val = C; static constexpr auto func = Func; };
 
 		using MasterWriteMappings = std::tuple<
-			MasterWriteOpMap<MasterWriteOpcode::Bytes, &Patcher::processBytes>
-#ifdef LOCK_ABI64
-			,
+			MasterWriteOpMap<MasterWriteOpcode::Bytes, &Patcher::processBytes>,
 			MasterWriteOpMap<MasterWriteOpcode::Variables, &Patcher::processVariables>,
 			MasterWriteOpMap<MasterWriteOpcode::CodeCave, &Patcher::processCodeCave>
-#endif
 		>;
 
 		static double NOINLINE evaluateExpression(const char* equation, double fps_target, double displaySync);
