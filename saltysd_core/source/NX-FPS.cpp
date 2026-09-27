@@ -1041,12 +1041,12 @@ namespace NVN {
 		// We assume that there won't be bigger than 1920x1080 RGBA8 texture.
 		// Per swizzling requirements height must be aligned to 1152.
 		// Size aligned to 0x1000;
-		constexpr size_t TEXTURE_MEMORY_SIZE = ((1920 * 1152 * 4) * 3 + 0xFFF) & ~0xFFF;
+		constexpr int WINDOW_TEXTURES = 3;
+		constexpr int GAME_TEXTURES = 2;
+		constexpr size_t TEXTURE_MEMORY_SIZE = (((1920 * 1152 * 4) * WINDOW_TEXTURES) + 0xFFF) & ~0xFFF;
 		constexpr size_t COMMAND_MEMORY_SIZE = 0x1000;
 		constexpr size_t CONTROL_MEMORY_SIZE = 0x1000;
 		constexpr size_t RESERVED_MEMORY_SIZE = TEXTURE_MEMORY_SIZE + COMMAND_MEMORY_SIZE + CONTROL_MEMORY_SIZE;
-		constexpr int GAME_TEXTURES = 2;
-		constexpr int WINDOW_TEXTURES = 3;
 		
 		constexpr int MEMORY_POOL_FLAGS_CPU_NO_ACCESS = 0x1;
 		constexpr int MEMORY_POOL_FLAGS_CPU_UNCACHED = 0x2;
