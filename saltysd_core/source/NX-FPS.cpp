@@ -981,6 +981,7 @@ namespace NVN {
 	static int (*nvnTextureGetFlags_0)(const Texture* texture);
 	static int (*nvnTextureGetTarget_0)(const Texture* texture);
 	static void (*nvnCommandBufferFinalize_0)(const CommandBuffer* nvnCmdBuf);
+	static void (*nvnQueueWaitSync_0)(const Queue* nvnQueue, const Sync* nvnSync);
 	static void (*nvnCommandBufferBarrier_0)(const CommandBuffer* nvnCmdBuf, int barrier);
 	static void (*nvnCommandBufferCopyTextureToTexture_0)(const CommandBuffer* nvnCmdBuf, const Texture* src, const TextureView* srcView, const CopyRegion* srcRegion, const Texture* dst, const TextureView* dstView, const CopyRegion* dstRegion, int flags);
 
@@ -1036,29 +1037,17 @@ namespace NVN {
 	CommandHandle cmdHandles{};
 	bool enableCounters = false;
 
-
-	/*
-		Triple buffer emulation for games that use only 2 window textures.
-
-		Memory for 3 display textures is reserved at the start of heap before the game starts (the game can take
-		all available heap for itself). When the game passes 2 textures to nvnWindowBuilderSetTextures, 3 textures
-		with the same properties are created in reserved memory and passed to the window instead.
-		The game keeps rendering into its own 2 textures (it gets only indexes 0 and 1 from nvnWindowAcquireTexture,
-		alternating with each present), and before each present its texture is copied into the window texture
-		returned by the real nvnWindowAcquireTexture, which is then presented.
-	*/
 	namespace TripleBuffer {
-		// Reserved memory layout: [textures pool | command memory pool | control memory]
-		// 3 x 1920x1080 RGBA8 block linear textures (height aligned up to 1152 rows) + alignment.
-		constexpr size_t TEXTURE_MEMORY_SIZE = 0x1C00000;
-		// Copies of full screen textures need a lot of command memory. Running out of it would call
-		// command buffer memory callback, which we don't set.
-		constexpr size_t COMMAND_MEMORY_SIZE = 0x100000;
-		constexpr size_t CONTROL_MEMORY_SIZE = 0x100000;
+		// We assume that there won't be bigger than 1920x1080 RGBA8 texture.
+		// Per swizzling requirements height must be aligned to 1152.
+		// Size aligned to 0x1000;
+		constexpr size_t TEXTURE_MEMORY_SIZE = ((1920 * 1152 * 4) * 3 + 0xFFF) & ~0xFFF;
+		constexpr size_t COMMAND_MEMORY_SIZE = 0x1000;
+		constexpr size_t CONTROL_MEMORY_SIZE = 0x1000;
 		constexpr size_t RESERVED_MEMORY_SIZE = TEXTURE_MEMORY_SIZE + COMMAND_MEMORY_SIZE + CONTROL_MEMORY_SIZE;
 		constexpr int GAME_TEXTURES = 2;
 		constexpr int WINDOW_TEXTURES = 3;
-
+		
 		constexpr int MEMORY_POOL_FLAGS_CPU_NO_ACCESS = 0x1;
 		constexpr int MEMORY_POOL_FLAGS_CPU_UNCACHED = 0x2;
 		constexpr int MEMORY_POOL_FLAGS_GPU_CACHED = 0x20;
@@ -1102,18 +1091,8 @@ namespace NVN {
 		const Window* activeWindow = nullptr;         // Window created from that builder, emulation is active for it.
 		int gameIndex = 0;                            // Index returned to the game (0 or 1).
 		int windowIndex = 0;                          // Index returned by real nvnWindowAcquireTexture.
+		const Sync* windowSync = nullptr;             // Sync signaled when window texture at windowIndex is free.
 		bool acquired = false;
-
-		bool functionsAvailable() {
-			return mainDevice && nvnTextureBuilderSetDevice_0 && nvnTextureBuilderSetDefaults_0 && nvnTextureBuilderSetFlags_0 && nvnTextureBuilderSetTarget_0
-				&& nvnTextureBuilderSetFormat_0 && nvnTextureBuilderSetSize2D_0 && nvnTextureBuilderGetStorageSize_0 && nvnTextureBuilderGetStorageAlignment_0
-				&& nvnTextureBuilderSetStorage_0 && nvnTextureInitialize_0 && nvnTextureGetWidth_0 && nvnTextureGetHeight_0 && nvnTextureGetFormat_0
-				&& nvnTextureGetFlags_0 && nvnTextureGetTarget_0 && nvnMemoryPoolBuilderSetDefaults_0 && nvnMemoryPoolBuilderSetDevice_0
-				&& nvnMemoryPoolBuilderSetFlags_0 && nvnMemoryPoolBuilderSetStorage_0 && nvnMemoryPoolInitialize_0 && nvnCommandBufferInitialize_0
-				&& nvnCommandBufferFinalize_0 && nvnCommandBufferAddCommandMemory_0 && nvnCommandBufferAddControlMemory_0 && nvnCommandBufferBeginRecording_0
-				&& nvnCommandBufferEndRecording_0 && nvnCommandBufferBarrier_0 && nvnCommandBufferCopyTextureToTexture_0 && nvnQueueSubmitCommands_0
-				&& nvnSyncInitialize_0 && nvnQueueFenceSync_0 && nvnSyncWait_0;
-		}
 
 		// Prepares a texture builder for our window texture.
 		void setupBuilder(TextureBuilder* builder) {
@@ -1227,10 +1206,6 @@ namespace NVN {
 					requested = false;
 					return nullptr;
 				}
-			}
-			if (!functionsAvailable()) {
-				requested = false;
-				return nullptr;
 			}
 			if (!frameSyncsInitialized) {
 				for (int i = 0; i < GAME_TEXTURES; i++) {
@@ -1400,6 +1375,9 @@ namespace NVN {
 		}
 		NX_FPS_Math::PreFrame();
 		if (TripleBuffer::activeWindow && nvnWindow == TripleBuffer::activeWindow && TripleBuffer::acquired && (index == 0 || index == 1)) {
+			// Window texture is written only by our copy, so it's enough that GPU waits for it to be released by display.
+			// This allows ZeroSync to skip CPU wait for it in game.
+			nvnQueueWaitSync_0(queue, TripleBuffer::windowSync);
 			nvnQueueSubmitCommands_0(queue, 1, &TripleBuffer::copyHandles[index][TripleBuffer::windowIndex]);
 			// Signaled when game's frame rendered to this index and our copy from it are finished.
 			// No flags needed, present right after flushes queue.
@@ -1519,13 +1497,14 @@ namespace NVN {
 			WindowSync = (Sync*)nvnSync;
 		}
 		Result ret = nvnWindowAcquireTexture_0(nvnWindow, nvnSync, index);
-		if (TripleBuffer::activeWindow && nvnWindow == TripleBuffer::activeWindow && index) {
+		if (R_SUCCEEDED(ret) && TripleBuffer::activeWindow && nvnWindow == TripleBuffer::activeWindow && index) {
 			// Game gets only its own 2 textures, alternating with each present. Real window texture is used as copy target.
-			// Index must be replaced even when acquire failed (f.e. when returning from home menu),
-			// because game uses it as offset to its own 2 textures.
 			const int realIndex = *index;
 			TripleBuffer::acquired = (ret == 0 && realIndex >= 0 && realIndex < TripleBuffer::WINDOW_TEXTURES);
-			if (TripleBuffer::acquired) TripleBuffer::windowIndex = realIndex;
+			if (TripleBuffer::acquired) {
+				TripleBuffer::windowIndex = realIndex;
+				TripleBuffer::windowSync = nvnSync;
+			}
 			const int gameIndex = TripleBuffer::gameIndex;
 			if (TripleBuffer::frameSyncPending[gameIndex]) {
 				nvnSyncWait_0(&TripleBuffer::frameSyncs[gameIndex], TripleBuffer::WAIT_TIMEOUT_MAXIMUM);
@@ -1650,6 +1629,7 @@ namespace NVN {
 			runtime_replace{"nvnTextureGetFlags", (uintptr_t*)&nvnTextureGetFlags_0},
 			runtime_replace{"nvnTextureGetTarget", (uintptr_t*)&nvnTextureGetTarget_0},
 			runtime_replace{"nvnCommandBufferFinalize", (uintptr_t*)&nvnCommandBufferFinalize_0},
+			runtime_replace{"nvnQueueWaitSync", (uintptr_t*)&nvnQueueWaitSync_0},
 			runtime_replace{"nvnCommandBufferBarrier", (uintptr_t*)&nvnCommandBufferBarrier_0},
 			runtime_replace{"nvnCommandBufferCopyTextureToTexture", (uintptr_t*)&nvnCommandBufferCopyTextureToTexture_0}
 		};
