@@ -892,8 +892,7 @@ namespace NVN {
 	struct WindowBuilder {
 		const char reserved[16];
 		uint32_t numBufferedFrames;
-		const char reserved2[20];
-		void** buffers;
+		const char reserved2[28];
 	};
 	struct MemoryPoolBuilder {
 		char reserved[0x40];
