@@ -34,7 +34,7 @@ include $(TOPDIR)/../version.mk
 MODULE_NAME :=  "SaltyNX Core"
 TARGET		:=	saltynx_core
 BUILD		:=	build
-SOURCES		:=	source source/tinyexpr source/crt0
+SOURCES		:=	source source/tinyexpr source/crt0 source/api
 DATA		:=	data
 INCLUDES	:=	include
 EXEFS_SRC	:=	exefs_src
