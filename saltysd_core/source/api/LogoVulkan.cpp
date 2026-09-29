@@ -1,4 +1,5 @@
 #include "LogoVulkan.hpp"
+#include "Lz4.hpp"
 #include <cstring>
 
 namespace LogoVK {
@@ -24,19 +25,30 @@ namespace LogoVK {
 			LOGO_VK_DEVICE_FUNCTIONS(LOGO_VK_MEMBER)
 		} vk{};
 		#undef LOGO_VK_MEMBER
+
+		#define LOGO_VK_NAME(name) "vk" #name "\0"
+		constexpr char kDeviceFunctionNames[] = LOGO_VK_DEVICE_FUNCTIONS(LOGO_VK_NAME);
+		#undef LOGO_VK_NAME
+		constexpr size_t CountNames(const char* names, size_t size) {
+			size_t count = 0;
+			for (size_t i = 0; i + 1 < size; i++) if (names[i] == '\0') count++;
+			return count;
+		}
+		static_assert(CountNames(kDeviceFunctionNames, sizeof(kDeviceFunctionNames)) == sizeof(DeviceFunctions) / sizeof(void*),
+			"kDeviceFunctionNames must name every member of DeviceFunctions");
 		PFN_vkGetPhysicalDeviceMemoryProperties GetPhysicalDeviceMemoryProperties = nullptr;
 		PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR GetPhysicalDeviceSurfaceCapabilitiesKHR = nullptr;
 
 #ifndef LOGO_VK_EXTERNAL_SOURCES
-		alignas(4) const unsigned char vertexSpirv[] = {
-			#embed "../../logo/vert.spv"
+		const unsigned char vertexPacked[] = {
+			#embed "../../logo/vert.spv.lz4"
 		};
-		alignas(4) const unsigned char fragmentSpirv[] = {
-			#embed "../../logo/frag.spv"
+		const unsigned char fragmentPacked[] = {
+			#embed "../../logo/frag.spv.lz4"
 		};
 #endif
 
-		constexpr int SLOTS = 8;                // frames in flight
+		constexpr int SLOTS = 8;
 		constexpr VkDeviceSize UBO_STRIDE = 256; // largest minUniformBufferOffsetAlignment the spec allows
 		constexpr uint32_t MAX_IMAGES = 8;
 		constexpr uint32_t MAX_WAITS = 16;
@@ -46,12 +58,12 @@ namespace LogoVK {
 			VkCommandBuffer cmd;
 			VkFence fence;
 			VkSemaphore done;
-			bool pending;   // submitted, fence not waited yet
+			bool pending;
 		};
 
 		struct SwapchainData {
 			VkSwapchainKHR handle;
-			bool usable;    // TRANSFER_SRC + COLOR_ATTACHMENT, single layer, few enough images
+			bool usable;
 			bool built;
 			VkFormat format;
 			VkExtent2D extent;
@@ -76,7 +88,7 @@ namespace LogoVK {
 		struct QueueFamily { VkQueue queue; uint32_t family; };
 		QueueFamily queues[8]{};
 		int queueCount = 0;
-		VkQueue usedQueue = VK_NULL_HANDLE; // the copy image is shared between frames, so one queue only
+		VkQueue usedQueue = VK_NULL_HANDLE;
 
 		VkPhysicalDeviceMemoryProperties memoryProperties{};
 		VkCommandPool commandPool = VK_NULL_HANDLE;
@@ -122,7 +134,6 @@ namespace LogoVK {
 			}
 		}
 
-		// ---- device level: command buffers, sync, descriptor set, sampler, uniform buffer ring ----
 		bool buildDevice(uint32_t queueFamily) {
 			GetPhysicalDeviceMemoryProperties(physicalDevice, &memoryProperties);
 
@@ -162,7 +173,6 @@ namespace LogoVK {
 			};
 			if (vk.CreateSampler(device, &samplerInfo, nullptr, &sampler) != VK_SUCCESS) return false;
 
-			// binding 0: Params (dynamic offset = slot), binding 1: copy of the area under the text
 			const VkDescriptorSetLayoutBinding bindings[2] = {
 				{0, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
 				{1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 1, VK_SHADER_STAGE_FRAGMENT_BIT, nullptr},
@@ -222,8 +232,8 @@ namespace LogoVK {
 				if (s.done) vk.DestroySemaphore(device, s.done, nullptr);
 				s = Slot{};
 			}
-			if (commandPool) vk.DestroyCommandPool(device, commandPool, nullptr);          // frees the command buffers
-			if (descriptorPool) vk.DestroyDescriptorPool(device, descriptorPool, nullptr); // frees the set
+			if (commandPool) vk.DestroyCommandPool(device, commandPool, nullptr);
+			if (descriptorPool) vk.DestroyDescriptorPool(device, descriptorPool, nullptr);
 			if (pipelineLayout) vk.DestroyPipelineLayout(device, pipelineLayout, nullptr);
 			if (setLayout) vk.DestroyDescriptorSetLayout(device, setLayout, nullptr);
 			if (sampler) vk.DestroySampler(device, sampler, nullptr);
@@ -236,21 +246,24 @@ namespace LogoVK {
 			deviceBuilt = false;
 		}
 
-		// ---- swapchain level: render pass, pipeline, image views, framebuffers, copy image ----
+		bool createModule(const unsigned char* packed, size_t packedSize, VkShaderModule* module) {
+			size_t size = 0;
+			unsigned char* code = Lz4::Unpack(packed, packedSize, &size);
+			if (!code) return false;
+			const VkShaderModuleCreateInfo info{
+				.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
+				.codeSize = size,
+				.pCode = (const uint32_t*)code,
+			};
+			const bool ok = vk.CreateShaderModule(device, &info, nullptr, module) == VK_SUCCESS;
+			free(code);
+			return ok;
+		}
+
 		bool buildPipeline(SwapchainData& sc) {
 			VkShaderModule modules[2]{};
-			const VkShaderModuleCreateInfo vertexInfo{
-				.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-				.codeSize = sizeof(vertexSpirv),
-				.pCode = (const uint32_t*)vertexSpirv,
-			};
-			const VkShaderModuleCreateInfo fragmentInfo{
-				.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-				.codeSize = sizeof(fragmentSpirv),
-				.pCode = (const uint32_t*)fragmentSpirv,
-			};
-			bool ok = vk.CreateShaderModule(device, &vertexInfo, nullptr, &modules[0]) == VK_SUCCESS &&
-			          vk.CreateShaderModule(device, &fragmentInfo, nullptr, &modules[1]) == VK_SUCCESS;
+			bool ok = createModule(vertexPacked, sizeof(vertexPacked), &modules[0]) &&
+			          createModule(fragmentPacked, sizeof(fragmentPacked), &modules[1]);
 			if (ok) {
 				const VkPipelineShaderStageCreateInfo stages[2] = {
 					{.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO, .stage = VK_SHADER_STAGE_VERTEX_BIT, .module = modules[0], .pName = "main"},
@@ -314,7 +327,6 @@ namespace LogoVK {
 		}
 
 		bool buildSwapchain(SwapchainData& sc) {
-			// Starts from COLOR_ATTACHMENT_OPTIMAL (barrier after the copy), ends ready for present.
 			const VkAttachmentDescription attachment{
 				.format = sc.format,
 				.samples = VK_SAMPLE_COUNT_1_BIT,
@@ -450,8 +462,6 @@ namespace LogoVK {
 		void record(VkCommandBuffer cmd, const SwapchainData& sc, uint32_t imageIndex, uint32_t dynamicOffset) {
 			const VkImage image = sc.images[imageIndex];
 
-			// Swapchain image PRESENT_SRC -> TRANSFER_SRC (after the game's semaphores, waited at TRANSFER),
-			// copy image -> TRANSFER_DST (after the previous frame's fragment shader reads).
 			const VkImageMemoryBarrier toCopy[2] = {
 				imageBarrier(image, 0, VK_ACCESS_TRANSFER_READ_BIT, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL),
 				imageBarrier(sc.region, 0, VK_ACCESS_TRANSFER_WRITE_BIT, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL),
@@ -496,7 +506,7 @@ namespace LogoVK {
 	}
 
 	void OnDeviceCreated(VkPhysicalDevice pd, VkDevice dev, DeviceResolver deviceResolve, InstanceResolver instanceResolve) {
-		if (device && device != dev) Release(); // a new device: forget the old one
+		if (device && device != dev) Release();
 		physicalDevice = pd;
 		device = dev;
 		failed = false;
@@ -505,9 +515,12 @@ namespace LogoVK {
 		swapchain = SwapchainData{};
 
 		functionsLoaded = true;
-		#define LOGO_VK_LOAD(name) vk.name = (PFN_vk##name)deviceResolve(dev, "vk" #name); if (!vk.name) functionsLoaded = false;
-		LOGO_VK_DEVICE_FUNCTIONS(LOGO_VK_LOAD)
-		#undef LOGO_VK_LOAD
+		const char* name = kDeviceFunctionNames;
+		for (size_t i = 0; i < sizeof(DeviceFunctions) / sizeof(void*); i++, name += strlen(name) + 1) {
+			void* address = deviceResolve(dev, name);
+			if (!address) functionsLoaded = false;
+			memcpy(reinterpret_cast<char*>(&vk) + i * sizeof(void*), &address, sizeof(void*));
+		}
 		GetPhysicalDeviceMemoryProperties = (PFN_vkGetPhysicalDeviceMemoryProperties)instanceResolve("vkGetPhysicalDeviceMemoryProperties");
 		GetPhysicalDeviceSurfaceCapabilitiesKHR = (PFN_vkGetPhysicalDeviceSurfaceCapabilitiesKHR)instanceResolve("vkGetPhysicalDeviceSurfaceCapabilitiesKHR");
 		if (!GetPhysicalDeviceMemoryProperties || !GetPhysicalDeviceSurfaceCapabilitiesKHR) functionsLoaded = false;
@@ -606,7 +619,7 @@ namespace LogoVK {
 		};
 		vk.ResetFences(device, 1, &slot.fence);
 		if (vk.QueueSubmit(queue, 1, &submit, slot.fence) != VK_SUCCESS) {
-			failed = true; // present goes on with the game's own semaphores
+			failed = true;
 			return VK_NULL_HANDLE;
 		}
 		slot.pending = true;

@@ -2,7 +2,7 @@
 #include "../NX-FPS-Common.hpp"
 #define EGL_NO_PLATFORM_SPECIFIC_TYPES
 #include <glad/egl.h>
-#include <glad/gles2.h>
+#include <glad/gles2.h> // OpenGL ES 3.2 + GL_NV_viewport_array + GL_OES_viewport_array
 
 namespace EGL {
 	typedef PFNGLVIEWPORTARRAYVOESPROC PFNGLVIEWPORTARRAYVPROC;

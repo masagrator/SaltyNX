@@ -1,9 +1,11 @@
 #include "LogoGL.hpp"
+#include "Lz4.hpp"
 #include <cstring>
-#include <glad/gl.h> // types, constants and PFNGL...PROC only (no glad loader)
+#include <glad/gl.h>
 
 namespace LogoGL {
 	namespace {
+		// Capabilities that change how our draw (or the copy) comes out. The last three are desktop GL only.
 		constexpr GLenum kCaps[] = {
 			GL_SCISSOR_TEST, GL_BLEND, GL_DEPTH_TEST, GL_STENCIL_TEST, GL_CULL_FACE, GL_RASTERIZER_DISCARD,
 			GL_SAMPLE_ALPHA_TO_COVERAGE, GL_SAMPLE_COVERAGE, GL_SAMPLE_MASK, GL_POLYGON_OFFSET_FILL,
@@ -11,7 +13,7 @@ namespace LogoGL {
 		};
 		constexpr int kCapCount = sizeof(kCaps) / sizeof(kCaps[0]);
 		constexpr int kDesktopOnlyCaps = 3;
-		
+
 		#define LOGO_GL_FUNCTIONS(X) \
 			X(GetString, GETSTRING) \
 			X(GetIntegerv, GETINTEGERV) \
@@ -65,14 +67,24 @@ namespace LogoGL {
 		} gl{};
 		#undef LOGO_GL_MEMBER
 
+		#define LOGO_GL_NAME(name, upper) "gl" #name "\0"
+		constexpr char kFunctionNames[] = LOGO_GL_FUNCTIONS(LOGO_GL_NAME);
+		#undef LOGO_GL_NAME
+		constexpr size_t CountNames(const char* names, size_t size) {
+			size_t count = 0;
+			for (size_t i = 0; i + 1 < size; i++) if (names[i] == '\0') count++;
+			return count;
+		}
+		static_assert(CountNames(kFunctionNames, sizeof(kFunctionNames)) == sizeof(Functions) / sizeof(void*),
+			"kFunctionNames must name every member of Functions");
+
 #ifndef LOGO_GL_EXTERNAL_SOURCES
-		const char vertexSource[] = {
-			#embed "../../logo/saltynx.vert"
-			, 0
+		// Minified + LZ4 packed by logo/pack_shader.py (run by make), unpacked only while the program is built.
+		const unsigned char vertexPacked[] = {
+			#embed "../../logo/vert.glsl.lz4"
 		};
-		const char fragmentSource[] = {
-			#embed "../../logo/saltynx.frag"
-			, 0
+		const unsigned char fragmentPacked[] = {
+			#embed "../../logo/frag.glsl.lz4"
 		};
 #endif
 
@@ -93,11 +105,14 @@ namespace LogoGL {
 		int textureWidth = 0, textureHeight = 0;
 
 		bool loadFunctions(Resolver resolve) {
-			bool ok = true;
-			#define LOGO_GL_LOAD(name, upper) gl.name = (PFNGL##upper##PROC)resolve("gl" #name); if (!gl.name && strcmp(#name, "PolygonMode") != 0) ok = false;
-			LOGO_GL_FUNCTIONS(LOGO_GL_LOAD)
-			#undef LOGO_GL_LOAD
-			return ok;
+			const char* name = kFunctionNames;
+			for (size_t i = 0; i < sizeof(Functions) / sizeof(void*); i++, name += strlen(name) + 1) {
+				void* address = resolve(name);
+				// Everything except glPolygonMode (not in OpenGL ES) is required.
+				if (!address && strcmp(name, "glPolygonMode") != 0) return false;
+				memcpy(reinterpret_cast<char*>(&gl) + i * sizeof(void*), &address, sizeof(void*));
+			}
+			return true;
 		}
 
 		const char* skipVersionLine(const char* source) {
@@ -120,11 +135,17 @@ namespace LogoGL {
 			return shader;
 		}
 
-		// Program, vertex array, uniform buffer and the framebuffer used for the copy. The binding
-		// changes done here are covered by the save/restore in Draw().
+		GLuint compilePacked(GLenum type, const unsigned char* packed, size_t packedSize) {
+			char* source = (char*)Lz4::Unpack(packed, packedSize, nullptr);
+			if (!source) return 0;
+			GLuint shader = compile(type, source); // glShaderSource copies the text
+			free(source);
+			return shader;
+		}
+
 		bool build() {
-			GLuint vs = compile(GL_VERTEX_SHADER, vertexSource);
-			GLuint fs = compile(GL_FRAGMENT_SHADER, fragmentSource);
+			GLuint vs = compilePacked(GL_VERTEX_SHADER, vertexPacked, sizeof(vertexPacked));
+			GLuint fs = vs ? compilePacked(GL_FRAGMENT_SHADER, fragmentPacked, sizeof(fragmentPacked)) : 0;
 			if (!vs || !fs) {
 				if (vs) gl.DeleteShader(vs);
 				if (fs) gl.DeleteShader(fs);
@@ -214,7 +235,7 @@ namespace LogoGL {
 			gl.UseProgram((GLuint)s.program);
 		}
 
-		// (Re)creates the copy texture when the area size changes. Texture unit 0 is active.
+		// (Re)creates the copy texture when the area size changes.
 		bool ensureTexture(int width, int height) {
 			if (texture && textureWidth == width && textureHeight == height) return true;
 			if (texture) gl.DeleteTextures(1, &texture);
@@ -237,7 +258,6 @@ namespace LogoGL {
 	bool Draw(const void* context, int width, int height, float time, Resolver resolve) {
 		if (width <= 0 || height <= 0) return false;
 		if (context != ownerContext) {
-			// Objects of another context can't be used here (and that context may be gone).
 			ownerContext = context;
 			ready = failed = false;
 			program = vao = ubo = texture = fbo = 0;
@@ -249,7 +269,6 @@ namespace LogoGL {
 			if (!functionsLoaded) { failed = true; return false; }
 		}
 		if (!ready) {
-			// Before save(): it skips the desktop-only state on OpenGL ES.
 			const char* version = (const char*)gl.GetString(GL_VERSION);
 			if (!version) { failed = true; return false; }
 			isES = strncmp(version, "OpenGL ES", 9) == 0;
@@ -273,7 +292,6 @@ namespace LogoGL {
 			if (!isES && gl.PolygonMode) gl.PolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 			gl.ColorMask(1, 1, 1, 1);
 
-			// Copy the area under the text out of the default framebuffer.
 			gl.BindFramebuffer(GL_READ_FRAMEBUFFER, 0);
 			gl.BindFramebuffer(GL_DRAW_FRAMEBUFFER, fbo);
 			gl.BlitFramebuffer(region.x, region.y, region.x + region.width, region.y + region.height,
@@ -302,7 +320,6 @@ namespace LogoGL {
 		}
 
 		if (!ok) {
-			// Not drawable on this context: free what was created, restore() rebinds the game's objects.
 			deleteObjects();
 			ready = false;
 			failed = true;

@@ -18,6 +18,7 @@ namespace Logo {
 	};
 	static_assert(sizeof(Params) == 32, "Params must match the std140 layout of the GLSL block");
 
+	// Compile time parse of APP_VERSION ("major.minor.micro" + optional suffix, f.e. "2.1.0-beta").
 	struct ParsedVersion {
 		uint32_t packed;
 		bool ok;
@@ -46,9 +47,6 @@ namespace Logo {
 	static_assert(kVersion.ok, "APP_VERSION must look like <major>.<minor>.<micro>[suffix], every number 0-255");
 
 	// GL and Vulkan can't sample the image they draw into, so the area under the text is copied first.
-	// It's the bottom-left part of the visible area and MUST cover the text baked into saltynx.vert
-	// (OFFSET / SCALE: currently about 26% of the width and 22% of the height). Pixels outside it
-	// read the nearest edge texel of the copy.
 	constexpr int REGION_W_NUM = 1, REGION_W_DEN = 2;
 	constexpr int REGION_H_NUM = 1, REGION_H_DEN = 4;
 

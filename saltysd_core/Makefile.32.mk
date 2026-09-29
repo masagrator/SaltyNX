@@ -146,6 +146,10 @@ all: $(BUILD)
 
 $(BUILD):
 	@[ -d $@ ] || mkdir -p $@
+	@python3 $(CURDIR)/logo/pack_shader.py --glsl $(CURDIR)/logo/saltynx.vert $(CURDIR)/logo/vert.glsl.lz4
+	@python3 $(CURDIR)/logo/pack_shader.py --glsl $(CURDIR)/logo/saltynx.frag $(CURDIR)/logo/frag.glsl.lz4
+	@python3 $(CURDIR)/logo/pack_shader.py $(CURDIR)/logo/vert.spv $(CURDIR)/logo/vert.spv.lz4
+	@python3 $(CURDIR)/logo/pack_shader.py $(CURDIR)/logo/frag.spv $(CURDIR)/logo/frag.spv.lz4
 	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile.32.mk
 	@echo linking $(notdir $@)
 	@$(LD) $(LDFLAGS) $(OFILES2) $(LIBPATHS) $(LIBS) -o $(TARGET).elf
@@ -155,7 +159,7 @@ $(BUILD):
 #---------------------------------------------------------------------------------
 clean:
 	@echo clean ...
-	@rm -fr $(BUILD) $(TARGET).pfs0 $(TARGET).nso $(TARGET).nro $(TARGET).nsp $(TARGET).nacp $(TARGET).elf $(TARGET).dbg .lst .map
+	@rm -fr logo/*.lz4 $(BUILD) $(TARGET).pfs0 $(TARGET).nso $(TARGET).nro $(TARGET).nsp $(TARGET).nacp $(TARGET).elf $(TARGET).dbg .lst .map
 
 
 #---------------------------------------------------------------------------------

@@ -18,5 +18,6 @@ namespace LogoVK {
 	VkSemaphore Draw(VkQueue queue, VkSwapchainKHR swapchain, uint32_t imageIndex,
 	                 uint32_t waitCount, const VkSemaphore* waits, float time);
 
+	// Waits for our work and destroys every object.
 	void Release();
 }

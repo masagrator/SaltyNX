@@ -2,7 +2,6 @@
 #include "LogoGL.hpp"
 
 namespace EGL {
-
 	constexpr EGLint MIN_SWAP_INTERVAL = 0;
 	constexpr EGLint MAX_SWAP_INTERVAL = 4;
 
@@ -114,7 +113,6 @@ namespace EGL {
 	}
 
 	namespace Common {
-		// v holds `count` viewports (x, y, width, height) starting at viewport `first`.
 		NOINLINE void ViewportArrayv(GLuint first, GLsizei count, const GLfloat* v, PFNGLVIEWPORTARRAYVPROC pointer) {
 			if (resolutionLookup) for (GLsizei i = 0; i < count; i++) {
 				const GLfloat* viewport = v + i * 4;

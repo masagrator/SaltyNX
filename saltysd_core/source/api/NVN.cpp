@@ -1,5 +1,6 @@
 #include "NVN.hpp"
 #include "Logo.hpp"
+#include <cstddef>
 
 static bool setNumActiveTexturesDetected = false;
 static uint8_t amountOfAvailableBuffers = 0;
@@ -473,15 +474,37 @@ namespace NVN {
 		constexpr char fragmentDataStorage[] {
 			#embed "../../logo/frag.code.bin"
 		};
-		static char vertexControlStorage[] {
+		constexpr char vertexControlStorage[] {
 			#embed "../../logo/vert.control.bin"
 		};
-		static char fragmentControlStorage[] {
+		constexpr char fragmentControlStorage[] {
 			#embed "../../logo/frag.control.bin"
 		};
 		constexpr size_t fragmentDataOffset = (sizeof(vertexDataStorage) + 0xFF) & ~0xFF;
 		constexpr size_t shaderDataSize = (fragmentDataOffset + sizeof(fragmentDataStorage) + 0xFFF) & ~0xFFF;
-		alignas(0x1000) static char shaderDataStorage[shaderDataSize] {};
+		struct ShaderCode {
+			char vertex[fragmentDataOffset];
+			char fragment[shaderDataSize - fragmentDataOffset];
+		};
+		alignas(0x1000) static ShaderCode shaderDataStorage {
+			{
+				#embed "../../logo/vert.code.bin"
+			},
+			{
+				#embed "../../logo/frag.code.bin"
+			},
+		};
+		static_assert(sizeof(ShaderCode) == shaderDataSize && offsetof(ShaderCode, fragment) == fragmentDataOffset);
+		constexpr char expected_control_magic[] = {0x34, 0x12, 0x76, 0x98};
+		constexpr char expected_control_version[] = {0x1, 0x00, 0x00, 0x00, 0x9, 0x00, 0x00, 0x00};
+		template <size_t N, typename T>
+		constexpr bool matches_at(const T* src, const char (&expected)[N]) {
+			return std::equal(expected, expected + N, src);
+		}
+		static_assert(matches_at(fragmentControlStorage, expected_control_magic));
+		static_assert(matches_at(fragmentControlStorage+4, expected_control_version));
+		static_assert(matches_at(vertexControlStorage, expected_control_magic));
+		static_assert(matches_at(vertexControlStorage+4, expected_control_version));
 
 		// Build-time guard: the logo must not need shader scratch memory.
 		constexpr uint32_t ReadU32(const char* p) {
@@ -548,8 +571,6 @@ namespace NVN {
 			if (!sizeof(vertexDataStorage)) return;
 			if (!sizeof(fragmentDataStorage)) return;
 			if (!sizeof(vertexControlStorage) || !sizeof(fragmentControlStorage)) return;
-			memcpy(shaderDataStorage, vertexDataStorage, sizeof(vertexDataStorage));
-			memcpy(shaderDataStorage + fragmentDataOffset, fragmentDataStorage, sizeof(fragmentDataStorage));
 			filesLoaded = true;
 			SaltySDCore_printf("NX-FPS: Logo: shader files loaded (vert 0x%lX, frag 0x%lX)\n", (unsigned long)sizeof(vertexDataStorage), (unsigned long)sizeof(fragmentDataStorage));
 		}
@@ -683,7 +704,7 @@ namespace NVN {
 			nvnMemoryPoolBuilderSetDefaults_0(&b);
 			nvnMemoryPoolBuilderSetDevice_0(&b, mainDevice);
 			nvnMemoryPoolBuilderSetFlags_0(&b, TripleBuffer::MEMORY_POOL_FLAGS_CPU_UNCACHED | TripleBuffer::MEMORY_POOL_FLAGS_GPU_CACHED | 0x40);
-			nvnMemoryPoolBuilderSetStorage_0(&b, shaderDataStorage, sizeof(shaderDataStorage));
+			nvnMemoryPoolBuilderSetStorage_0(&b, &shaderDataStorage, sizeof(shaderDataStorage));
 			if (!nvnMemoryPoolInitialize_0(&shaderPool, &b)) return false;
 
 			BufferAddress base = nvnMemoryPoolGetBufferAddress_0(&shaderPool);

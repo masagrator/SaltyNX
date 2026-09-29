@@ -55,7 +55,7 @@ namespace vk {
 		bool done = false;
 		uint64_t startTick = 0;
 		uint64_t endTick = 0;
-		VkInstance lastInstance = VK_NULL_HANDLE;
+		VkInstance lastInstance = VK_NULL_HANDLE; // for instance level functions that aren't exported
 
 		void* ResolveDevice(VkDevice device, const char* name) {
 			void* address = vkGetDeviceProcAddr_0 ? (void*)vkGetDeviceProcAddr_0(device, name) : nullptr;
