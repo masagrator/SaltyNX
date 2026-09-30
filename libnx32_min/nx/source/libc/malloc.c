@@ -112,10 +112,14 @@ void free(void* p)
 	mutexUnlock(&s_lock);
 }
 
+// Doesn't call malloc(): GCC turns "malloc() then memset() to 0" into a call to calloc(), which in here
+// would be calloc() calling itself forever.
 void* calloc(size_t count, size_t size)
 {
 	if (size && count > (size_t)-1 / size) return NULL;
-	void* p = malloc(count * size);
+	mutexLock(&s_lock);
+	void* p = allocLocked(count * size);
+	mutexUnlock(&s_lock);
 	if (p) memset(p, 0, count * size);
 	return p;
 }
