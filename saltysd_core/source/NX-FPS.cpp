@@ -22,6 +22,15 @@ extern "C" {
 			Shared -> MAGIC = 0x465053;
 			Shared->expectedSetBuffers = -1;
 
+			FILE* logo_file = SaltySDCore_fopen("sdmc:/SaltySD/flags/nologo.flag", "rb");
+			if  (logo_file) {
+				SaltySDCore_fclose(logo_file);
+				NVN::Logo::done = true;
+				EGL::Logo::done = true;
+				vk::Logo::done = true;
+				SaltySDCore_printf("NX-FPS: Logo: disabled by nologo.flag\n");
+			}
+
 			//Putting this inside doesn't generate bloat in .init_array
 			std::array replacements = {
 				runtime_replace{"nvnBootstrapLoader", (uintptr_t*)&NVN::nvnBootstrapLoader_0, (void*)NVN::BootstrapLoader_1, nullptr},
@@ -47,9 +56,9 @@ extern "C" {
 				runtime_replace{"vkGetDeviceProcAddr", (uintptr_t*)&vk::vkGetDeviceProcAddr_0, (void*)vk::GetDeviceProcAddr, nullptr},
 				runtime_replace{"vkCmdSetViewportWithCount", (uintptr_t*)&vk::vkCmdSetViewportWithCount_0, (void*)vk::CmdSetViewportWithCount, nullptr},
 				runtime_replace{"vkGetSwapchainImagesKHR", (uintptr_t*)&vk::vkGetSwapchainImagesKHR_0, nullptr, nullptr},
-				runtime_replace{"vkCreateDevice", (uintptr_t*)&vk::vkCreateDevice_0, (void*)vk::CreateDevice, nullptr},
-				runtime_replace{"vkGetDeviceQueue", (uintptr_t*)&vk::vkGetDeviceQueue_0, (void*)vk::GetDeviceQueue, nullptr},
-				runtime_replace{"vkDestroySwapchainKHR", (uintptr_t*)&vk::vkDestroySwapchainKHR_0, (void*)vk::DestroySwapchain, nullptr},
+				runtime_replace{"vkCreateDevice", (uintptr_t*)&vk::vkCreateDevice_0, (void*)vk::CreateDevice, vk::Logo::check},
+				runtime_replace{"vkGetDeviceQueue", (uintptr_t*)&vk::vkGetDeviceQueue_0, (void*)vk::GetDeviceQueue, vk::Logo::check},
+				runtime_replace{"vkDestroySwapchainKHR", (uintptr_t*)&vk::vkDestroySwapchainKHR_0, (void*)vk::DestroySwapchain, vk::Logo::check},
 				runtime_replace{"_ZN11NvSwapchain18CreateSwapchainKHREP10VkDevice_TPK24VkSwapchainCreateInfoKHRPK21VkAllocationCallbacksPP16VkSwapchainKHR_T", (uintptr_t*)&vk::nvSwapchainCreateSwapchainKHR_0, nullptr, nullptr},
 
 				runtime_replace{"_ZN2nn2oe20SetFocusHandlingModeENS0_17FocusHandlingModeE", (uintptr_t*)&nn::SetFocusHandlingMode_0, (void*)nn::setFocusHandlingMode, nullptr},

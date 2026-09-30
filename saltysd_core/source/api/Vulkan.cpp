@@ -181,9 +181,9 @@ namespace vk {
 			runtime_replace{"vkCmdSetScissorWithCount", (uintptr_t*)&vkCmdSetScissorWithCount_0, (void*)CmdSetScissorWithCount},
 			runtime_replace{"vkCreateSwapchainKHR", (uintptr_t*)&vkCreateSwapchainKHR_0, (void*)vk::CreateSwapchain},
 			runtime_replace{"vkGetSwapchainImagesKHR", (uintptr_t*)&vkGetSwapchainImagesKHR_0},
-			runtime_replace{"vkCreateDevice", (uintptr_t*)&vkCreateDevice_0, (void*)vk::CreateDevice},
-			runtime_replace{"vkGetDeviceQueue", (uintptr_t*)&vkGetDeviceQueue_0, (void*)vk::GetDeviceQueue},
-			runtime_replace{"vkDestroySwapchainKHR", (uintptr_t*)&vkDestroySwapchainKHR_0, (void*)vk::DestroySwapchain}
+			runtime_replace{"vkCreateDevice", (uintptr_t*)&vkCreateDevice_0, (void*)vk::CreateDevice, Logo::check},
+			runtime_replace{"vkGetDeviceQueue", (uintptr_t*)&vkGetDeviceQueue_0, (void*)vk::GetDeviceQueue, Logo::check},
+			runtime_replace{"vkDestroySwapchainKHR", (uintptr_t*)&vkDestroySwapchainKHR_0, (void*)vk::DestroySwapchain, Logo::check}
 		};
 
 		NOINLINE PFN_vkVoidFunction GetDeviceProcAddr(VkDevice device, const char* pName, PFN_vkGetDeviceProcAddr pointer) {
@@ -198,7 +198,11 @@ namespace vk {
 			for (const auto& replacement : vk_replacements) {
 				if (!strcmp(replacement.name, pName)) {
 					if (replacement.orig_ptr && *replacement.orig_ptr == 0) *replacement.orig_ptr = address;
-					if (replacement.hook_ptr) return (PFN_vkVoidFunction)replacement.hook_ptr;
+					if (replacement.hook_ptr) {
+						bool check = true;
+						if (replacement.cond_check) replacement.cond_check(&check);
+						if (check) return (PFN_vkVoidFunction)replacement.hook_ptr;
+					}
 					break;
 				}
 			}
@@ -212,7 +216,11 @@ namespace vk {
 			for (const auto& replacement : vk_replacements) {
 				if (!strcmp(replacement.name, pName)) {
 					if (replacement.orig_ptr && *replacement.orig_ptr == 0) *replacement.orig_ptr = address;
-					if (replacement.hook_ptr) return (PFN_vkVoidFunction)replacement.hook_ptr;
+					if (replacement.hook_ptr) {
+						bool check = true;
+						if (replacement.cond_check) replacement.cond_check(&check);
+						if (check) return (PFN_vkVoidFunction)replacement.hook_ptr;
+					}
 					break;
 				}
 			}

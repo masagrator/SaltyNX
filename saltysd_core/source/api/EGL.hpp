@@ -36,4 +36,8 @@ namespace EGL {
 	void ViewportIndexedfvNV(GLuint index, const GLfloat* v);
 	void ViewportIndexedfvOES(GLuint index, const GLfloat* v);
 	__eglMustCastToProperFunctionPointerType GetProc(const char* procname);
+
+	namespace Logo {
+		extern bool done; // finished, failed, or disabled by nologo.flag
+	}
 }

@@ -2,7 +2,6 @@
 #include "../NX-FPS-Common.hpp"
 
 namespace NVN {
-	// Opaque NVN objects (sizes from the NVN headers) and the plain structs its functions take.
 	struct Texture {
 		char reserved[0xC0];
 	};
@@ -124,5 +123,9 @@ namespace NVN {
 		constexpr size_t TEXTURE_MEMORY_SIZE = (((1920 * 1152 * 4) * WINDOW_TEXTURES) + 0xFFF) & ~0xFFF;
 		constexpr size_t RESERVED_MEMORY_SIZE = TEXTURE_MEMORY_SIZE;
 		extern bool requested;
+	}
+
+	namespace Logo {
+		extern bool done; // finished, failed, or disabled by nologo.flag
 	}
 }

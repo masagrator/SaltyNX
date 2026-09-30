@@ -34,6 +34,12 @@ namespace vk {
 	void GetDeviceQueue(VkDevice device, uint32_t queueFamilyIndex, uint32_t queueIndex, VkQueue* pQueue);
 	void DestroySwapchain(VkDevice device, VkSwapchainKHR swapchain, const VkAllocationCallbacks* pAllocator);
 
+	namespace Logo {
+		extern bool done; // finished, failed, or disabled by nologo.flag
+		// cond_check for the hooks that exist only for the logo (vkCreateDevice, vkGetDeviceQueue, vkDestroySwapchainKHR)
+		inline void check(bool* out) { *out = !done; }
+	}
+
 	namespace nvSwapchain {
 		VkResult QueuePresent(VkQueue queue, const VkPresentInfoKHR* pPresentInfo);
 		VkResult CreateSwapchain(VkDevice device, const VkSwapchainCreateInfoKHR* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSwapchainKHR* pSwapchain);

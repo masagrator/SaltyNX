@@ -373,7 +373,6 @@ namespace NVN {
 
 			uintptr_t addr = (uintptr_t)nvnWindowBuilderSetTextures_0;
 			if (!addr) return;
-			addr &= ~uintptr_t(3); // align 4, in case the low bit was set as a Thumb marker
 
 			const uint32_t* code = (const uint32_t*)addr;
 			for (int i = 0; i < 64; i++) {
@@ -425,7 +424,7 @@ namespace NVN {
 	}
 
 	bool WindowInitialize(const Window* nvnWindow, WindowBuilder* windowBuilder) {
-		if (presentedTextureCount == 0) Logo::RecoverFromBuilder(windowBuilder);
+		if (!Logo::done && presentedTextureCount == 0) Logo::RecoverFromBuilder(windowBuilder);
 		if (TripleBuffer::activeBuilder && windowBuilder == TripleBuffer::activeBuilder) {
 			bool ret = nvnWindowInitialize_0(nvnWindow, windowBuilder);
 			if (ret) TripleBuffer::activeWindow = nvnWindow;
