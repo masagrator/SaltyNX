@@ -43,6 +43,9 @@ void main() {
     float keep = clamp(diff / max(MIN_CONTRAST, 0.0001), 0.0, 1.0);
     keep = keep * keep * (3.0 - 2.0 * keep);                   // smoothstep
     vec3 extreme = vec3(lumBg > 0.5 ? 0.0 : 1.0);
+	
+	vec3 color = mix(extreme, inverse, keep);
+	float fade = 1.0 - clamp((uTime - 2.5) / 0.5, 0.0, 1.0);
 
-    fragColor = vec4(mix(extreme, inverse, keep), 1.0);
+    fragColor = vec4(mix(background, color, fade), 1.0);
 }
