@@ -373,8 +373,7 @@ namespace NVN {
 
 			uintptr_t addr = (uintptr_t)nvnWindowBuilderSetTextures_0;
 			if (!addr) return;
-			addr &= ~uintptr_t(3); // align 4, in case the low bit was set as a Thumb marker
-
+			
 			const uint32_t* code = (const uint32_t*)addr;
 			for (int i = 0; i < 64; i++) {
 				uint32_t word = code[i];
