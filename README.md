@@ -104,3 +104,11 @@ Titles in exceptions.txt are treated as part of Blacklist, you can find it in ro
 
 # Thanks to
 - `Cooler3D` for sharing code with me how he was changing handheld display refresh rate in his tools that were first publicly available tools allowing this on HOS. I have used that as basis to make my own function.
+
+# Other
+`Claude` was used to:
+ - cleanup libnx32_min from unused files and add files to make it independent from newlib shipped with DevkitARM which was breaking PIE compilation
+ - Fix bootstrapper32 code to generate properly position independent ELF
+ - Core32 and Bootstrapper32 now relocate themselves instead of sysmodule doing that for them (fixing an issue with pointers needed relocating in read only sections)
+ - Add support for showing logo via shader
+ - Implement my design for triple buffer workaround targeting memory hardcoded double buffer games
