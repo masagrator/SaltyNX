@@ -61,19 +61,21 @@ void __libnx_init(void* ctx, Handle main_thread, void* saved_lr)
 
 void __attribute__((weak)) __libnx_exit(int rc)
 {
-	fsdevUnmountAll();
 	uintptr_t addr = SaltySDCore_getCodeStart();
 	__nx_exit_clear(orig_ctx, orig_main_thread, (void*)addr);
 }
 
+#if !defined(SWITCH32)
 //Because we are not in libnx environment, we need to remove libnx check for its own THREADVARS_MAGIC from syscall_getreent.
 //This is done by using linker's -Wrap instead of what original SaltyNX used because this method was incompatible with newest libnx
+//(Core32 doesn't link newlib, so it has no __syscall_getreent to wrap.)
 struct _reent* _real___syscall_getreent(void);
 struct _reent* _wrap___syscall_getreent(void)
 {
     ThreadVars* tv = getThreadVars();
     return tv->reent;
 }
+#endif
 
 uintptr_t g_heapAddr;
 size_t g_heapSize;

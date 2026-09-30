@@ -23,7 +23,6 @@ extern Result SaltySD_Restore() LINKABLE;
 extern Result SaltySD_LoadELF(u64 heap, u64* elf_addr, u64* elf_size, char* name) LINKABLE;
 #endif
 extern Result SaltySD_Memcpy(uintptr_t to, uintptr_t from, size_t size) LINKABLE;
-extern Result SaltySD_GetSDCard(Handle *retrieve) LINKABLE;
 extern Result SaltySD_printf(const char* format, ...) LINKABLE;
 extern Result SaltySD_CheckIfSharedMemoryAvailable(ptrdiff_t *offset, size_t size) LINKABLE;
 extern Result SaltySD_GetSharedMemoryHandle(Handle *retrieve) LINKABLE;

@@ -42,7 +42,6 @@ For log = natural log uncomment the next line. */
 #include <math.h>
 #include <string.h>
 #include <stdio.h>
-#include <ctype.h>
 #include <limits.h>
 
 #ifndef NAN
@@ -240,6 +239,10 @@ static double comma(double a, double b) {(void)a; return b;}
 #define LINKABLE __attribute__ ((weak))
 extern double strtod(const char* str, char** endptr) LINKABLE;
 
+/* ASCII only, same as isalpha/isdigit in the "C" locale (Core32 doesn't link newlib's ctype table). */
+static int te_isalpha(char c) { return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z'); }
+static int te_isdigit(char c) { return c >= '0' && c <= '9'; }
+
 
 void next_token(state *s) {
     s->type = TOK_NULL;
@@ -257,10 +260,10 @@ void next_token(state *s) {
             s->type = TOK_NUMBER;
         } else {
             /* Look for a variable or builtin function call. */
-            if (isalpha((int)(s->next[0]))) {
+            if (te_isalpha(s->next[0])) {
                 const char *start;
                 start = s->next;
-                while (isalpha((int)(s->next[0])) || isdigit((int)(s->next[0])) || (s->next[0] == '_')) s->next++;
+                while (te_isalpha(s->next[0]) || te_isdigit(s->next[0]) || (s->next[0] == '_')) s->next++;
                 
                 const te_variable *var = find_lookup(s, start, s->next - start);
                 if (!var) var = find_builtin(start, s->next - start);

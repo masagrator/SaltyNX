@@ -56,9 +56,9 @@ CFLAGS			+=	$(INCLUDE) -DSWITCH32 -DAPP_VERSION=\"$(VERSION)\" -DMODULE_NAME=\"$
 CXXFLAGS		:=	$(CFLAGS) -fno-exceptions -fno-rtti -std=gnu++26
 
 ASFLAGS			:=	-g $(ARCH)
-LDFLAGS			=	-specs=$(CURDIR)/../libnx32_min/nx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map) -B$(ARMV6K_LIBDIR) -L$(ARMV6K_SYSLIB) -Wl,-wrap,__syscall_getreent
+LDFLAGS			=	-specs=$(CURDIR)/../libnx32_min/nx/switch.specs -g $(ARCH) -nostdlib -Wl,-Map,$(notdir $*.map) -B$(ARMV6K_LIBDIR)
 
-LIBS			:=	-lnx_min
+LIBS			:=	-lnx_min -lgcc
 
 #---------------------------------Wpointer-to-int-cast-------------------------------------------------
 # list of directories containing libraries, this must be the top level containing

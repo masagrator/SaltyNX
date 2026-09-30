@@ -200,29 +200,6 @@ Result SaltySD_Exception()
 	return (Result)r;
 }
 
-Result SaltySD_GetSDCard(Handle *retrieve)
-{
-	u64 r;
-	Handle h;
-	if (Transact({handleService_GetSDCard, RawSize<Empty>, 0, 0, 0, nullptr}, r, nullptr, &h) && !r)
-	{
-		*retrieve = h;
-
-		// Init fs stuff
-		FsFileSystem sdcardfs;
-		#if defined(SWITCH32) || defined(OUNCE32)
-		sdcardfs.s.handle = *retrieve;
-		#else
-		sdcardfs.s.own_handle = *retrieve;
-		#endif
-		int dev = fsdevMountDevice("sdmc", sdcardfs);
-		setDefaultDevice(dev);
-
-		SaltySDCore_printf(MODULE_NAME ": got SD card handle %x\n", h);
-	}
-	return (Result)r;
-}
-
 Result SaltySD_CheckIfSharedMemoryAvailable(ptrdiff_t *new_offset, size_t new_size)
 {
 	struct ReqShmem { 
