@@ -60,7 +60,7 @@ static bool hijack_bootstrap(Handle* debug, u64 pid, u64 tid, bool isA64)
     // Load in the ELF
     //svcReadDebugProcessMemory(backup, debug, context.pc.x, 0x1000);
     game_start_address = context.pc.x;
-    uint64_t new_start;
+    uint64_t new_start = 0;
     if (isA64) {
         FILE* file = 0;
         file = fopen("sdmc:/SaltySD/saltynx_bootstrap.elf", "rb");
@@ -73,12 +73,26 @@ static bool hijack_bootstrap(Handle* debug, u64 pid, u64 tid, bool isA64)
         size_t saltynx_bootstrap_elf_size = ftell(file);
         fseek(file, 0, 0);
         u8* elf = malloc(saltynx_bootstrap_elf_size);
-        fread(elf, saltynx_bootstrap_elf_size, 1, file);
+        if (!elf || fread(elf, saltynx_bootstrap_elf_size, 1, file) != 1) {
+            SaltyNX_printf(APP_NAME ": couldn't read SaltySD/saltynx_bootstrap.elf, aborting...\n");
+            fclose(file);
+            free(elf);
+            svcCloseHandle(*debug);
+            return false;
+        }
         fclose(file);
-        load_elf_debug(*debug, &new_start, elf, saltynx_bootstrap_elf_size);
+        ret = load_elf_debug(*debug, &new_start, elf, saltynx_bootstrap_elf_size);
         free(elf);
     }
-    else load_elf32_debug(*debug, &new_start);
+    else ret = load_elf32_debug(*debug, &new_start);
+
+    // Nothing was changed in the process when loading fails: detach and let the game start without SaltyNX.
+    if (R_FAILED(ret) || !new_start)
+    {
+        SaltyNX_printf(APP_NAME ": loading the bootstrap failed (0x%x), aborting...\n", ret);
+        svcCloseHandle(*debug);
+        return false;
+    }
 
     // Set new PC
     context.pc.x = new_start;
@@ -86,6 +100,8 @@ static bool hijack_bootstrap(Handle* debug, u64 pid, u64 tid, bool isA64)
     if (ret)
     {
         SaltyNX_printf(APP_NAME ": svcSetDebugThreadContext returned %x!\n", ret);
+        // The game would resume at its own entry with rtld's code overwritten: put that code back.
+        restore_elf_debug(*debug);
     }
      
     svcCloseHandle(*debug);
