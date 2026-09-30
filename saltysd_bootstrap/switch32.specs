@@ -1,0 +1,4 @@
+%rename link                old_link
+
+*link:
+%(old_link) -T ./switch32.ld -pie --gc-sections -z text --build-id=sha1

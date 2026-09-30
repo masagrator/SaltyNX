@@ -42,7 +42,8 @@ EXEFS_SRC	:=	exefs_src
 #---------------------------------------------------------------------------------
 # options for code generation
 #---------------------------------------------------------------------------------
-ARCH			:=	-march=armv8-a -mfpu=neon-vfpv4 -mtune=cortex-a57 -mtp=soft -fPIC -mfloat-abi=hard
+# -ffixed-r9: r9 points to the BootState block for the whole run (source/bootstate.h)
+ARCH			:=	-march=armv8-a -mfpu=neon-vfpv4 -mtune=cortex-a57 -mtp=soft -fPIE -mfloat-abi=hard -ffixed-r9
 
 CFLAGS				:=	-Wall -Werror -O3 \
 					-ffast-math -ffunction-sections -fdata-sections \
@@ -53,10 +54,9 @@ CFLAGS				+=	$(INCLUDE) -DSWITCH32
 CXXFLAGS			:= $(CFLAGS) -fno-rtti -fno-exceptions -std=gnu++26
 
 ASFLAGS				:=	-g $(ARCH)
-LDFLAGS_3K			=	-specs=$(CURDIR)/switch_3k.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map) -B$(ARMV6K_LIBDIR) -L$(ARMV6K_SYSLIB) 
-LDFLAGS_5K			=	-specs=$(CURDIR)/switch_5k.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map) -B$(ARMV6K_LIBDIR) -L$(ARMV6K_SYSLIB) 
+LDFLAGS				=	-specs=$(CURDIR)/switch32.specs -g $(ARCH) -nostdlib -Wl,-Map,$(notdir $*.map) -B$(ARMV6K_LIBDIR)
 
-LIBS				:= -lnx_min
+LIBS				:= -lnx_min -lgcc
 
 #---------------------------------------------------------------------------------
 # list of directories containing libraries, this must be the top level containing
@@ -146,17 +146,14 @@ $(BUILD):
 	@[ -d $@ ] || mkdir -p $@
 	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile.32.mk
 	@echo linking $(notdir $@)
-	@$(LD) $(LDFLAGS_3K) $(OFILES2) $(LIBPATHS) $(LIBS) -o $(TARGET)_3k.elf
-	@$(LD) $(LDFLAGS_5K) $(OFILES2) $(LIBPATHS) $(LIBS) -o $(TARGET)_5k.elf
-	@$(OBJCOPY) --only-keep-debug $(CURDIR)/$(TARGET)_3k.elf $(CURDIR)/$(TARGET)_3k.dbg
-	@$(OBJCOPY) --add-gnu-debuglink=$(CURDIR)/$(TARGET)_3k.dbg --strip-debug --strip-unneeded $(CURDIR)/$(TARGET)_3k.elf
-	@$(OBJCOPY) --only-keep-debug $(CURDIR)/$(TARGET)_5k.elf $(CURDIR)/$(TARGET)_5k.dbg
-	@$(OBJCOPY) --add-gnu-debuglink=$(CURDIR)/$(TARGET)_5k.dbg --strip-debug --strip-unneeded $(CURDIR)/$(TARGET)_5k.elf
+	@$(LD) $(LDFLAGS) $(OFILES2) $(LIBPATHS) $(LIBS) -o $(TARGET).elf
+	@$(OBJCOPY) --only-keep-debug $(CURDIR)/$(TARGET).elf $(CURDIR)/$(TARGET).dbg
+	@$(OBJCOPY) --add-gnu-debuglink=$(CURDIR)/$(TARGET).dbg --strip-debug --strip-unneeded $(CURDIR)/$(TARGET).elf
 
 #---------------------------------------------------------------------------------
 clean:
 	@echo clean ...
-	@rm -fr $(BUILD) $(TARGET).pfs0 $(TARGET).nso $(TARGET).nro $(TARGET).nsp $(TARGET).nacp $(TARGET)_3k.elf $(TARGET)_5k.elf $(TARGET)_3k.dbg $(TARGET)_5k.dbg .lst .map
+	@rm -fr $(BUILD) $(TARGET).pfs0 $(TARGET).nso $(TARGET).nro $(TARGET).nsp $(TARGET).nacp $(TARGET).elf $(TARGET).dbg .lst .map
 
 
 #---------------------------------------------------------------------------------
