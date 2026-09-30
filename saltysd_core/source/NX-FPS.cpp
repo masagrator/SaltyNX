@@ -11,7 +11,6 @@ extern "C" {
 
 		sharedOperationMode = _sharedOperationMode;
 		SaltySDCore_printf("NX-FPS: alive\n");
-		NVN::Logo::LoadShaderFiles();
 		LOCK::patcher.bindMainRegion(Utils::getMainAddress());
 		SaltySDCore_printf("NX-FPS: found main at: 0x%lX\n", LOCK::patcher.mainRegion());
 		Result ret = SaltySD_CheckIfSharedMemoryAvailable(&SharedMemoryOffset, sizeof(NxFpsSharedBlock));

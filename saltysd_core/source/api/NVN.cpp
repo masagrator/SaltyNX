@@ -1,6 +1,5 @@
 #include "NVN.hpp"
-#include "Logo.hpp"
-#include <cstddef>
+#include "LogoNVN.hpp"
 
 static bool setNumActiveTexturesDetected = false;
 static uint8_t amountOfAvailableBuffers = 0;
@@ -14,113 +13,8 @@ enum {
 
 namespace NVN {
 
-	struct Texture {
-		char reserved[0xC0];
-	};
-	struct TextureView {
-		char reserved[0x28];
-	};
-	struct TextureBuilder {
-		char reserved[0x80];
-	};
-	struct Window {
-		char reserved[0x180];
-	};
-	struct DeviceBuilder {
-		char reserved[0x40];
-	};
-	struct Device {
-		char reserved[0x3000];
-	};
-	struct CommandBuffer {
-		char reserved[0xA0];
-	};
-	struct MemoryPool {
-    	char reserved[0x100];
-	};
-	struct Sync {
-		char reserved[0x40];
-	};
-	struct QueueBuilder {
-    	char reserved[0x40];
-	};
-	struct Queue {
-		char reserved[0x2000];
-	};
-	struct WindowBuilder {
-		const char reserved[16];
-		uint8_t numBufferedFrames;
-		const char reserved2[47];
-	};
-	struct MemoryPoolBuilder {
-		char reserved[0x40];
-	};
-	struct Program {
-		char reserved[0xC0];
-	};
-	struct ShaderData {
-		uint64_t data;
-		const void* control;
-	};
-	struct DepthStencilState {
-		char reserved[0x8];
-	};
-	struct ChannelMaskState {
-		char reserved[0x4];
-	};
-	struct ColorState {
-		char reserved[0x4];
-	};
-	struct BlendState {
-		char reserved[0x8];
-	};
-	struct PolygonState {
-		char reserved[0x4];
-	};
-	struct TexturePool {
-		char reserved[0x20];
-	};
-	struct SamplerPool {
-		char reserved[0x20];
-	};
-	struct SamplerBuilder {
-		char reserved[0x60];
-	};
-	struct Sampler {
-		char reserved[0x30];
-	};
-
-	struct Viewport {
-		float x;
-		float y;
-		float width;
-		float height;
-	};
-	struct Scissor {
-		int x;
-		int y;
-		int width;
-		int height;
-	};
-	struct CopyRegion {
-		int x;
-		int y;
-		int z;
-		int width;
-		int height;
-		int depth;
-	};
-
 	Sync* WindowSync = 0;
 	Device* mainDevice = 0;
-
-	typedef int textureFlags;
-	typedef int textureTarget;
-	typedef int textureFormat;
-	typedef int memoryPoolFlags;
-	typedef uint64_t BufferAddress;
-	typedef uint64_t CommandHandle;
-	typedef uint64_t TextureHandle;
 
 	static u16 (*nvnTextureGetWidth_0)(const Texture* texture);
 	static u16 (*nvnTextureGetHeight_0)(const Texture* texture);
@@ -158,7 +52,6 @@ namespace NVN {
 	static bool (*nvnMemoryPoolInitialize_0)(const MemoryPool* nvnMemPool, const MemoryPoolBuilder* nvnMemPoolBuilder);
 	static void* (*nvnMemoryPoolMap_0)(const MemoryPool* nvnMemPool);
 	static BufferAddress (*nvnMemoryPoolGetBufferAddress_0)(const MemoryPool* nvnMemPool);
-	static void (*nvnDeviceGetInteger_0)(const Device* nvnDevice, int info, int* out);
 	static bool (*nvnDeviceInitialize_0)(Device* nvnDevice, const DeviceBuilder* nvnDeviceBuilder);
 	static void (*nvnTextureBuilderSetDevice_0)(TextureBuilder* builder, Device* device);
 	static void (*nvnTextureBuilderSetDefaults_0)(TextureBuilder* builder);
@@ -177,44 +70,11 @@ namespace NVN {
 	static void (*nvnCommandBufferBarrier_0)(const CommandBuffer* nvnCmdBuf, int barrier);
 	static void (*nvnCommandBufferCopyTextureToTexture_0)(const CommandBuffer* nvnCmdBuf, const Texture* src, const TextureView* srcView, const CopyRegion* srcRegion, const Texture* dst, const TextureView* dstView, const CopyRegion* dstRegion, int flags);
 
-	static bool (*nvnProgramInitialize_0)(Program* program, Device* device);
-	static bool (*nvnProgramSetShaders_0)(Program* program, int count, const ShaderData* shaders);
-	static void (*nvnCommandBufferBindProgram_0)(const CommandBuffer* cmdBuf, const Program* program, int stages);
-	static void (*nvnCommandBufferClearColor_0)(const CommandBuffer* cmdBuf, int index, const float* color, int mask);
-	static void (*nvnCommandBufferDrawArrays_0)(const CommandBuffer* cmdBuf, int mode, int first, int count);
-	static void (*nvnDepthStencilStateSetDefaults_0)(DepthStencilState* state);
-	static void (*nvnCommandBufferBindDepthStencilState_0)(const CommandBuffer* cmdBuf, const DepthStencilState* state);
-	static void (*nvnChannelMaskStateSetDefaults_0)(ChannelMaskState* state);
-	static void (*nvnCommandBufferBindChannelMaskState_0)(const CommandBuffer* cmdBuf, const ChannelMaskState* state);
-	static void (*nvnColorStateSetDefaults_0)(ColorState* state);
-	static void (*nvnCommandBufferBindColorState_0)(const CommandBuffer* cmdBuf, const ColorState* state);
-	static void (*nvnBlendStateSetDefaults_0)(BlendState* state);
-	static void (*nvnCommandBufferBindBlendState_0)(const CommandBuffer* cmdBuf, const BlendState* state);
-	static void (*nvnPolygonStateSetDefaults_0)(PolygonState* state);
-	static void (*nvnCommandBufferBindPolygonState_0)(const CommandBuffer* cmdBuf, const PolygonState* state);
-	struct Rectangle {
-		int x;
-		int y;
-		int width;
-		int height;
-	};
 	static void (*nvnWindowGetCrop_0)(const Window* window, Rectangle* crop);
-	static bool (*nvnTexturePoolInitialize_0)(TexturePool* pool, const MemoryPool* memoryPool, ptrdiff_t offset, int numDescriptors);
-	static void (*nvnTexturePoolRegisterTexture_0)(const TexturePool* pool, int id, const Texture* texture, const TextureView* view);
-	static bool (*nvnSamplerPoolInitialize_0)(SamplerPool* pool, const MemoryPool* memoryPool, ptrdiff_t offset, int numDescriptors);
-	static void (*nvnSamplerPoolRegisterSampler_0)(const SamplerPool* pool, int id, const Sampler* sampler);
-	static void (*nvnSamplerBuilderSetDevice_0)(SamplerBuilder* builder, Device* device);
-	static void (*nvnSamplerBuilderSetDefaults_0)(SamplerBuilder* builder);
-	static void (*nvnSamplerBuilderSetMinMagFilter_0)(SamplerBuilder* builder, int min, int mag);
-	static void (*nvnSamplerBuilderSetWrapMode_0)(SamplerBuilder* builder, int s, int t, int r);
-	static bool (*nvnSamplerInitialize_0)(Sampler* sampler, const SamplerBuilder* builder);
-	static TextureHandle (*nvnDeviceGetTextureHandle_0)(const Device* device, int textureId, int samplerId);
 	static void (*nvnCommandBufferSetTexturePool_0)(const CommandBuffer* cmdBuf, const TexturePool* pool);
 	static void (*nvnCommandBufferSetSamplerPool_0)(const CommandBuffer* cmdBuf, const SamplerPool* pool);
 	static const TexturePool* volatile gameTexturePool = nullptr;
 	static const SamplerPool* volatile gameSamplerPool = nullptr;
-	static void (*nvnCommandBufferBindTexture_0)(const CommandBuffer* cmdBuf, int stage, int index, TextureHandle handle);
-	static void (*nvnCommandBufferBindUniformBuffer_0)(const CommandBuffer* cmdBuf, int stage, int index, BufferAddress address, size_t size);
 
 	constexpr size_t COMMAND_MEMORY_PER_BUF = 0x1000; 
 	constexpr size_t CONTROL_MEMORY_PER_BUF = 0x1000;
@@ -460,119 +320,12 @@ namespace NVN {
 	int presentedTextureCount = 0;
 
 	namespace Logo {
-		// Params, kVersion, DURATION_SECONDS, VERTEX_COUNT
-		using namespace ::Logo;
-
-		constexpr int UBO_BINDING = 0;
-		constexpr int TEXTURE_BINDING = 0;
-		constexpr int STAGE_VERTEX = 0;   // NVNshaderStage
-		constexpr int STAGE_FRAGMENT = 1;
-
-		constexpr char vertexDataStorage[] {
-			#embed "../../logo/vert.code.bin"
-		};
-		constexpr char fragmentDataStorage[] {
-			#embed "../../logo/frag.code.bin"
-		};
-		constexpr char vertexControlStorage[] {
-			#embed "../../logo/vert.control.bin"
-		};
-		constexpr char fragmentControlStorage[] {
-			#embed "../../logo/frag.control.bin"
-		};
-		constexpr size_t fragmentDataOffset = (sizeof(vertexDataStorage) + 0xFF) & ~0xFF;
-		constexpr size_t shaderDataSize = (fragmentDataOffset + sizeof(fragmentDataStorage) + 0xFFF) & ~0xFFF;
-		struct ShaderCode {
-			char vertex[fragmentDataOffset];
-			char fragment[shaderDataSize - fragmentDataOffset];
-		};
-		alignas(0x1000) static ShaderCode shaderDataStorage {
-			{
-				#embed "../../logo/vert.code.bin"
-			},
-			{
-				#embed "../../logo/frag.code.bin"
-			},
-		};
-		static_assert(sizeof(ShaderCode) == shaderDataSize && offsetof(ShaderCode, fragment) == fragmentDataOffset);
-		constexpr char expected_control_magic[] = {0x34, 0x12, 0x76, 0x98};
-		constexpr char expected_control_version[] = {0x1, 0x00, 0x00, 0x00, 0x9, 0x00, 0x00, 0x00};
-		template <size_t N, typename T>
-		constexpr bool matches_at(const T* src, const char (&expected)[N]) {
-			return std::equal(expected, expected + N, src);
-		}
-		static_assert(matches_at(fragmentControlStorage, expected_control_magic));
-		static_assert(matches_at(fragmentControlStorage+4, expected_control_version));
-		static_assert(matches_at(vertexControlStorage, expected_control_magic));
-		static_assert(matches_at(vertexControlStorage+4, expected_control_version));
-
-		// Build-time guard: the logo must not need shader scratch memory.
-		constexpr uint32_t ReadU32(const char* p) {
-			return (uint32_t)(unsigned char)p[0] | ((uint32_t)(unsigned char)p[1] << 8) |
-			       ((uint32_t)(unsigned char)p[2] << 16) | ((uint32_t)(unsigned char)p[3] << 24);
-		}
-		// Returns 0 = no local memory, 1 = needs scratch memory, 2 = SPH not found.
-		constexpr int SphLocalMemoryState(const char* data, size_t size, uint32_t sphType, uint32_t shaderType) {
-			for (size_t off = 0; off + 0x50 <= size && off <= 0x100; off += 4) {
-				const uint32_t w0 = ReadU32(data + off);
-				if ((w0 & 0x1F) != sphType || ((w0 >> 5) & 0x1F) != 3 || ((w0 >> 10) & 0xF) != shaderType) continue;
-				return ((ReadU32(data + off + 4) | ReadU32(data + off + 8) | ReadU32(data + off + 12)) & 0xFFFFFF) ? 1 : 0;
-			}
-			return 2;
-		}
-		static_assert(SphLocalMemoryState(vertexDataStorage, sizeof(vertexDataStorage), 1, 1) != 1,
-			"saltynx.vert needs shader scratch memory (local memory / CRS spill), remove divergent break/continue/early returns");
-		static_assert(SphLocalMemoryState(fragmentDataStorage, sizeof(fragmentDataStorage), 2, 5) != 1,
-			"saltynx.frag needs shader scratch memory (local memory / CRS spill)");
-
-		bool filesLoaded = false;
-
-		MemoryPool shaderPool{};
-		Program program{};
-		MemoryPool cmdMemPool{};
-		// Ring of command/control memory slots. The GPU may still be reading a previous
-		// frame's commands, so every frame records into the next slot instead of overwriting.
-		constexpr int SLOTS = 8;
-		constexpr size_t SLOT_SIZE = 0x1000;
-		alignas(0x1000) static char cmdHostStorage[SLOTS * SLOT_SIZE]{};
-		alignas(0x1000) static char controlMemStorage[SLOTS * SLOT_SIZE]{};
-		int currentSlot = 0;
-		CommandBuffer cmdBuf{};
-
-		DepthStencilState depthState{};
-		ChannelMaskState channelState{};
-		ColorState colorState{};
-		BlendState blendState{};
-		PolygonState polygonState{};
-
-		constexpr size_t TEX_POOL_OFFSET = 0x0000;
-		constexpr size_t SAMPLER_POOL_OFFSET = 0x4000;
-		constexpr size_t UBO_POOL_OFFSET = 0x8000;
-		constexpr size_t RES_POOL_SIZE = 0x9000;
-		alignas(0x1000) static char resHostStorage[RES_POOL_SIZE]{};
-		MemoryPool resPool{};
-		TexturePool texturePool{};
-		SamplerPool samplerPool{};
-		Sampler framebufferSampler{};
-		uint8_t* uboCpu = nullptr;
-		BufferAddress uboGpu = 0;
-		size_t uboStride = 0x100;          // per slot, >= device uniform buffer alignment
-		int reservedTextureDescriptors = 256;
-		int reservedSamplerDescriptors = 256;
-		bool resourcesReady = false;
-
-		bool cmdReady = false;
-		bool programReady = false;
-		bool initAttempted = false;
-		uint64_t endTick = 0;
+		bool done = false;
 		uint64_t startTick = 0;
+		uint64_t endTick = 0;
 
-		void LoadShaderFiles() {
-			if (!sizeof(vertexDataStorage)) return;
-			if (!sizeof(fragmentDataStorage)) return;
-			if (!sizeof(vertexControlStorage) || !sizeof(fragmentControlStorage)) return;
-			filesLoaded = true;
-			SaltySDCore_printf("NX-FPS: Logo: shader files loaded (vert 0x%lX, frag 0x%lX)\n", (unsigned long)sizeof(vertexDataStorage), (unsigned long)sizeof(fragmentDataStorage));
+		void* Resolve(const char* name) {
+			return (void*)nvnDeviceGetProcAddress_0(mainDevice, name);
 		}
 
 		bool offsetScanAttempted = false;
@@ -652,161 +405,22 @@ namespace NVN {
 			return true;
 		}
 
-		bool buildResources() {
-			// NVNdeviceInfo: 4 = UNIFORM_BUFFER_ALIGNMENT, 15/16 = TEXTURE/SAMPLER_DESCRIPTOR_SIZE,
-			// 17/18 = RESERVED_TEXTURE/SAMPLER_DESCRIPTORS. Ids below the reserved counts belong to NVN,
-			// ours have to come after them.
-			int uboAlign = 0x100, texDescSize = 0x20, samplerDescSize = 0x20;
-			nvnDeviceGetInteger_0(mainDevice, 4, &uboAlign);
-			nvnDeviceGetInteger_0(mainDevice, 15, &texDescSize);
-			nvnDeviceGetInteger_0(mainDevice, 16, &samplerDescSize);
-			nvnDeviceGetInteger_0(mainDevice, 17, &reservedTextureDescriptors);
-			nvnDeviceGetInteger_0(mainDevice, 18, &reservedSamplerDescriptors);
-			if (uboAlign < 0x100) uboAlign = 0x100;
-			uboStride = (size_t)uboAlign;
-
-			const size_t texPoolBytes = (size_t)(reservedTextureDescriptors + SLOTS) * (size_t)texDescSize;
-			const size_t samplerPoolBytes = (size_t)(reservedSamplerDescriptors + 1) * (size_t)samplerDescSize;
-			if (texPoolBytes > SAMPLER_POOL_OFFSET - TEX_POOL_OFFSET) return false;
-			if (samplerPoolBytes > UBO_POOL_OFFSET - SAMPLER_POOL_OFFSET) return false;
-			if (uboStride * SLOTS > RES_POOL_SIZE - UBO_POOL_OFFSET) return false;
-
-			MemoryPoolBuilder b{};
-			nvnMemoryPoolBuilderSetDefaults_0(&b);
-			nvnMemoryPoolBuilderSetDevice_0(&b, mainDevice);
-			nvnMemoryPoolBuilderSetFlags_0(&b, TripleBuffer::MEMORY_POOL_FLAGS_CPU_UNCACHED | TripleBuffer::MEMORY_POOL_FLAGS_GPU_CACHED);
-			nvnMemoryPoolBuilderSetStorage_0(&b, resHostStorage, sizeof(resHostStorage));
-			if (!nvnMemoryPoolInitialize_0(&resPool, &b)) return false;
-
-			uboCpu = (uint8_t*)nvnMemoryPoolMap_0(&resPool);
-			if (!uboCpu) return false;
-			uboCpu += UBO_POOL_OFFSET;
-			uboGpu = nvnMemoryPoolGetBufferAddress_0(&resPool) + UBO_POOL_OFFSET;
-
-			SamplerBuilder sb{};
-			nvnSamplerBuilderSetDefaults_0(&sb);
-			nvnSamplerBuilderSetDevice_0(&sb, mainDevice);
-			nvnSamplerBuilderSetMinMagFilter_0(&sb, 0, 0);
-			nvnSamplerBuilderSetWrapMode_0(&sb, 0, 0, 0);
-			if (!nvnSamplerInitialize_0(&framebufferSampler, &sb)) return false;
-
-			if (!nvnSamplerPoolInitialize_0(&samplerPool, &resPool, (ptrdiff_t)SAMPLER_POOL_OFFSET, reservedSamplerDescriptors + 1)) return false;
-			nvnSamplerPoolRegisterSampler_0(&samplerPool, reservedSamplerDescriptors, &framebufferSampler);
-
-			if (!nvnTexturePoolInitialize_0(&texturePool, &resPool, (ptrdiff_t)TEX_POOL_OFFSET, reservedTextureDescriptors + SLOTS)) return false;
-			return true;
-		}
-
-		bool buildProgram() {
-			if (!filesLoaded) return false;
-
-			MemoryPoolBuilder b{};
-			nvnMemoryPoolBuilderSetDefaults_0(&b);
-			nvnMemoryPoolBuilderSetDevice_0(&b, mainDevice);
-			nvnMemoryPoolBuilderSetFlags_0(&b, TripleBuffer::MEMORY_POOL_FLAGS_CPU_UNCACHED | TripleBuffer::MEMORY_POOL_FLAGS_GPU_CACHED | 0x40);
-			nvnMemoryPoolBuilderSetStorage_0(&b, &shaderDataStorage, sizeof(shaderDataStorage));
-			if (!nvnMemoryPoolInitialize_0(&shaderPool, &b)) return false;
-
-			BufferAddress base = nvnMemoryPoolGetBufferAddress_0(&shaderPool);
-			if (!nvnProgramInitialize_0(&program, mainDevice)) return false;
-
-			ShaderData stages[2] = {
-				{ base, vertexControlStorage },
-				{ base + fragmentDataOffset, fragmentControlStorage },
-			};
-			if (!nvnProgramSetShaders_0(&program, 2, stages)) return false;
-
-			nvnDepthStencilStateSetDefaults_0(&depthState);
-			nvnChannelMaskStateSetDefaults_0(&channelState);
-			nvnColorStateSetDefaults_0(&colorState);
-			nvnBlendStateSetDefaults_0(&blendState);
-			nvnPolygonStateSetDefaults_0(&polygonState);
-			return true;
-		}
-
-		bool init() {
-			if (initAttempted) return cmdReady;
-			initAttempted = true;
-			if (!mainDevice) return false;
-
-			MemoryPoolBuilder b{};
-			nvnMemoryPoolBuilderSetDefaults_0(&b);
-			nvnMemoryPoolBuilderSetDevice_0(&b, mainDevice);
-			nvnMemoryPoolBuilderSetFlags_0(&b, TripleBuffer::MEMORY_POOL_FLAGS_CPU_UNCACHED | TripleBuffer::MEMORY_POOL_FLAGS_GPU_CACHED);
-			nvnMemoryPoolBuilderSetStorage_0(&b, cmdHostStorage, sizeof(cmdHostStorage));
-			if (!nvnMemoryPoolInitialize_0(&cmdMemPool, &b)) return false;
-
-			if (!nvnCommandBufferInitialize_0(&cmdBuf, mainDevice)) return false;
-
-			cmdReady = true;
-			resourcesReady = buildResources();
-			programReady = resourcesReady && buildProgram();
-			return true;
-		}
-
-		void Draw(const Queue* queue, const Texture* target, int width, int height, int cropX, int cropY, int cropWidth, int cropHeight) {
-			if (!init() || !target || width <= 0 || height <= 0) return;
-			const uint64_t nowTick = Utils::_getSystemTick();
+		// Right before present: target holds the finished frame.
+		void Draw(const Queue* queue, const Texture* target, const Rectangle& crop) {
+			if (!mainDevice || !target) return;
+			const uint64_t now = Utils::_getSystemTick();
 			if (endTick == 0) {
-				startTick = nowTick;
-				endTick = nowTick + (systemtickfrequency * DURATION_SECONDS);
+				startTick = now;
+				endTick = now + systemtickfrequency * ::Logo::DURATION_SECONDS;
 			}
-			if (nowTick >= endTick) return;
-
-			bool haveCrop = cropWidth > 0 && cropHeight > 0;
-			int visibleW = haveCrop ? cropWidth : width;
-			int visibleH = haveCrop ? cropHeight : height;
-			int originX = haveCrop ? cropX : 0;
-			int originY = haveCrop ? cropY : 0;
-
-			const int slot = currentSlot;
-			nvnCommandBufferAddCommandMemory_0(&cmdBuf, &cmdMemPool, slot * SLOT_SIZE, SLOT_SIZE);
-			nvnCommandBufferAddControlMemory_0(&cmdBuf, controlMemStorage + slot * SLOT_SIZE, SLOT_SIZE);
-			currentSlot = (currentSlot + 1) % SLOTS;
-
-			BufferAddress paramsAddress = 0;
-			TextureHandle framebufferHandle = 0;
-			if (programReady) {
-				// Per-slot UBO: the GPU may still be reading the previous slots' data.
-				Params params{};
-				params.time = systemtickfrequency ? (float)((double)(nowTick - startTick) / (double)systemtickfrequency) : 0.0f;
-				params.version = kVersion.packed;
-				params.cropWidth = (uint32_t)visibleW;
-				params.cropHeight = (uint32_t)visibleH;
-				params.cropX = (uint32_t)originX;
-				params.cropY = (uint32_t)originY;
-				params.regionX = 0; // NVN samples the frame itself
-				params.regionY = 0;
-				memcpy(uboCpu + slot * uboStride, &params, sizeof(params));
-				paramsAddress = uboGpu + slot * uboStride;
-
-				const int textureId = reservedTextureDescriptors + slot;
-				nvnTexturePoolRegisterTexture_0(&texturePool, textureId, target, nullptr);
-				framebufferHandle = nvnDeviceGetTextureHandle_0(mainDevice, textureId, reservedSamplerDescriptors);
+			if (now >= endTick) {
+				done = true;
+				return;
 			}
-			nvnCommandBufferBeginRecording_0(&cmdBuf);
-			nvnCommandBufferSetRenderTargets_0(&cmdBuf, 1, &target, nullptr, nullptr, nullptr);
-			nvnCommandBufferSetViewport_0(&cmdBuf, originX, originY, visibleW, visibleH);
-			if (programReady) {
-				nvnCommandBufferBarrier_0(&cmdBuf, TripleBuffer::BARRIER_ORDER_FRAGMENTS | TripleBuffer::BARRIER_INVALIDATE_TEXTURE);
-				nvnCommandBufferSetTexturePool_0(&cmdBuf, &texturePool);
-				nvnCommandBufferSetSamplerPool_0(&cmdBuf, &samplerPool);
-				nvnCommandBufferBindDepthStencilState_0(&cmdBuf, &depthState);
-				nvnCommandBufferBindChannelMaskState_0(&cmdBuf, &channelState);
-				nvnCommandBufferBindColorState_0(&cmdBuf, &colorState);
-				nvnCommandBufferBindBlendState_0(&cmdBuf, &blendState);
-				nvnCommandBufferBindPolygonState_0(&cmdBuf, &polygonState);
-				nvnCommandBufferBindProgram_0(&cmdBuf, &program, 0x1F);
-				nvnCommandBufferBindUniformBuffer_0(&cmdBuf, STAGE_VERTEX, UBO_BINDING, paramsAddress, sizeof(Params));
-				nvnCommandBufferBindUniformBuffer_0(&cmdBuf, STAGE_FRAGMENT, UBO_BINDING, paramsAddress, sizeof(Params));
-				nvnCommandBufferBindTexture_0(&cmdBuf, STAGE_FRAGMENT, TEXTURE_BINDING, framebufferHandle);
-				nvnCommandBufferDrawArrays_0(&cmdBuf, 4 /*TRIANGLES*/, 0, VERTEX_COUNT);
-				// Give the queue back the pools the game expects to still be bound (none recorded yet = nothing to restore).
-				if (const TexturePool* p = gameTexturePool) nvnCommandBufferSetTexturePool_0(&cmdBuf, p);
-				if (const SamplerPool* p = gameSamplerPool) nvnCommandBufferSetSamplerPool_0(&cmdBuf, p);
-			}
-			CommandHandle handle = nvnCommandBufferEndRecording_0(&cmdBuf);
-			nvnQueueSubmitCommands_0(queue, 1, &handle);
+			const float time = (float)((double)(now - startTick) / (double)systemtickfrequency);
+			if (!LogoNVN::Draw(mainDevice, queue, target, nvnTextureGetWidth_0(target), nvnTextureGetHeight_0(target), crop, time,
+			                   gameTexturePool, gameSamplerPool, Resolve))
+				done = true;
 		}
 	}
 
@@ -970,9 +584,7 @@ namespace NVN {
 			nvnQueueWaitSync_0(queue, TripleBuffer::windowSync);
 			nvnQueueSubmitCommands_0(queue, 1, &TripleBuffer::copyHandles[index][TripleBuffer::windowIndex]);
 
-			const Texture* logoTarget = TripleBuffer::windowTextures[TripleBuffer::windowIndex];
-			Logo::Draw(queue, logoTarget, nvnTextureGetWidth_0(logoTarget), nvnTextureGetHeight_0(logoTarget),
-							crop.x, crop.y, crop.width, crop.height);
+			if (!Logo::done) Logo::Draw(queue, TripleBuffer::windowTextures[TripleBuffer::windowIndex], crop);
 
 			nvnQueueFenceSync_0(queue, &TripleBuffer::frameSyncs[index], TripleBuffer::SYNC_CONDITION_ALL_GPU_COMMANDS_COMPLETE, 0);
 			TripleBuffer::frameSyncPending[index] = true;
@@ -981,11 +593,7 @@ namespace NVN {
 			TripleBuffer::acquired = false;
 		}
 		else {
-			if (index >= 0 && index < presentedTextureCount) {
-				const Texture* logoTarget = presentedTextures[index];
-				Logo::Draw(queue, logoTarget, nvnTextureGetWidth_0(logoTarget), nvnTextureGetHeight_0(logoTarget),
-				              crop.x, crop.y, crop.width, crop.height);
-			}
+			if (!Logo::done && index >= 0 && index < presentedTextureCount) Logo::Draw(queue, presentedTextures[index], crop);
 			nvnQueuePresentTexture_0(queue, nvnWindow, index);
 		}
 		if (m_enableCounters) {
@@ -1180,7 +788,6 @@ namespace NVN {
 		std::array nvn_replacements = {
 			runtime_replace{"nvnDeviceGetProcAddress", nullptr, (void*)GetProcAddress0},
 			runtime_replace{"nvnDeviceInitialize", (uintptr_t*)&nvnDeviceInitialize_0, (void*)DeviceInitialize},
-			runtime_replace{"nvnDeviceGetInteger", (uintptr_t*)&nvnDeviceGetInteger_0},
 			runtime_replace{"nvnQueuePresentTexture", (uintptr_t*)&nvnQueuePresentTexture_0, (void*)PresentTexture},
 			runtime_replace{"nvnWindowAcquireTexture", (uintptr_t*)&nvnWindowAcquireTexture_0, (void*)AcquireTexture},
 			runtime_replace{"nvnWindowSetPresentInterval", (uintptr_t*)&nvnWindowSetPresentInterval_0, (void*)SetPresentInterval},
@@ -1232,36 +839,9 @@ namespace NVN {
 			runtime_replace{"nvnQueueWaitSync", (uintptr_t*)&nvnQueueWaitSync_0},
 			runtime_replace{"nvnCommandBufferBarrier", (uintptr_t*)&nvnCommandBufferBarrier_0},
 			runtime_replace{"nvnCommandBufferCopyTextureToTexture", (uintptr_t*)&nvnCommandBufferCopyTextureToTexture_0},
-			runtime_replace{"nvnProgramInitialize", (uintptr_t*)&nvnProgramInitialize_0},
-			runtime_replace{"nvnProgramSetShaders", (uintptr_t*)&nvnProgramSetShaders_0},
-			runtime_replace{"nvnCommandBufferBindProgram", (uintptr_t*)&nvnCommandBufferBindProgram_0},
-			runtime_replace{"nvnCommandBufferClearColor", (uintptr_t*)&nvnCommandBufferClearColor_0},
-			runtime_replace{"nvnCommandBufferDrawArrays", (uintptr_t*)&nvnCommandBufferDrawArrays_0},
-			runtime_replace{"nvnDepthStencilStateSetDefaults", (uintptr_t*)&nvnDepthStencilStateSetDefaults_0},
-			runtime_replace{"nvnCommandBufferBindDepthStencilState", (uintptr_t*)&nvnCommandBufferBindDepthStencilState_0},
-			runtime_replace{"nvnChannelMaskStateSetDefaults", (uintptr_t*)&nvnChannelMaskStateSetDefaults_0},
-			runtime_replace{"nvnCommandBufferBindChannelMaskState", (uintptr_t*)&nvnCommandBufferBindChannelMaskState_0},
-			runtime_replace{"nvnColorStateSetDefaults", (uintptr_t*)&nvnColorStateSetDefaults_0},
-			runtime_replace{"nvnCommandBufferBindColorState", (uintptr_t*)&nvnCommandBufferBindColorState_0},
-			runtime_replace{"nvnBlendStateSetDefaults", (uintptr_t*)&nvnBlendStateSetDefaults_0},
-			runtime_replace{"nvnCommandBufferBindBlendState", (uintptr_t*)&nvnCommandBufferBindBlendState_0},
-			runtime_replace{"nvnPolygonStateSetDefaults", (uintptr_t*)&nvnPolygonStateSetDefaults_0},
-			runtime_replace{"nvnCommandBufferBindPolygonState", (uintptr_t*)&nvnCommandBufferBindPolygonState_0},
 			runtime_replace{"nvnWindowGetCrop", (uintptr_t*)&nvnWindowGetCrop_0},
-			runtime_replace{"nvnTexturePoolInitialize", (uintptr_t*)&nvnTexturePoolInitialize_0},
-			runtime_replace{"nvnTexturePoolRegisterTexture", (uintptr_t*)&nvnTexturePoolRegisterTexture_0},
-			runtime_replace{"nvnSamplerPoolInitialize", (uintptr_t*)&nvnSamplerPoolInitialize_0},
-			runtime_replace{"nvnSamplerPoolRegisterSampler", (uintptr_t*)&nvnSamplerPoolRegisterSampler_0},
-			runtime_replace{"nvnSamplerBuilderSetDevice", (uintptr_t*)&nvnSamplerBuilderSetDevice_0},
-			runtime_replace{"nvnSamplerBuilderSetDefaults", (uintptr_t*)&nvnSamplerBuilderSetDefaults_0},
-			runtime_replace{"nvnSamplerBuilderSetMinMagFilter", (uintptr_t*)&nvnSamplerBuilderSetMinMagFilter_0},
-			runtime_replace{"nvnSamplerBuilderSetWrapMode", (uintptr_t*)&nvnSamplerBuilderSetWrapMode_0},
-			runtime_replace{"nvnSamplerInitialize", (uintptr_t*)&nvnSamplerInitialize_0},
-			runtime_replace{"nvnDeviceGetTextureHandle", (uintptr_t*)&nvnDeviceGetTextureHandle_0},
 			runtime_replace{"nvnCommandBufferSetTexturePool", (uintptr_t*)&nvnCommandBufferSetTexturePool_0, (void*)CommandBufferSetTexturePool},
-			runtime_replace{"nvnCommandBufferSetSamplerPool", (uintptr_t*)&nvnCommandBufferSetSamplerPool_0, (void*)CommandBufferSetSamplerPool},
-			runtime_replace{"nvnCommandBufferBindTexture", (uintptr_t*)&nvnCommandBufferBindTexture_0},
-			runtime_replace{"nvnCommandBufferBindUniformBuffer", (uintptr_t*)&nvnCommandBufferBindUniformBuffer_0}
+			runtime_replace{"nvnCommandBufferSetSamplerPool", (uintptr_t*)&nvnCommandBufferSetSamplerPool_0, (void*)CommandBufferSetSamplerPool}
 		};
 
 		for (const auto& replacement : nvn_replacements) {
