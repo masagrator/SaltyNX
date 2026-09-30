@@ -44,10 +44,8 @@ sdcard_out/atmosphere/contents/0000000000534C56/exefs.nsp: saltysd_core/saltynx_
 	@cp saltysd_core/saltynx_core.dbg sdcard_debug/SaltySD/saltynx_core.dbg
 	@cp saltysd_bootstrap/saltynx_bootstrap.elf sdcard_out/SaltySD/saltynx_bootstrap.elf
 	@cp saltysd_bootstrap/saltynx_bootstrap.dbg sdcard_debug/SaltySD/saltynx_bootstrap.dbg
-	@cp saltysd_bootstrap/saltynx_bootstrap32_3k.elf sdcard_out/SaltySD/saltynx_bootstrap32_3k.elf
-	@cp saltysd_bootstrap/saltynx_bootstrap32_5k.elf sdcard_out/SaltySD/saltynx_bootstrap32_5k.elf
-	@cp saltysd_bootstrap/saltynx_bootstrap32_3k.dbg sdcard_debug/SaltySD/saltynx_bootstrap32_3k.dbg
-	@cp saltysd_bootstrap/saltynx_bootstrap32_5k.dbg sdcard_debug/SaltySD/saltynx_bootstrap32_5k.dbg
+	@cp saltysd_bootstrap/saltynx_bootstrap32.elf sdcard_out/SaltySD/saltynx_bootstrap32.elf
+	@cp saltysd_bootstrap/saltynx_bootstrap32.dbg sdcard_debug/SaltySD/saltynx_bootstrap32.dbg
 	@cp saltysd_proc/saltynx_proc.nsp sdcard_out/atmosphere/contents/0000000000534C56/exefs.nsp
 	@cp saltysd_proc/saltynx_proc.elf sdcard_debug/atmosphere/contents/0000000000534C56/exefs.elf
 	@cp saltysd_proc/toolbox.json sdcard_out/atmosphere/contents/0000000000534C56/toolbox.json
