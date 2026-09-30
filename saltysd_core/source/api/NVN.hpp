@@ -2,7 +2,6 @@
 #include "../NX-FPS-Common.hpp"
 
 namespace NVN {
-	// Opaque NVN objects (sizes from the NVN headers) and the plain structs its functions take.
 	struct Texture {
 		char reserved[0xC0];
 	};
