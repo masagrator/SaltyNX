@@ -30,6 +30,8 @@ namespace NVN {
 	static void (*nvnWindowSetNumActiveTextures_0)(const Window* nvnWindow, int buffers);
 	static int (*nvnWindowGetNumActiveTextures_0)(const Window* nvnWindow);
 	static bool (*nvnWindowInitialize_0)(const Window* nvnWindow, WindowBuilder* windowBuilder);
+	static void (*nvnWindowFinalize_0)(const Window* nvnWindow);
+	static void (*nvnTextureFinalize_0)(const Texture* texture);
 	static Result (*nvnWindowAcquireTexture_0)(const Window* nvnWindow, const Sync* nvnSync, const int* index);
 	static void (*nvnWindowSetPresentInterval_0)(const Window* nvnWindow, int mode);
 	static int (*nvnWindowGetPresentInterval_0)(const Window* nvnWindow);
@@ -148,6 +150,7 @@ namespace NVN {
 		constexpr uint64_t WAIT_TIMEOUT_MAXIMUM = UINT64_MAX;
 
 		bool requested = false;
+		bool texturesInUse = false;
 		bool poolInitialized = false;
 		bool texturesInitialized = false;
 		bool cmdBufInitialized = false;
@@ -209,8 +212,15 @@ namespace NVN {
 			const int flags = nvnTextureGetFlags_0(reference);
 			const int target = nvnTextureGetTarget_0(reference);
 
-			if (texturesInitialized)
-				return (width == texWidth && height == texHeight && format == texFormat && flags == texFlags && target == texTarget);
+			if (texturesInitialized) {
+				if (width == texWidth && height == texHeight && format == texFormat && flags == texFlags && target == texTarget)
+					return true;
+				// Game recreated its window with other textures (f.e. Alan Wake: 1280x720 in handheld, 1920x1080 in dock).
+				// Ours can be recreated only when no window uses them anymore.
+				if (texturesInUse || !nvnTextureFinalize_0) return false;
+				for (int i = 0; i < WINDOW_TEXTURES; i++) nvnTextureFinalize_0(&textures[i]);
+				texturesInitialized = false;
+			}
 
 			texWidth = width; texHeight = height; texFormat = format; texFlags = flags; texTarget = target;
 
@@ -297,14 +307,25 @@ namespace NVN {
 				}
 				frameSyncsInitialized = true;
 			}
-			if (!createPool() || !createTextures(textures[0])) return nullptr;
+			if (!createPool()) return nullptr;
+			// Wait until GPU is done with our copies before touching textures or command memory.
 			// Copies are recorded again only for new game textures. Otherwise command memory
 			// that GPU may still be reading would be overwritten.
-			if (!cmdBufInitialized || gameTextures[0] != textures[0] || gameTextures[1] != textures[1]) {
-				gameTextures[0] = textures[0];
-				gameTextures[1] = textures[1];
-				if (!recordCopies()) return nullptr;
+			for (int i = 0; i < GAME_TEXTURES; i++) {
+				if (frameSyncPending[i]) {
+					nvnSyncWait_0(&frameSyncs[i], WAIT_TIMEOUT_MAXIMUM);
+					frameSyncPending[i] = false;
+				}
 			}
+			if (!createTextures(textures[0])) return nullptr;
+			// Copies are always recorded again. A copy command stores the source texture's GPU storage
+			// at record time, not the Texture pointer, and games can recreate their textures at the
+			// same addresses (Alan Wake frees its 2 backbuffers on every dock/handheld switch and
+			// allocates new ones that land in the same place). Comparing pointers then kept the old
+			// copies, which kept showing the last frame from the freed textures.
+			gameTextures[0] = textures[0];
+			gameTextures[1] = textures[1];
+			if (!recordCopies()) return nullptr;
 			activeBuilder = builder;
 			activeWindow = nullptr;
 			gameIndex = 0;
@@ -427,7 +448,10 @@ namespace NVN {
 		if (!Logo::done && presentedTextureCount == 0) Logo::RecoverFromBuilder(windowBuilder);
 		if (TripleBuffer::activeBuilder && windowBuilder == TripleBuffer::activeBuilder) {
 			bool ret = nvnWindowInitialize_0(nvnWindow, windowBuilder);
-			if (ret) TripleBuffer::activeWindow = nvnWindow;
+			if (ret) {
+				TripleBuffer::activeWindow = nvnWindow;
+				TripleBuffer::texturesInUse = true;
+			}
 			return ret;
 		}
 		// Window initialized without our textures (f.e. object reused after finalize), don't emulate it.
@@ -440,6 +464,22 @@ namespace NVN {
 			(Shared -> ActiveBuffers) = windowBuilder -> numBufferedFrames;	
 		}
 		return nvnWindowInitialize_0(nvnWindow, windowBuilder);
+	}
+
+	void WindowFinalize(const Window* nvnWindow) {
+		if (nvnWindow && nvnWindow == TripleBuffer::activeWindow) {
+			// Our copies may still be running on GPU.
+			for (int i = 0; i < TripleBuffer::GAME_TEXTURES; i++) {
+				if (TripleBuffer::frameSyncPending[i]) {
+					nvnSyncWait_0(&TripleBuffer::frameSyncs[i], TripleBuffer::WAIT_TIMEOUT_MAXIMUM);
+					TripleBuffer::frameSyncPending[i] = false;
+				}
+			}
+			TripleBuffer::activeWindow = nullptr;
+			TripleBuffer::acquired = false;
+			TripleBuffer::texturesInUse = false;
+		}
+		nvnWindowFinalize_0(nvnWindow);
 	}
 
 	void WindowBuilderSetTextures(const WindowBuilder* nvnWindowBuilder, int numBufferedFrames, const Texture** nvnTextures) {
@@ -794,6 +834,8 @@ namespace NVN {
 			runtime_replace{"nvnWindowSetNumActiveTextures", (uintptr_t*)&nvnWindowSetNumActiveTextures_0, (void*)WindowSetNumActiveTextures, initWindowSetNumActiveTextures},
 			runtime_replace{"nvnWindowBuilderSetTextures", (uintptr_t*)&nvnWindowBuilderSetTextures_0, (void*)WindowBuilderSetTextures},
 			runtime_replace{"nvnWindowInitialize", (uintptr_t*)&nvnWindowInitialize_0, (void*)WindowInitialize},
+			runtime_replace{"nvnWindowFinalize", (uintptr_t*)&nvnWindowFinalize_0, (void*)WindowFinalize},
+			runtime_replace{"nvnTextureFinalize", (uintptr_t*)&nvnTextureFinalize_0},
 			runtime_replace{"nvnSyncWait", (uintptr_t*)&nvnSyncWait_0, (void*)SyncWait0},
 			runtime_replace{"nvnCommandBufferSetRenderTargets", (uintptr_t*)&nvnCommandBufferSetRenderTargets_0, (void*)CommandBufferSetRenderTargets},
 			runtime_replace{"nvnCommandBufferSetViewport", (uintptr_t*)&nvnCommandBufferSetViewport_0, (void*)CommandBufferSetViewport},
