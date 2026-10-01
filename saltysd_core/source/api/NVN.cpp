@@ -33,6 +33,7 @@ namespace NVN {
 	static void (*nvnWindowFinalize_0)(const Window* nvnWindow);
 	static void (*nvnTextureFinalize_0)(const Texture* texture);
 	static Result (*nvnWindowAcquireTexture_0)(const Window* nvnWindow, const Sync* nvnSync, const int* index);
+	static int (*nvnQueueAcquireTexture_0)(const Queue* queue, const Window* nvnWindow, int* index);
 	static void (*nvnWindowSetPresentInterval_0)(const Window* nvnWindow, int mode);
 	static int (*nvnWindowGetPresentInterval_0)(const Window* nvnWindow);
 	static int (*nvnSyncWait_0)(const Sync* _this, uint64_t timeout_ns);
@@ -620,7 +621,8 @@ namespace NVN {
 		nvnWindowGetCrop_0(nvnWindow, &crop);
 
 		if (TripleBuffer::activeWindow && nvnWindow == TripleBuffer::activeWindow && TripleBuffer::acquired && (index == 0 || index == 1)) {
-			nvnQueueWaitSync_0(queue, TripleBuffer::windowSync);
+			// Null after nvnQueueAcquireTexture: the queue already waits for the texture.
+			if (TripleBuffer::windowSync) nvnQueueWaitSync_0(queue, TripleBuffer::windowSync);
 			nvnQueueSubmitCommands_0(queue, 1, &TripleBuffer::copyHandles[index][TripleBuffer::windowIndex]);
 
 			if (!Logo::done) Logo::Draw(queue, TripleBuffer::windowTextures[TripleBuffer::windowIndex], crop);
@@ -764,6 +766,26 @@ namespace NVN {
 		return ret;
 	}
 
+	int QueueAcquireTexture(const Queue* queue, const Window* nvnWindow, int* index) {
+		const int ret = nvnQueueAcquireTexture_0(queue, nvnWindow, index);
+		if (ret == 0 && TripleBuffer::activeWindow && nvnWindow == TripleBuffer::activeWindow && index) {
+			const int realIndex = *index;
+			TripleBuffer::acquired = (realIndex >= 0 && realIndex < TripleBuffer::WINDOW_TEXTURES);
+			if (TripleBuffer::acquired) {
+				TripleBuffer::windowIndex = realIndex;
+				TripleBuffer::windowSync = nullptr;
+			}
+			const int gameIndex = TripleBuffer::gameIndex;
+			if (TripleBuffer::frameSyncPending[gameIndex]) {
+				nvnSyncWait_0(&TripleBuffer::frameSyncs[gameIndex], TripleBuffer::WAIT_TIMEOUT_MAXIMUM);
+				TripleBuffer::frameSyncPending[gameIndex] = false;
+			}
+			*index = gameIndex;
+		}
+		return ret;
+	}
+
+
 	void* CommandBufferSetViewports(CommandBuffer* cmdBuf, int start, int count, const Viewport* viewports) {
 		if (resolutionLookup) for (int i = start; i < start+count; i++) {
 			if (viewports[i].height > 1.f && viewports[i].width > 1.f && viewports[i].x == 0.f && viewports[i].y == 0.f) {
@@ -829,6 +851,7 @@ namespace NVN {
 			runtime_replace{"nvnDeviceInitialize", (uintptr_t*)&nvnDeviceInitialize_0, (void*)DeviceInitialize},
 			runtime_replace{"nvnQueuePresentTexture", (uintptr_t*)&nvnQueuePresentTexture_0, (void*)PresentTexture},
 			runtime_replace{"nvnWindowAcquireTexture", (uintptr_t*)&nvnWindowAcquireTexture_0, (void*)AcquireTexture},
+			runtime_replace{"nvnQueueAcquireTexture", (uintptr_t*)&nvnQueueAcquireTexture_0, (void*)QueueAcquireTexture},
 			runtime_replace{"nvnWindowSetPresentInterval", (uintptr_t*)&nvnWindowSetPresentInterval_0, (void*)SetPresentInterval},
 			runtime_replace{"nvnWindowGetPresentInterval", (uintptr_t*)&nvnWindowGetPresentInterval_0},
 			runtime_replace{"nvnWindowSetNumActiveTextures", (uintptr_t*)&nvnWindowSetNumActiveTextures_0, (void*)WindowSetNumActiveTextures, initWindowSetNumActiveTextures},
