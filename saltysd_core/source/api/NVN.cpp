@@ -31,6 +31,7 @@ namespace NVN {
 	static int (*nvnWindowGetNumActiveTextures_0)(const Window* nvnWindow);
 	static bool (*nvnWindowInitialize_0)(const Window* nvnWindow, WindowBuilder* windowBuilder);
 	static void (*nvnWindowFinalize_0)(const Window* nvnWindow);
+	static void (*nvnWindowBuilderSetNumActiveTextures_0)(const WindowBuilder* builder, int numActiveTextures);
 	static void (*nvnTextureFinalize_0)(const Texture* texture);
 	static Result (*nvnWindowAcquireTexture_0)(const Window* nvnWindow, const Sync* nvnSync, const int* index);
 	static int (*nvnQueueAcquireTexture_0)(const Queue* queue, const Window* nvnWindow, int* index);
@@ -309,8 +310,6 @@ namespace NVN {
 			}
 			if (!createPool()) return nullptr;
 			// Wait until GPU is done with our copies before touching textures or command memory.
-			// Copies are recorded again only for new game textures. Otherwise command memory
-			// that GPU may still be reading would be overwritten.
 			for (int i = 0; i < GAME_TEXTURES; i++) {
 				if (frameSyncPending[i]) {
 					nvnSyncWait_0(&frameSyncs[i], WAIT_TIMEOUT_MAXIMUM);
@@ -444,13 +443,45 @@ namespace NVN {
 		}
 	}
 
+	void WindowBuilderSetTextures(const WindowBuilder* nvnWindowBuilder, int numBufferedFrames, const Texture** nvnTextures) {
+		if (const Texture** emulated = TripleBuffer::setup(nvnWindowBuilder, numBufferedFrames, nvnTextures)) {
+			(Shared -> Buffers) = TripleBuffer::WINDOW_TEXTURES;
+			(Shared -> ActiveBuffers) = TripleBuffer::WINDOW_TEXTURES;
+			amountOfAvailableBuffers = TripleBuffer::WINDOW_TEXTURES;
+			presentedTextureCount = (TripleBuffer::WINDOW_TEXTURES < MAX_PRESENTED_TEXTURES) ? TripleBuffer::WINDOW_TEXTURES : MAX_PRESENTED_TEXTURES;
+			for (int i = 0; i < presentedTextureCount; i++) presentedTextures[i] = emulated[i];
+			return nvnWindowBuilderSetTextures_0(nvnWindowBuilder, TripleBuffer::WINDOW_TEXTURES, emulated);
+		}
+		if (TripleBuffer::activeBuilder == nvnWindowBuilder) TripleBuffer::activeBuilder = nullptr;
+		presentedTextureCount = (numBufferedFrames < MAX_PRESENTED_TEXTURES) ? numBufferedFrames : MAX_PRESENTED_TEXTURES;
+		for (int i = 0; i < presentedTextureCount; i++) presentedTextures[i] = nvnTextures[i];
+		(Shared -> Buffers) = numBufferedFrames;
+		amountOfAvailableBuffers = numBufferedFrames;
+		if ((Shared -> SetBuffers) >= 2 && (Shared -> SetBuffers) <= numBufferedFrames) {
+			if (!setNumActiveTexturesDetected) numBufferedFrames = (Shared -> SetBuffers);
+			else Shared->expectedSetBuffers = (Shared -> SetBuffers);
+		}
+		(Shared -> ActiveBuffers) = numBufferedFrames;
+		return nvnWindowBuilderSetTextures_0(nvnWindowBuilder, numBufferedFrames, nvnTextures);
+	}
+
 	bool WindowInitialize(const Window* nvnWindow, WindowBuilder* windowBuilder) {
-		if (!Logo::done && presentedTextureCount == 0) Logo::RecoverFromBuilder(windowBuilder);
+		// SetTextures hook was skipped (game filled the builder directly): textures come from the builder.
+		if (presentedTextureCount == 0 && (!Logo::done || TripleBuffer::requested) && Logo::RecoverFromBuilder(windowBuilder) && TripleBuffer::requested) {
+			// Copy, because WindowBuilderSetTextures replaces presentedTextures with our textures.
+			static const Texture* textures[MAX_PRESENTED_TEXTURES]{};
+			for (int i = 0; i < presentedTextureCount; i++) textures[i] = presentedTextures[i];
+			WindowBuilderSetTextures(windowBuilder, presentedTextureCount, textures);
+		}
 		if (TripleBuffer::activeBuilder && windowBuilder == TripleBuffer::activeBuilder) {
+			// All 3 textures must be active, whatever the game set on the builder.
+			if (nvnWindowBuilderSetNumActiveTextures_0) nvnWindowBuilderSetNumActiveTextures_0(windowBuilder, TripleBuffer::WINDOW_TEXTURES);
 			bool ret = nvnWindowInitialize_0(nvnWindow, windowBuilder);
 			if (ret) {
 				TripleBuffer::activeWindow = nvnWindow;
 				TripleBuffer::texturesInUse = true;
+				(Shared -> Buffers) = TripleBuffer::WINDOW_TEXTURES;
+				(Shared -> ActiveBuffers) = TripleBuffer::WINDOW_TEXTURES;
 			}
 			return ret;
 		}
@@ -482,29 +513,23 @@ namespace NVN {
 		nvnWindowFinalize_0(nvnWindow);
 	}
 
-	void WindowBuilderSetTextures(const WindowBuilder* nvnWindowBuilder, int numBufferedFrames, const Texture** nvnTextures) {
-		if (const Texture** emulated = TripleBuffer::setup(nvnWindowBuilder, numBufferedFrames, nvnTextures)) {
-			(Shared -> Buffers) = TripleBuffer::WINDOW_TEXTURES;
-			(Shared -> ActiveBuffers) = TripleBuffer::WINDOW_TEXTURES;
-			amountOfAvailableBuffers = TripleBuffer::WINDOW_TEXTURES;
-			presentedTextureCount = (TripleBuffer::WINDOW_TEXTURES < MAX_PRESENTED_TEXTURES) ? TripleBuffer::WINDOW_TEXTURES : MAX_PRESENTED_TEXTURES;
-			for (int i = 0; i < presentedTextureCount; i++) presentedTextures[i] = emulated[i];
-			return nvnWindowBuilderSetTextures_0(nvnWindowBuilder, TripleBuffer::WINDOW_TEXTURES, emulated);
+	void WindowBuilderSetNumActiveTextures(const WindowBuilder* builder, int numActiveTextures) {
+		if (TripleBuffer::activeBuilder && builder == TripleBuffer::activeBuilder) {
+			numActiveTextures = TripleBuffer::WINDOW_TEXTURES;
 		}
-		if (TripleBuffer::activeBuilder == nvnWindowBuilder) TripleBuffer::activeBuilder = nullptr;
-		presentedTextureCount = (numBufferedFrames < MAX_PRESENTED_TEXTURES) ? numBufferedFrames : MAX_PRESENTED_TEXTURES;
-		for (int i = 0; i < presentedTextureCount; i++) presentedTextures[i] = nvnTextures[i];
-		(Shared -> Buffers) = numBufferedFrames;
-		amountOfAvailableBuffers = numBufferedFrames;
-		if ((Shared -> SetBuffers) >= 2 && (Shared -> SetBuffers) <= numBufferedFrames) {
-			if (!setNumActiveTexturesDetected) numBufferedFrames = (Shared -> SetBuffers);
-			else Shared->expectedSetBuffers = (Shared -> SetBuffers);
+		else if (!setNumActiveTexturesDetected && (Shared -> SetBuffers) >= 2 && (Shared -> SetBuffers) <= (Shared -> Buffers)) {
+			numActiveTextures = (Shared -> SetBuffers);
 		}
-		(Shared -> ActiveBuffers) = numBufferedFrames;
-		return nvnWindowBuilderSetTextures_0(nvnWindowBuilder, numBufferedFrames, nvnTextures);
+		(Shared -> ActiveBuffers) = numActiveTextures;
+		nvnWindowBuilderSetNumActiveTextures_0(builder, numActiveTextures);
 	}
 
 	void WindowSetNumActiveTextures(const Window* nvnWindow, int numBufferedFrames) {
+		if (TripleBuffer::activeWindow && nvnWindow == TripleBuffer::activeWindow) {
+			if (numBufferedFrames > 0) (Shared -> SetActiveBuffers) = numBufferedFrames;
+			(Shared -> ActiveBuffers) = TripleBuffer::WINDOW_TEXTURES;
+			return nvnWindowSetNumActiveTextures_0(nvnWindow, TripleBuffer::WINDOW_TEXTURES);
+		}
 		if (numBufferedFrames < 0) {
 			numBufferedFrames *= -1;
 			nvnWindowSetNumActiveTextures_0(nvnWindow, numBufferedFrames);
@@ -689,7 +714,7 @@ namespace NVN {
 		}
 		NX_FPS_Math::PostFrame();
 
-		if (setNumActiveTexturesDetected) {
+		if (setNumActiveTexturesDetected && nvnWindow != TripleBuffer::activeWindow) {
 			auto expectedBuffers = Shared->expectedSetBuffers;
 			if ((expectedBuffers > 0) && (amountOfAvailableBuffers >= expectedBuffers) && (expectedBuffers != (Shared->ActiveBuffers))) {
 				expectedBuffers *= -1;
@@ -853,6 +878,7 @@ namespace NVN {
 			runtime_replace{"nvnWindowBuilderSetTextures", (uintptr_t*)&nvnWindowBuilderSetTextures_0, (void*)WindowBuilderSetTextures},
 			runtime_replace{"nvnWindowInitialize", (uintptr_t*)&nvnWindowInitialize_0, (void*)WindowInitialize},
 			runtime_replace{"nvnWindowFinalize", (uintptr_t*)&nvnWindowFinalize_0, (void*)WindowFinalize},
+			runtime_replace{"nvnWindowBuilderSetNumActiveTextures", (uintptr_t*)&nvnWindowBuilderSetNumActiveTextures_0, (void*)WindowBuilderSetNumActiveTextures},
 			runtime_replace{"nvnTextureFinalize", (uintptr_t*)&nvnTextureFinalize_0},
 			runtime_replace{"nvnSyncWait", (uintptr_t*)&nvnSyncWait_0, (void*)SyncWait0},
 			runtime_replace{"nvnCommandBufferSetRenderTargets", (uintptr_t*)&nvnCommandBufferSetRenderTargets_0, (void*)CommandBufferSetRenderTargets},
