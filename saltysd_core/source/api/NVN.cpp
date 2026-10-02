@@ -181,7 +181,6 @@ namespace NVN {
 		const Window* activeWindow = nullptr;
 		int gameIndex = 0;
 		int windowIndex = 0;
-		const Sync* windowSync = nullptr;
 		bool acquired = false;
 
 		// Prepares a texture builder for our window texture.
@@ -621,8 +620,6 @@ namespace NVN {
 		nvnWindowGetCrop_0(nvnWindow, &crop);
 
 		if (TripleBuffer::activeWindow && nvnWindow == TripleBuffer::activeWindow && TripleBuffer::acquired && (index == 0 || index == 1)) {
-			// Null after nvnQueueAcquireTexture: the queue already waits for the texture.
-			if (TripleBuffer::windowSync) nvnQueueWaitSync_0(queue, TripleBuffer::windowSync);
 			nvnQueueSubmitCommands_0(queue, 1, &TripleBuffer::copyHandles[index][TripleBuffer::windowIndex]);
 
 			if (!Logo::done) Logo::Draw(queue, TripleBuffer::windowTextures[TripleBuffer::windowIndex], crop);
@@ -752,7 +749,6 @@ namespace NVN {
 			TripleBuffer::acquired = (ret == 0 && realIndex >= 0 && realIndex < TripleBuffer::WINDOW_TEXTURES);
 			if (TripleBuffer::acquired) {
 				TripleBuffer::windowIndex = realIndex;
-				TripleBuffer::windowSync = nvnSync;
 			}
 			const int gameIndex = TripleBuffer::gameIndex;
 			if (TripleBuffer::frameSyncPending[gameIndex]) {
@@ -773,7 +769,6 @@ namespace NVN {
 			TripleBuffer::acquired = (realIndex >= 0 && realIndex < TripleBuffer::WINDOW_TEXTURES);
 			if (TripleBuffer::acquired) {
 				TripleBuffer::windowIndex = realIndex;
-				TripleBuffer::windowSync = nullptr;
 			}
 			const int gameIndex = TripleBuffer::gameIndex;
 			if (TripleBuffer::frameSyncPending[gameIndex]) {
