@@ -175,6 +175,13 @@ namespace NVN {
 		CommandHandle copyHandles[GAME_TEXTURES][WINDOW_TEXTURES]{};
 
 		Sync frameSyncs[GAME_TEXTURES]{};
+		// Window gives out the free slot that was used longest ago. After window is (re)initialized
+		// slots start as "never used" and if game never has 2 slots busy at acquire (f.e. it runs
+		// at stable 30 FPS from start), it keeps alternating 0 and 1 forever and third slot is never used.
+		// At first present after init we use all 3 slots once, so they rotate from then on.
+		Sync primeSyncs[2]{};
+		bool primeSyncsInitialized = false;
+		bool needPrime = false;
 		bool frameSyncPending[GAME_TEXTURES]{};
 		bool frameSyncsInitialized = false;
 
@@ -307,6 +314,7 @@ namespace NVN {
 					}
 				}
 				frameSyncsInitialized = true;
+				primeSyncsInitialized = nvnSyncInitialize_0(&primeSyncs[0], mainDevice) && nvnSyncInitialize_0(&primeSyncs[1], mainDevice);
 			}
 			if (!createPool()) return nullptr;
 			// Wait until GPU is done with our copies before touching textures or command memory.
@@ -480,6 +488,7 @@ namespace NVN {
 			if (ret) {
 				TripleBuffer::activeWindow = nvnWindow;
 				TripleBuffer::texturesInUse = true;
+				TripleBuffer::needPrime = TripleBuffer::primeSyncsInitialized && nvnWindowAcquireTexture_0 && nvnQueueWaitSync_0;
 				(Shared -> Buffers) = TripleBuffer::WINDOW_TEXTURES;
 				(Shared -> ActiveBuffers) = TripleBuffer::WINDOW_TEXTURES;
 			}
@@ -572,7 +581,8 @@ namespace NVN {
 		nvnCommandBufferSetSamplerPool_0(cmdBuf, pool);
 	}
 	int SyncWait0(const Sync* _this, uint64_t timeout_ns) {
-		if (_this == WindowSync && (Shared -> ActiveBuffers) == 2) {
+		// ZeroSync is a double buffer workaround, emulated triple buffer window must wait normally.
+		if (_this == WindowSync && !TripleBuffer::activeWindow && (Shared -> ActiveBuffers) == 2) {
 			if ((Shared -> ZeroSync) == ZeroSyncType_Semi) {
 				const uint64_t endFrameTick = Utils::_getSystemTick();
 				u64 FrameTarget = (systemtickfrequency/60) - 8000;
@@ -649,9 +659,23 @@ namespace NVN {
 
 			if (!Logo::done) Logo::Draw(queue, TripleBuffer::windowTextures[TripleBuffer::windowIndex], crop);
 
+			nvnQueuePresentTexture_0(queue, nvnWindow, TripleBuffer::windowIndex);
+			// See needPrime. Game's slot is already presented, so each acquire here takes another
+			// free slot, and since presented ones can't be free yet so fast, all 3 slots get used once.
+			// Acquire is done only after present, NVN doesn't allow 2 acquired textures at once.
+			if (TripleBuffer::needPrime) {
+				TripleBuffer::needPrime = false;
+				for (int i = 0; i < 2; i++) {
+					int slot = -1;
+					if (nvnWindowAcquireTexture_0(nvnWindow, &TripleBuffer::primeSyncs[i], &slot) != 0 || slot < 0 || slot >= TripleBuffer::WINDOW_TEXTURES) break;
+					nvnQueueWaitSync_0(queue, &TripleBuffer::primeSyncs[i]);
+					nvnQueueSubmitCommands_0(queue, 1, &TripleBuffer::copyHandles[index][slot]);
+					nvnQueuePresentTexture_0(queue, nvnWindow, slot);
+				}
+			}
+			// After presents, so it also covers copies to primed slots.
 			nvnQueueFenceSync_0(queue, &TripleBuffer::frameSyncs[index], TripleBuffer::SYNC_CONDITION_ALL_GPU_COMMANDS_COMPLETE, 0);
 			TripleBuffer::frameSyncPending[index] = true;
-			nvnQueuePresentTexture_0(queue, nvnWindow, TripleBuffer::windowIndex);
 			TripleBuffer::gameIndex ^= 1;
 			TripleBuffer::acquired = false;
 		}
