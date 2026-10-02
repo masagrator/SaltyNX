@@ -659,6 +659,10 @@ namespace NVN {
 
 			if (!Logo::done) Logo::Draw(queue, TripleBuffer::windowTextures[TripleBuffer::windowIndex], crop);
 
+			// Fence must be placed before present, present flushes queue. Fence placed after it stays
+			// unflushed until next present, so CPU wait on it (f.e. in WindowFinalize) never returns.
+			nvnQueueFenceSync_0(queue, &TripleBuffer::frameSyncs[index], TripleBuffer::SYNC_CONDITION_ALL_GPU_COMMANDS_COMPLETE, 0);
+			TripleBuffer::frameSyncPending[index] = true;
 			nvnQueuePresentTexture_0(queue, nvnWindow, TripleBuffer::windowIndex);
 			// See needPrime. Game's slot is already presented, so each acquire here takes another
 			// free slot, and since presented ones can't be free yet so fast, all 3 slots get used once.
@@ -670,12 +674,11 @@ namespace NVN {
 					if (nvnWindowAcquireTexture_0(nvnWindow, &TripleBuffer::primeSyncs[i], &slot) != 0 || slot < 0 || slot >= TripleBuffer::WINDOW_TEXTURES) break;
 					nvnQueueWaitSync_0(queue, &TripleBuffer::primeSyncs[i]);
 					nvnQueueSubmitCommands_0(queue, 1, &TripleBuffer::copyHandles[index][slot]);
+					// Covers this copy too.
+					nvnQueueFenceSync_0(queue, &TripleBuffer::frameSyncs[index], TripleBuffer::SYNC_CONDITION_ALL_GPU_COMMANDS_COMPLETE, 0);
 					nvnQueuePresentTexture_0(queue, nvnWindow, slot);
 				}
 			}
-			// After presents, so it also covers copies to primed slots.
-			nvnQueueFenceSync_0(queue, &TripleBuffer::frameSyncs[index], TripleBuffer::SYNC_CONDITION_ALL_GPU_COMMANDS_COMPLETE, 0);
-			TripleBuffer::frameSyncPending[index] = true;
 			TripleBuffer::gameIndex ^= 1;
 			TripleBuffer::acquired = false;
 		}
