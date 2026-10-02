@@ -75,7 +75,7 @@ namespace vk {
 				startTick = now;
 				endTick = now + systemtickfrequency * ::Logo::DURATION_SECONDS;
 			}
-			if (now >= endTick) {
+			if (now >= endTick && Shared->frameNumber >= ::Logo::MIN_FRAMES) {
 				LogoVK::Release();
 				done = true;
 				return info;

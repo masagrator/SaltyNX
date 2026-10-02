@@ -432,7 +432,7 @@ namespace NVN {
 				startTick = now;
 				endTick = now + systemtickfrequency * ::Logo::DURATION_SECONDS;
 			}
-			if (now >= endTick) {
+			if (now >= endTick && Shared->frameNumber >= ::Logo::MIN_FRAMES) {
 				done = true;
 				return;
 			}

@@ -4,6 +4,7 @@
 
 namespace Logo {
 	constexpr uint64_t DURATION_SECONDS = 3;
+	constexpr uint32_t MIN_FRAMES = 90; // shown at least this many frames, even when the time ran out first
 	constexpr int VERTEX_COUNT = 924; // fixed size draw, unused quads collapse in the vertex shader
 
 	struct Params {
