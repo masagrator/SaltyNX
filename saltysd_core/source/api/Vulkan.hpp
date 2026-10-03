@@ -19,6 +19,7 @@ namespace vk {
 	inline PFN_vkCreateSwapchainKHR nvSwapchainCreateSwapchainKHR_0;
 	inline PFN_vkGetDeviceProcAddr nvSwapchainGetDeviceProcAddr_0;
 	inline PFN_vkGetInstanceProcAddr nvSwapchainGetInstanceProcAddr_0;
+	inline u32 (*viSetLayerCrop_0)(void* layer, int x, int y, int width, int height);
 
 	VkResult QueuePresent(VkQueue queue, const VkPresentInfoKHR* pPresentInfo);
 	VkResult CreateSwapchain(VkDevice device, const VkSwapchainCreateInfoKHR* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkSwapchainKHR* pSwapchain);
@@ -33,10 +34,11 @@ namespace vk {
 	VkResult CreateDevice(VkPhysicalDevice physicalDevice, const VkDeviceCreateInfo* pCreateInfo, const VkAllocationCallbacks* pAllocator, VkDevice* pDevice);
 	void GetDeviceQueue(VkDevice device, uint32_t queueFamilyIndex, uint32_t queueIndex, VkQueue* pQueue);
 	void DestroySwapchain(VkDevice device, VkSwapchainKHR swapchain, const VkAllocationCallbacks* pAllocator);
+	u32 SetLayerCrop(void* layer, int x, int y, int width, int height);
 
 	namespace Logo {
 		extern bool done; // finished, failed, or disabled by nologo.flag
-		// cond_check for the hooks that exist only for the logo (vkCreateDevice, vkGetDeviceQueue, vkDestroySwapchainKHR)
+		// cond_check for the hooks that exist only for the logo (vkCreateDevice, vkGetDeviceQueue, vkDestroySwapchainKHR, nn::vi::SetLayerCrop)
 		inline void check(bool* out) { *out = !done; }
 	}
 

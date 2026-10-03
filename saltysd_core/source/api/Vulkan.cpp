@@ -105,6 +105,13 @@ namespace vk {
 		if (!Logo::done) LogoVK::OnDeviceQueue(device, queueFamilyIndex, *pQueue);
 	}
 
+	// Games that render into a part of the swapchain image show only that part through the layer crop
+	// (f.e. dynamic resolution). Logo has to be placed inside it.
+	u32 SetLayerCrop(void* layer, int x, int y, int width, int height) {
+		LogoVK::SetCrop(x, y, width, height);
+		return viSetLayerCrop_0(layer, x, y, width, height);
+	}
+
 	void DestroySwapchain(VkDevice device, VkSwapchainKHR swapchain, const VkAllocationCallbacks* pAllocator) {
 		// Our image views of its images have to go first.
 		LogoVK::OnSwapchainDestroyed(device, swapchain);

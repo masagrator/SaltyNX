@@ -104,6 +104,8 @@ namespace LogoVK {
 		uint8_t* uniformCpu = nullptr;
 
 		SwapchainData swapchain{};
+		// Layer crop, see SetCrop()
+		int cropX = 0, cropY = 0, cropW = 0, cropH = 0;
 
 		bool findMemoryType(uint32_t typeBits, VkMemoryPropertyFlags wanted, uint32_t* index) {
 			for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; i++) {
@@ -459,7 +461,8 @@ namespace LogoVK {
 			};
 		}
 
-		void record(VkCommandBuffer cmd, const SwapchainData& sc, uint32_t imageIndex, uint32_t dynamicOffset) {
+		// area: part of the image copied under the text (inside view), view: visible part of the image
+		void record(VkCommandBuffer cmd, const SwapchainData& sc, uint32_t imageIndex, uint32_t dynamicOffset, const Logo::Region& area, const VkRect2D& view) {
 			const VkImage image = sc.images[imageIndex];
 
 			const VkImageMemoryBarrier toCopy[2] = {
@@ -471,10 +474,10 @@ namespace LogoVK {
 
 			const VkImageCopy copy{
 				.srcSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
-				.srcOffset = {sc.area.x, sc.area.y, 0},
+				.srcOffset = {area.x, area.y, 0},
 				.dstSubresource = {VK_IMAGE_ASPECT_COLOR_BIT, 0, 0, 1},
 				.dstOffset = {0, 0, 0},
-				.extent = {(uint32_t)sc.area.width, (uint32_t)sc.area.height, 1},
+				.extent = {(uint32_t)area.width, (uint32_t)area.height, 1},
 			};
 			vk.CmdCopyImage(cmd, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, sc.region, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
 
@@ -496,10 +499,9 @@ namespace LogoVK {
 			vk.CmdBeginRenderPass(cmd, &begin, VK_SUBPASS_CONTENTS_INLINE);
 			vk.CmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, sc.pipeline);
 			vk.CmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 1, &dynamicOffset);
-			const VkViewport viewport{0.0f, 0.0f, (float)sc.extent.width, (float)sc.extent.height, 0.0f, 1.0f};
-			const VkRect2D scissor{{0, 0}, sc.extent};
+			const VkViewport viewport{(float)view.offset.x, (float)view.offset.y, (float)view.extent.width, (float)view.extent.height, 0.0f, 1.0f};
 			vk.CmdSetViewport(cmd, 0, 1, &viewport);
-			vk.CmdSetScissor(cmd, 0, 1, &scissor);
+			vk.CmdSetScissor(cmd, 0, 1, &view);
 			vk.CmdDraw(cmd, Logo::VERTEX_COUNT, 1, 0, 0);
 			vk.CmdEndRenderPass(cmd);
 		}
@@ -554,6 +556,13 @@ namespace LogoVK {
 		if (swapchain.usable) memcpy(swapchain.images, images, imageCount * sizeof(VkImage));
 	}
 
+	void SetCrop(int x, int y, int width, int height) {
+		cropX = x;
+		cropY = y;
+		cropW = width;
+		cropH = height;
+	}
+
 	void OnSwapchainDestroyed(VkDevice dev, VkSwapchainKHR handle) {
 		if (dev != device || !functionsLoaded || !handle || handle != swapchain.handle) return;
 		waitAll();
@@ -585,15 +594,29 @@ namespace LogoVK {
 			slot.pending = false;
 		}
 
+		// Visible part of the image: layer crop clamped to the image, whole image without crop.
+		const int imageW = (int)swapchain.extent.width, imageH = (int)swapchain.extent.height;
+		VkRect2D view{{0, 0}, swapchain.extent};
+		if (cropW > 0 && cropH > 0 && cropX >= 0 && cropY >= 0 && cropX < imageW && cropY < imageH) {
+			view.offset = {cropX, cropY};
+			view.extent = {(uint32_t)(cropW < imageW - cropX ? cropW : imageW - cropX), (uint32_t)(cropH < imageH - cropY ? cropH : imageH - cropY)};
+		}
+		// Area under the text inside the visible part. Region image was made for the whole image, so it always fits.
+		Logo::Region area = Logo::BottomLeftRegion((int)view.extent.width, (int)view.extent.height, true);
+		area.x += view.offset.x;
+		area.y += view.offset.y;
+		if (area.width > swapchain.area.width) area.width = swapchain.area.width;
+		if (area.height > swapchain.area.height) area.height = swapchain.area.height;
+
 		Logo::Params params{};
 		params.time = time;
 		params.version = Logo::kVersion.packed;
-		params.cropWidth = swapchain.extent.width;
-		params.cropHeight = swapchain.extent.height;
-		params.cropX = 0;
-		params.cropY = 0;
-		params.regionX = swapchain.area.x;
-		params.regionY = swapchain.area.y;
+		params.cropWidth = view.extent.width;
+		params.cropHeight = view.extent.height;
+		params.cropX = (uint32_t)view.offset.x;
+		params.cropY = (uint32_t)view.offset.y;
+		params.regionX = area.x;
+		params.regionY = area.y;
 		memcpy(uniformCpu + dynamicOffset, &params, sizeof(params)); // host coherent
 
 		vk.ResetCommandBuffer(slot.cmd, 0);
@@ -602,7 +625,7 @@ namespace LogoVK {
 			.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
 		};
 		if (vk.BeginCommandBuffer(slot.cmd, &beginInfo) != VK_SUCCESS) return VK_NULL_HANDLE;
-		record(slot.cmd, swapchain, imageIndex, dynamicOffset);
+		record(slot.cmd, swapchain, imageIndex, dynamicOffset, area, view);
 		if (vk.EndCommandBuffer(slot.cmd) != VK_SUCCESS) return VK_NULL_HANDLE;
 
 		VkPipelineStageFlags waitStages[MAX_WAITS];

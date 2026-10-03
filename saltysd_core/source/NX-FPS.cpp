@@ -59,6 +59,7 @@ extern "C" {
 				runtime_replace{"vkCreateDevice", (uintptr_t*)&vk::vkCreateDevice_0, (void*)vk::CreateDevice, vk::Logo::check},
 				runtime_replace{"vkGetDeviceQueue", (uintptr_t*)&vk::vkGetDeviceQueue_0, (void*)vk::GetDeviceQueue, vk::Logo::check},
 				runtime_replace{"vkDestroySwapchainKHR", (uintptr_t*)&vk::vkDestroySwapchainKHR_0, (void*)vk::DestroySwapchain, vk::Logo::check},
+				runtime_replace{"_ZN2nn2vi12SetLayerCropEPNS0_5LayerEiiii", (uintptr_t*)&vk::viSetLayerCrop_0, (void*)vk::SetLayerCrop, vk::Logo::check},
 				runtime_replace{"_ZN11NvSwapchain18CreateSwapchainKHREP10VkDevice_TPK24VkSwapchainCreateInfoKHRPK21VkAllocationCallbacksPP16VkSwapchainKHR_T", (uintptr_t*)&vk::nvSwapchainCreateSwapchainKHR_0, nullptr, nullptr},
 
 				runtime_replace{"_ZN2nn2oe20SetFocusHandlingModeENS0_17FocusHandlingModeE", (uintptr_t*)&nn::SetFocusHandlingMode_0, (void*)nn::setFocusHandlingMode, nullptr},
