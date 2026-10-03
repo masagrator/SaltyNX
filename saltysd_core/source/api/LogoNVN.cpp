@@ -63,7 +63,14 @@ namespace LogoNVN {
 			X(CommandBufferBindUniformBuffer, void, const CommandBuffer* cmdBuf, int stage, int index, BufferAddress address, size_t size) \
 			X(CommandBufferBindTexture, void, const CommandBuffer* cmdBuf, int stage, int index, TextureHandle handle) \
 			X(CommandBufferDrawArrays, void, const CommandBuffer* cmdBuf, int mode, int first, int count) \
-			X(QueueSubmitCommands, void, const Queue* queue, int numCommandBuffers, const CommandHandle* handles)
+			X(QueueSubmitCommands, void, const Queue* queue, int numCommandBuffers, const CommandHandle* handles) \
+			X(QueueBuilderSetDevice, void, QueueBuilder* builder, Device* device) \
+			X(QueueBuilderSetDefaults, void, QueueBuilder* builder) \
+			X(QueueInitialize, bool, Queue* queue, const QueueBuilder* builder) \
+			X(QueueFenceSync, void, const Queue* queue, Sync* sync, int condition, int flags) \
+			X(QueueWaitSync, void, const Queue* queue, const Sync* sync) \
+			X(QueueFlush, void, const Queue* queue) \
+			X(SyncInitialize, bool, Sync* sync, Device* device)
 
 		#define LOGO_NVN_MEMBER(name, ret, ...) ret (*name)(__VA_ARGS__);
 		struct Functions {
@@ -166,6 +173,21 @@ namespace LogoNVN {
 		int reservedTextureDescriptors = 256;
 		int reservedSamplerDescriptors = 256;
 
+		// Own queue for the logo. NVN state (bound textures, uniform buffers, program, render states...) stays
+		// set on a queue between command buffers, and engines that cache it (f.e. Feral's NVN backend only
+		// rebinds texture and uniform buffer slots that changed) keep using what the logo bound in its place.
+		// With an own queue the game's queue state is never touched, both queues are ordered with syncs.
+		constexpr size_t QUEUE_MEMORY_SIZE = 0x40000;
+		alignas(0x1000) char queueMemory[QUEUE_MEMORY_SIZE];
+		Queue logoQueue{};
+		Sync gameDone[SLOTS]{};
+		Sync logoDone[SLOTS]{};
+		bool ownQueue = false;
+		// Optional, missing on older SDKs (NVN allocates queue memory itself there).
+		void (*QueueBuilderSetComputeMemorySize)(QueueBuilder* builder, size_t size) = nullptr;
+		size_t (*QueueBuilderGetQueueMemorySize)(const QueueBuilder* builder) = nullptr;
+		void (*QueueBuilderSetQueueMemory)(QueueBuilder* builder, void* memory, size_t size) = nullptr;
+
 		bool initAttempted = false;
 		bool ready = false;
 
@@ -248,6 +270,33 @@ namespace LogoNVN {
 			return true;
 		}
 
+		template <typename T> void loadOptional(T& function, Resolver resolve, const char* name) {
+			void* address = resolve(name);
+			memcpy(&function, &address, sizeof(address));
+		}
+
+		bool buildQueue(Device* device, Resolver resolve) {
+			loadOptional(QueueBuilderSetComputeMemorySize, resolve, "nvnQueueBuilderSetComputeMemorySize");
+			loadOptional(QueueBuilderGetQueueMemorySize, resolve, "nvnQueueBuilderGetQueueMemorySize");
+			loadOptional(QueueBuilderSetQueueMemory, resolve, "nvnQueueBuilderSetQueueMemory");
+			QueueBuilder qb{};
+			nvn.QueueBuilderSetDevice(&qb, device);
+			nvn.QueueBuilderSetDefaults(&qb);
+			if (QueueBuilderSetComputeMemorySize) QueueBuilderSetComputeMemorySize(&qb, 0); // no compute work
+			if (QueueBuilderGetQueueMemorySize && QueueBuilderSetQueueMemory) {
+				const size_t size = (QueueBuilderGetQueueMemorySize(&qb) + 0xFFF) & ~(size_t)0xFFF;
+				if (!size || size > QUEUE_MEMORY_SIZE) {
+					SaltySDCore_printf("NX-FPS: Logo: NVN queue needs 0x%lX bytes, have 0x%lX\n", (unsigned long)size, (unsigned long)QUEUE_MEMORY_SIZE);
+					return false;
+				}
+				QueueBuilderSetQueueMemory(&qb, queueMemory, size);
+			}
+			if (!nvn.QueueInitialize(&logoQueue, &qb)) return false;
+			for (int i = 0; i < SLOTS; i++)
+				if (!nvn.SyncInitialize(&gameDone[i], device) || !nvn.SyncInitialize(&logoDone[i], device)) return false;
+			return true;
+		}
+
 		bool init(Device* device, Resolver resolve) {
 			if (initAttempted) return ready;
 			initAttempted = true;
@@ -258,6 +307,8 @@ namespace LogoNVN {
 			else if (!buildResources(device)) failed = "resources";
 			else if (!buildProgram(device)) failed = "program";
 			ready = !failed;
+			// Without own queue the logo is drawn on game's queue as before.
+			if (ready) ownQueue = buildQueue(device, resolve);
 			if (ready) SaltySDCore_printf("NX-FPS: Logo: NVN ready (vert 0x%lX, frag 0x%lX)\n", (unsigned long)sizeof(vertexDataStorage), (unsigned long)sizeof(fragmentDataStorage));
 			else SaltySDCore_printf("NX-FPS: Logo: NVN init failed: %s\n", failed);
 			return ready;
@@ -277,6 +328,14 @@ namespace LogoNVN {
 		const int originY = haveCrop ? crop.y : 0;
 
 		const int slot = currentSlot;
+		// Logo queue starts after everything the game submitted so far (the frame is complete).
+		const Queue* drawQueue = queue;
+		if (ownQueue) {
+			nvn.QueueFenceSync(queue, &gameDone[slot], 0 /*ALL_GPU_COMMANDS_COMPLETE*/, 0);
+			nvn.QueueFlush(queue);
+			nvn.QueueWaitSync(&logoQueue, &gameDone[slot]);
+			drawQueue = &logoQueue;
+		}
 		nvn.CommandBufferAddCommandMemory(&cmdBuf, &cmdMemPool, slot * SLOT_SIZE, SLOT_SIZE);
 		nvn.CommandBufferAddControlMemory(&cmdBuf, controlMemStorage + slot * SLOT_SIZE, SLOT_SIZE);
 		currentSlot = (currentSlot + 1) % SLOTS;
@@ -314,11 +373,19 @@ namespace LogoNVN {
 		nvn.CommandBufferBindUniformBuffer(&cmdBuf, STAGE_FRAGMENT, UBO_BINDING, paramsAddress, sizeof(Params));
 		nvn.CommandBufferBindTexture(&cmdBuf, STAGE_FRAGMENT, TEXTURE_BINDING, framebufferHandle);
 		nvn.CommandBufferDrawArrays(&cmdBuf, 4 /*TRIANGLES*/, 0, VERTEX_COUNT);
-		// Give the queue back the pools the game expects to still be bound (none recorded yet = nothing to restore).
-		if (gameTexturePool) nvn.CommandBufferSetTexturePool(&cmdBuf, gameTexturePool);
-		if (gameSamplerPool) nvn.CommandBufferSetSamplerPool(&cmdBuf, gameSamplerPool);
+		// On game's queue give back the pools the game expects to still be bound (none recorded yet = nothing to restore).
+		if (!ownQueue) {
+			if (gameTexturePool) nvn.CommandBufferSetTexturePool(&cmdBuf, gameTexturePool);
+			if (gameSamplerPool) nvn.CommandBufferSetSamplerPool(&cmdBuf, gameSamplerPool);
+		}
 		const CommandHandle handle = nvn.CommandBufferEndRecording(&cmdBuf);
-		nvn.QueueSubmitCommands(queue, 1, &handle);
+		nvn.QueueSubmitCommands(drawQueue, 1, &handle);
+		// Game's queue (present comes next) waits until the logo is drawn.
+		if (ownQueue) {
+			nvn.QueueFenceSync(&logoQueue, &logoDone[slot], 0 /*ALL_GPU_COMMANDS_COMPLETE*/, 0);
+			nvn.QueueFlush(&logoQueue);
+			nvn.QueueWaitSync(queue, &logoDone[slot]);
+		}
 		return true;
 	}
 }
