@@ -452,7 +452,7 @@ namespace NVN {
 	}
 
 	void WindowBuilderSetTextures(const WindowBuilder* nvnWindowBuilder, int numBufferedFrames, const Texture** nvnTextures) {
-		if (const Texture** emulated = TripleBuffer::setup(nvnWindowBuilder, numBufferedFrames, nvnTextures)) {
+		if (const Texture** emulated = TripleBuffer::setup(nvnWindowBuilder, numBufferedFrames, nvnTextures)) [[unlikely]] {
 			(Shared -> Buffers) = TripleBuffer::WINDOW_TEXTURES;
 			(Shared -> ActiveBuffers) = TripleBuffer::WINDOW_TEXTURES;
 			amountOfAvailableBuffers = TripleBuffer::WINDOW_TEXTURES;
@@ -475,13 +475,13 @@ namespace NVN {
 
 	bool WindowInitialize(const Window* nvnWindow, WindowBuilder* windowBuilder) {
 		// SetTextures hook was skipped (game filled the builder directly): textures come from the builder.
-		if (presentedTextureCount == 0 && (!Logo::done || TripleBuffer::requested) && Logo::RecoverFromBuilder(windowBuilder) && TripleBuffer::requested) {
+		if (presentedTextureCount == 0 && (!Logo::done || TripleBuffer::requested) && Logo::RecoverFromBuilder(windowBuilder) && TripleBuffer::requested) [[unlikely]] {
 			// Copy, because WindowBuilderSetTextures replaces presentedTextures with our textures.
 			static const Texture* textures[MAX_PRESENTED_TEXTURES]{};
 			for (int i = 0; i < presentedTextureCount; i++) textures[i] = presentedTextures[i];
 			WindowBuilderSetTextures(windowBuilder, presentedTextureCount, textures);
 		}
-		if (TripleBuffer::activeBuilder && windowBuilder == TripleBuffer::activeBuilder) {
+		if (TripleBuffer::activeBuilder && windowBuilder == TripleBuffer::activeBuilder) [[unlikely]] {
 			// All 3 textures must be active, whatever the game set on the builder.
 			if (nvnWindowBuilderSetNumActiveTextures_0) nvnWindowBuilderSetNumActiveTextures_0(windowBuilder, TripleBuffer::WINDOW_TEXTURES);
 			bool ret = nvnWindowInitialize_0(nvnWindow, windowBuilder);
@@ -507,7 +507,7 @@ namespace NVN {
 	}
 
 	void WindowFinalize(const Window* nvnWindow) {
-		if (nvnWindow && nvnWindow == TripleBuffer::activeWindow) {
+		if (nvnWindow && nvnWindow == TripleBuffer::activeWindow) [[unlikely]] {
 			// Our copies may still be running on GPU.
 			for (int i = 0; i < TripleBuffer::GAME_TEXTURES; i++) {
 				if (TripleBuffer::frameSyncPending[i]) {
@@ -654,7 +654,7 @@ namespace NVN {
 		Rectangle crop{};
 		nvnWindowGetCrop_0(nvnWindow, &crop);
 
-		if (TripleBuffer::activeWindow && nvnWindow == TripleBuffer::activeWindow && TripleBuffer::acquired && (index == 0 || index == 1)) {
+		if (TripleBuffer::activeWindow && nvnWindow == TripleBuffer::activeWindow && TripleBuffer::acquired && (index == 0 || index == 1)) [[unlikely]] {
 			nvnQueueSubmitCommands_0(queue, 1, &TripleBuffer::copyHandles[index][TripleBuffer::windowIndex]);
 
 			if (!Logo::done) Logo::Draw(queue, TripleBuffer::windowTextures[TripleBuffer::windowIndex], crop);
@@ -686,7 +686,7 @@ namespace NVN {
 			if (!Logo::done && index >= 0 && index < presentedTextureCount) Logo::Draw(queue, presentedTextures[index], crop);
 			nvnQueuePresentTexture_0(queue, nvnWindow, index);
 		}
-		if (m_enableCounters) {
+		if (m_enableCounters) [[unlikely]] {
 			Shared->PerfCounters.NVN.timestamp = timestampDataCPU->timestamp;
 			#if defined(SWITCH) || defined(OUNCE)
 			uint64x2x4_t loaded_data1 = vld1q_u64_x4(&timestampDataCPU->samplesPassed);
@@ -756,7 +756,7 @@ namespace NVN {
 
 		const auto new_fpslock = NX_FPS_Math::new_fpslock;
 		
-		if (!new_fpslock) {
+		if (!new_fpslock) [[likely]] {
 			NX_FPS_Math::FPStiming = 0;
 			NX_FPS_Math::FPSlock = 0;
 			changeFPS = false;
@@ -795,7 +795,7 @@ namespace NVN {
 			WindowSync = (Sync*)nvnSync;
 		}
 		Result ret = nvnWindowAcquireTexture_0(nvnWindow, nvnSync, index);
-		if (R_SUCCEEDED(ret) && TripleBuffer::activeWindow && nvnWindow == TripleBuffer::activeWindow && index) {
+		if (R_SUCCEEDED(ret) && TripleBuffer::activeWindow && nvnWindow == TripleBuffer::activeWindow && index) [[unlikely]] {
 			// Game gets only its own 2 textures, alternating with each present. Real window texture is used as copy target.
 			const int realIndex = *index;
 			TripleBuffer::acquired = (ret == 0 && realIndex >= 0 && realIndex < TripleBuffer::WINDOW_TEXTURES);
@@ -816,7 +816,7 @@ namespace NVN {
 
 	int QueueAcquireTexture(const Queue* queue, const Window* nvnWindow, int* index) {
 		const int ret = nvnQueueAcquireTexture_0(queue, nvnWindow, index);
-		if (ret == 0 && TripleBuffer::activeWindow && nvnWindow == TripleBuffer::activeWindow && index) {
+		if (ret == 0 && TripleBuffer::activeWindow && nvnWindow == TripleBuffer::activeWindow && index) [[unlikely]] {
 			const int realIndex = *index;
 			TripleBuffer::acquired = (realIndex >= 0 && realIndex < TripleBuffer::WINDOW_TEXTURES);
 			if (TripleBuffer::acquired) {
