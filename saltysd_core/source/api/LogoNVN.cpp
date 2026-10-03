@@ -2,6 +2,48 @@
 #include <cstddef>
 #include <cstring>
 
+// Calls fn(arg) with the stack pointer moved to stackTop and returns fn's result.
+extern "C" uintptr_t logo_nvn_call_on_stack(uintptr_t (*fn)(void*), void* arg, void* stackTop);
+#if defined(__aarch64__)
+asm(R"(
+	.text
+	.balign 4
+	.global logo_nvn_call_on_stack
+	.hidden logo_nvn_call_on_stack
+	.type logo_nvn_call_on_stack, %function
+logo_nvn_call_on_stack:
+	stp x29, x30, [sp, #-16]!
+	mov x29, sp
+	mov sp, x2
+	mov x9, x0
+	mov x0, x1
+	blr x9
+	mov sp, x29
+	ldp x29, x30, [sp], #16
+	ret
+	.size logo_nvn_call_on_stack, . - logo_nvn_call_on_stack
+)");
+#else
+asm(R"(
+	.text
+	.balign 4
+	.arm
+	.global logo_nvn_call_on_stack
+	.hidden logo_nvn_call_on_stack
+	.type logo_nvn_call_on_stack, %function
+logo_nvn_call_on_stack:
+	push {r4, lr}
+	mov r4, sp
+	mov sp, r2
+	mov r3, r0
+	mov r0, r1
+	blx r3
+	mov sp, r4
+	pop {r4, pc}
+	.size logo_nvn_call_on_stack, . - logo_nvn_call_on_stack
+)");
+#endif
+
 namespace LogoNVN {
 	namespace {
 		using namespace NVN;
@@ -315,7 +357,35 @@ namespace LogoNVN {
 		}
 	}
 
+	namespace {
+		bool DrawOnOwnStack(Device* device, const Queue* queue, const Texture* target, int width, int height,
+		                    const Rectangle& crop, float time,
+		                    const TexturePool* gameTexturePool, const SamplerPool* gameSamplerPool, Resolver resolve);
+
+		struct DrawArgs {
+			Device* device; const Queue* queue; const Texture* target; int width; int height;
+			const Rectangle* crop; float time;
+			const TexturePool* gameTexturePool; const SamplerPool* gameSamplerPool; Resolver resolve;
+		};
+		uintptr_t DrawTrampoline(void* p) {
+			const DrawArgs& a = *(const DrawArgs*)p;
+			return DrawOnOwnStack(a.device, a.queue, a.target, a.width, a.height, *a.crop, a.time, a.gameTexturePool, a.gameSamplerPool, a.resolve);
+		}
+		// Present runs on the game's thread, and some games give it a tiny stack (f.e. 8 KiB "Presentation Thread"
+		// in a 32-bit game). NVN calls made by the logo (queue/program init on first frame) overflowed it.
+		// Logo is drawn from one thread only, so one static stack is enough.
+		alignas(16) char drawStack[0x10000];
+	}
+
 	bool Draw(Device* device, const Queue* queue, const Texture* target, int width, int height,
+	          const Rectangle& crop, float time,
+	          const TexturePool* gameTexturePool, const SamplerPool* gameSamplerPool, Resolver resolve) {
+		DrawArgs args{device, queue, target, width, height, &crop, time, gameTexturePool, gameSamplerPool, resolve};
+		return logo_nvn_call_on_stack(DrawTrampoline, &args, drawStack + sizeof(drawStack)) != 0;
+	}
+
+	namespace {
+	bool DrawOnOwnStack(Device* device, const Queue* queue, const Texture* target, int width, int height,
 	          const Rectangle& crop, float time,
 	          const TexturePool* gameTexturePool, const SamplerPool* gameSamplerPool, Resolver resolve) {
 		if (!init(device, resolve)) return false;
@@ -387,5 +457,6 @@ namespace LogoNVN {
 			nvn.QueueWaitSync(queue, &logoDone[slot]);
 		}
 		return true;
+	}
 	}
 }
