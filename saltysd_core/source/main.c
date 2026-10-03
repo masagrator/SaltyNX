@@ -28,7 +28,7 @@ void virtmemSetup(void);
 
 u32 __nx_applet_type = AppletType_None;
 
-static char g_heap[0x8000];
+static char g_heap[0x10000];
 
 extern void __nx_exit_clear(void* ctx, Handle thread, void* addr);
 extern void elf_trampoline(void* context, Handle thread, void* func);
@@ -61,22 +61,64 @@ void __libnx_init(void* ctx, Handle main_thread, void* saved_lr)
 
 void __attribute__((weak)) __libnx_exit(int rc)
 {
-	fsdevUnmountAll();
 	uintptr_t addr = SaltySDCore_getCodeStart();
 	__nx_exit_clear(orig_ctx, orig_main_thread, (void*)addr);
 }
 
+#if !defined(SWITCH32)
 //Because we are not in libnx environment, we need to remove libnx check for its own THREADVARS_MAGIC from syscall_getreent.
 //This is done by using linker's -Wrap instead of what original SaltyNX used because this method was incompatible with newest libnx
+//(Core32 doesn't link newlib, so it has no __syscall_getreent to wrap.)
 struct _reent* _real___syscall_getreent(void);
 struct _reent* _wrap___syscall_getreent(void)
 {
     ThreadVars* tv = getThreadVars();
     return tv->reent;
 }
+#endif
 
 uintptr_t g_heapAddr;
 size_t g_heapSize;
+
+// Additional memory reserved at the start of heap (right after ELF area) for Core's own use (f.e. NX-FPS
+// triple buffer emulation). It must be requested before game starts, game's heap is moved after it.
+static size_t reserved_area_size = 0;
+static uintptr_t reserved_area_addr = 0;
+
+static size_t getElfAreaAligned(void)
+{
+	return ((elf_area_size+0x1FFFFF) & ~0x1FFFFF);
+}
+
+static size_t getHeapAddon(void)
+{
+	return getElfAreaAligned() + reserved_area_size;
+}
+
+bool SaltySDCore_ReserveMemory(size_t size)
+{
+	if (!size || reserved_area_addr) return false;
+	const size_t aligned = ((size+0x1FFFFF) & ~0x1FFFFF);
+	// Heap holds only Core (and plugins) at this point, so it can be resized right away.
+	// This way caller knows immediately if reservation succeeded, and heap layout won't change later.
+	void* addr = NULL;
+	Result rc = svcSetHeapSize(&addr, getHeapAddon() + aligned);
+	if (R_FAILED(rc)) {
+		SaltySDCore_printf(MODULE_NAME ": Failed to reserve 0x%lx bytes of heap: 0x%lx\n", (unsigned long)aligned, (unsigned long)rc);
+		return false;
+	}
+	reserved_area_size = aligned;
+	g_heapAddr = (uintptr_t)addr;
+	g_heapSize = getHeapAddon();
+	reserved_area_addr = g_heapAddr + getElfAreaAligned();
+	return true;
+}
+
+uintptr_t SaltySDCore_GetReservedMemory(size_t* size)
+{
+	if (size) *size = reserved_area_addr ? reserved_area_size : 0;
+	return reserved_area_addr;
+}
 
 void SaltySDCore_LoadPatches() {
 	char tmp4[256] = "";
@@ -190,10 +232,10 @@ void setupELFHeap(void)
 {
 	void* addr = NULL;
 
-	svcSetHeapSize(&addr, ((elf_area_size+0x1FFFFF) & ~0x1FFFFF));
+	svcSetHeapSize(&addr, getHeapAddon());
 
 	g_heapAddr = (uintptr_t)addr;
-	g_heapSize = ((elf_area_size+0x1FFFFF) & ~0x1FFFFF);
+	g_heapSize = getHeapAddon();
 }
 
 #if defined(SWITCH) || defined(OUNCE)
@@ -249,7 +291,7 @@ void SaltySDCore_RegisterExistingModules()
 
 Result svcSetHeapSizeIntercept(uintptr_t *out, size_t size)
 {	
-	size_t addon = ((elf_area_size+0x1FFFFF) & ~0x1FFFFF);
+	size_t addon = getHeapAddon();
 	Result ret = svcSetHeapSize((void*)out, size+addon);
 	
 	//SaltySDCore_printf(MODULE_NAME ": svcSetHeapSize intercept %x %llx %llx\n", ret, *out, size+((elf_area_size+0x200000) & 0xffe00000));
@@ -273,7 +315,7 @@ Result svcGetInfoIntercept (u64 *out, size_t id0, Handle handle, u64 id1)
 	{	
 		switch(id0) {
 			case InfoType_HeapRegionAddress:
-				*out += ((elf_area_size+0x1FFFFF) & ~0x1FFFFF);
+				*out += getHeapAddon();
 				break;
 		}
 	}

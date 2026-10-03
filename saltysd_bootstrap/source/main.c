@@ -19,8 +19,13 @@
 
 #endif
 
-void* __saltysd_exit_func = svcExitProcess;
+#include "bootstate.h"
+
+#if !defined(__arm__) // 32-bit: these are BootState fields (bootstate.h)
+// Set to svcExitProcess by __rel_init (a runtime store, so this needs no relocation), later to the game's entry.
+void* __saltysd_exit_func;
 Handle saltysd;
+#endif
 
 Result saltySDTerm()
 {
@@ -112,8 +117,10 @@ Result saltySDLoadELF(uintptr_t heap, uintptr_t* elf_addr, size_t* elf_size, cha
 	return ret;
 }
 
+#if !defined(__arm__)
 uintptr_t g_heapAddr;
 size_t g_heapSize;
+#endif
 
 void setupAppHeap(void)
 {

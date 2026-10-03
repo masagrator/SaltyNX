@@ -29,69 +29,12 @@
 
 namespace elf32_parser {
 
-struct section_t {
-	Elf32_Shdr *shdr;
-	uint8_t* data;
-
-	int section_index = 0; 
-	std::string section_name;
-	std::string section_type;
-};
-
 struct segment_t {
 	Elf32_Phdr *phdr;
 	uint8_t* data;
 
 	std::string segment_type, segment_flags;
 };
-
-struct symbol_t {
-	Elf32_Sym* sym;
-	int symbol_num = 0;
-	std::string symbol_name, symbol_section;  
-
-};
-
-struct relocation_t {
-	Elf32_Rel* rel;
-	std::string   relocation_section_name;
-	uint64_t section_idx, relocation_plt_address;
-	
-	uint64_t get_symbol_value(const std::vector<symbol_t> &syms) {
-		uint64_t sym_val = 0;
-		for(auto &sym: syms) {
-			if(sym.symbol_num == (const int)ELF32_R_SYM(rel->r_info)) {
-				sym_val = sym.sym->st_value;
-				break;
-			}
-		}
-		
-		return sym_val;
-	}
-	
-	std::string get_symbol_name(const std::vector<symbol_t> &syms) {
-		std::string sym_name;
-		for(auto &sym: syms) {
-			if(sym.symbol_num == (const int)ELF32_R_SYM(rel->r_info)) {
-				sym_name = sym.symbol_name;
-				break;
-			}
-		}
-		
-		return sym_name;
-	}
-	
-	std::string get_relocation_type() {
-		switch(ELF32_R_TYPE(rel->r_info)) {
-			case 23: return "R_ARM_RELATIVE";
-			case 2: return "R_ARM_ABS32";
-			case 22: return "R_ARM_JUMP_SLOT";
-			default: return "OTHERS";
-		}
-	}
-
-};
-
 
 class Elf32_parser {
 	public:
@@ -108,17 +51,10 @@ class Elf32_parser {
 #endif
 		}
 		
-		std::vector<section_t> get_sections();
 		std::vector<segment_t> get_segments();
-		std::vector<symbol_t> get_symbols();
-		std::vector<relocation_t> get_relocations();
 		uint8_t *get_memory_map();
 		
-		void relocate(uint32_t text_addr, uint32_t data_addr, uint32_t read_addr);
-		
 	private:
-
-		std::string get_section_type(int tt);
 
 		std::string get_segment_type(uint32_t &seg_type);
 		std::string get_segment_flags(uint32_t &seg_flags);

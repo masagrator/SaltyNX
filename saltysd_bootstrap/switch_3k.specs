@@ -1,8 +1,0 @@
-%rename link                old_link
-
-*link:
-%(old_link) -T ./switch_3k.ld -pie --gc-sections -z notext --build-id=sha1
-
-*startfile:
-crti%O%s crtbegin%O%s
-

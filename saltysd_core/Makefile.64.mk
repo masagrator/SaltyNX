@@ -34,7 +34,7 @@ include $(TOPDIR)/../version.mk
 MODULE_NAME :=  "SaltyNX Core"
 TARGET		:=	saltynx_core
 BUILD		:=	build
-SOURCES		:=	source source/tinyexpr source/crt0
+SOURCES		:=	source source/tinyexpr source/crt0 source/api
 DATA		:=	data
 INCLUDES	:=	include
 EXEFS_SRC	:=	exefs_src
@@ -144,6 +144,10 @@ all: $(BUILD)
 
 $(BUILD):
 	@[ -d $@ ] || mkdir -p $@
+	@python3 $(CURDIR)/logo/pack_shader.py --glsl $(CURDIR)/logo/saltynx.vert $(CURDIR)/logo/vert.glsl.lz4
+	@python3 $(CURDIR)/logo/pack_shader.py --glsl $(CURDIR)/logo/saltynx.frag $(CURDIR)/logo/frag.glsl.lz4
+	@python3 $(CURDIR)/logo/pack_shader.py $(CURDIR)/logo/vert.spv $(CURDIR)/logo/vert.spv.lz4
+	@python3 $(CURDIR)/logo/pack_shader.py $(CURDIR)/logo/frag.spv $(CURDIR)/logo/frag.spv.lz4
 	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile.64.mk
 	@$(OBJCOPY) --only-keep-debug $(CURDIR)/$(TARGET).elf $(CURDIR)/$(TARGET).dbg
 	@$(OBJCOPY) --add-gnu-debuglink=$(CURDIR)/$(TARGET).dbg --strip-debug --strip-unneeded $(CURDIR)/$(TARGET).elf
@@ -153,7 +157,7 @@ $(BUILD):
 #---------------------------------------------------------------------------------
 clean:
 	@echo clean ...
-	@rm -fr size.txt $(BUILD) $(TARGET).pfs0 $(TARGET).nso $(TARGET).nro $(TARGET).nsp $(TARGET).nacp $(TARGET).elf $(TARGET).dbg .map
+	@rm -fr size.txt logo/*.lz4 $(BUILD) $(TARGET).pfs0 $(TARGET).nso $(TARGET).nro $(TARGET).nsp $(TARGET).nacp $(TARGET).elf $(TARGET).dbg .map
 
 
 #---------------------------------------------------------------------------------

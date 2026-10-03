@@ -18,6 +18,8 @@ extern "C" {
 #endif
 
 extern uintptr_t SaltySDCore_getCodeStart() LINKABLE;
+extern bool SaltySDCore_ReserveMemory(size_t size) LINKABLE;
+extern uintptr_t SaltySDCore_GetReservedMemory(size_t* size) LINKABLE;
 extern size_t SaltySDCore_getCodeSize() LINKABLE;
 extern uintptr_t SaltySDCore_findCode(u8* code, size_t size) LINKABLE;
 extern uintptr_t SaltySDCore_findCodeEx(u8* code, size_t size) LINKABLE;

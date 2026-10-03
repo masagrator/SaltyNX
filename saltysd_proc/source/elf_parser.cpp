@@ -217,101 +217,143 @@ std::string Elf_parser::get_segment_flags(uint32_t &seg_flags) {
 
 #define PG(x) (x & ~0xFFF)
 
+// Symbol k of all SHT_SYMTAB and SHT_DYNSYM sections joined in section order (same numbering as get_symbols()).
+static Elf64_Sym* symbol_at(uint8_t* program, uint64_t k)
+{
+	Elf64_Ehdr *ehdr = (Elf64_Ehdr*)program;
+	Elf64_Shdr *shdr = (Elf64_Shdr*)(program + ehdr->e_shoff);
+	for (int s = 0; s < ehdr->e_shnum; s++) {
+		if (shdr[s].sh_type != SHT_SYMTAB && shdr[s].sh_type != SHT_DYNSYM)
+			continue;
+		const uint64_t count = shdr[s].sh_size / sizeof(Elf64_Sym);
+		if (k < count)
+			return (Elf64_Sym*)(program + shdr[s].sh_offset) + k;
+		k -= count;
+	}
+	return nullptr;
+}
+
 void Elf_parser::relocate_segment(int num, uint64_t new_addr)
 {
-	segment_t segment = get_segments()[num];
+	// Works directly on the headers in the ELF buffer: no vectors, no strings, no heap use, so the
+	// number of sections, symbols and relocations doesn't matter (the proc heap is only 0x30000 bytes).
+	Elf64_Ehdr *ehdr = (Elf64_Ehdr*)m_mmap_program;
+	Elf64_Phdr *segment = (Elf64_Phdr*)(m_mmap_program + ehdr->e_phoff) + num;
+	Elf64_Shdr *shdr = (Elf64_Shdr*)(m_mmap_program + ehdr->e_shoff);
+	const int shnum = ehdr->e_shnum;
 	
-	uint64_t old_vaddr = segment.phdr->p_vaddr;
-	uint64_t old_vaddr_end = segment.phdr->p_vaddr + segment.phdr->p_memsz;
-	segment.phdr->p_vaddr = new_addr;
-	segment.phdr->p_paddr = new_addr;
+	uint64_t old_vaddr = segment->p_vaddr;
+	uint64_t old_vaddr_end = segment->p_vaddr + segment->p_memsz;
+	segment->p_vaddr = new_addr;
+	segment->p_paddr = new_addr;
 	
 	
-	for (auto sec : get_sections())
+	for (int s = 0; s < shnum; s++)
 	{
-		if (sec.shdr->sh_addr >= old_vaddr && sec.shdr->sh_addr < old_vaddr_end)
+		if (shdr[s].sh_addr >= old_vaddr && shdr[s].sh_addr < old_vaddr_end)
 		{
-			sec.shdr->sh_addr -= old_vaddr;
-			sec.shdr->sh_addr += new_addr;
+			shdr[s].sh_addr -= old_vaddr;
+			shdr[s].sh_addr += new_addr;
 			
-			for (auto sym : get_symbols())
+			for (int t = 0; t < shnum; t++)
 			{
-				if (sym.sym->st_shndx == sec.section_index)
+				if (shdr[t].sh_type != SHT_SYMTAB && shdr[t].sh_type != SHT_DYNSYM)
+					continue;
+				Elf64_Sym* syms = (Elf64_Sym*)(m_mmap_program + shdr[t].sh_offset);
+				const uint64_t count = shdr[t].sh_size / sizeof(Elf64_Sym);
+				for (uint64_t i = 0; i < count; i++)
 				{
-					sym.sym->st_value -= old_vaddr;
-					sym.sym->st_value += new_addr;
+					if (syms[i].st_shndx == s)
+					{
+						syms[i].st_value -= old_vaddr;
+						syms[i].st_value += new_addr;
+					}
 				}
 			}
 		}
 	}
 	
-	for (auto rel : get_relocations())
+	for (int r = 0; r < shnum; r++)
 	{
-		symbol_t sym = get_symbols()[ELF64_R_SYM(rel.rela->r_info)];
-		section_t sec = get_sections()[sym.sym->st_shndx];
-		section_t rel_sec = get_sections()[rel.section_idx];
+		if (shdr[r].sh_type != SHT_RELA)
+			continue;
 		
-		int type = ELF64_R_TYPE(rel.rela->r_info);
-		uint64_t sa = sym.sym->st_value + rel.rela->r_addend;
-		uint64_t p = (rel.rela->r_offset);
-		uint64_t sap = sa - p;
+		Elf64_Rela* relas = (Elf64_Rela*)(m_mmap_program + shdr[r].sh_offset);
+		const uint64_t total_relas = shdr[r].sh_size / sizeof(Elf64_Rela);
+		Elf64_Shdr* rel_shdr = &shdr[shdr[r].sh_info];
+		uint8_t* rel_data = m_mmap_program + rel_shdr->sh_offset;
 		
-		if (rel.rela->r_offset >= old_vaddr && rel.rela->r_offset < old_vaddr_end)
+		for (uint64_t i = 0; i < total_relas; i++)
 		{
-			rel.rela->r_offset -= old_vaddr;
-			rel.rela->r_offset += new_addr;
-		}
-
-		if (type == R_AARCH64_ABS64)
-		{
-			*(uint64_t*)(rel_sec.data + rel.rela->r_offset - rel_sec.shdr->sh_addr) = sa;
-		}
-		else if (type == R_AARCH64_ABS32)
-		{
-			*(uint32_t*)(rel_sec.data + rel.rela->r_offset - rel_sec.shdr->sh_addr) = (uint32_t)sa;
-		}
-		else if (type == R_AARCH64_ABS16)
-		{
-			*(uint16_t*)(rel_sec.data + rel.rela->r_offset - rel_sec.shdr->sh_addr) = (uint16_t)sa;
-		}
-		else if (type == R_AARCH64_PREL64)
-		{
-			*(uint64_t*)(rel_sec.data + rel.rela->r_offset - rel_sec.shdr->sh_addr) = sap;
-		}
-		else if (type == R_AARCH64_PREL32)
-		{
-			*(uint32_t*)(rel_sec.data + rel.rela->r_offset - rel_sec.shdr->sh_addr) = (uint32_t)sap;
-		}
-		else if (type == R_AARCH64_PREL16)
-		{
-			*(uint16_t*)(rel_sec.data + rel.rela->r_offset - rel_sec.shdr->sh_addr) = (uint16_t)sap;
-		}
-		else if (type == R_AARCH64_ADR_PREL_PG_HI21)
-		{
-			uint32_t pages = ((PG(sa) - PG(p)) >> 12);
-			uint32_t page_lowerpart = pages >> 2;
-			uint32_t page_upperpart = pages & 3;
+			Elf64_Rela* rela = &relas[i];
+			Elf64_Sym* sym = symbol_at(m_mmap_program, ELF64_R_SYM(rela->r_info));
+			if (!sym)
+				continue;
 			
-			//printf("%x %x\n", page_lowerpart, page_upperpart);
+			int type = ELF64_R_TYPE(rela->r_info);
+			uint64_t sa = sym->st_value + rela->r_addend;
+			uint64_t p = (rela->r_offset);
+			uint64_t sap = sa - p;
+			
+			if (rela->r_offset >= old_vaddr && rela->r_offset < old_vaddr_end)
+			{
+				rela->r_offset -= old_vaddr;
+				rela->r_offset += new_addr;
+			}
+			
+			uint8_t* target = rel_data + rela->r_offset - rel_shdr->sh_addr;
 
-			*(uint32_t*)(rel_sec.data + rel.rela->r_offset - rel_sec.shdr->sh_addr) &= ~0x607FFFE0;
-			*(uint32_t*)(rel_sec.data + rel.rela->r_offset - rel_sec.shdr->sh_addr) |= (page_lowerpart << 5) & 0x7FFFE0;
-			*(uint32_t*)(rel_sec.data + rel.rela->r_offset - rel_sec.shdr->sh_addr) |= (page_upperpart << 29);
-		}
-		else if (type == R_AARCH64_ADD_ABS_LO12_NC)
-		{
-			*(uint32_t*)(rel_sec.data + rel.rela->r_offset - rel_sec.shdr->sh_addr) &= ~0x3ffc00;
-			*(uint32_t*)(rel_sec.data + rel.rela->r_offset - rel_sec.shdr->sh_addr) |= ((sa & 0xFFF) << 10) & 0x3ffc00;
-		}
-		else if (type == R_AARCH64_LDST32_ABS_LO12_NC)
-		{
-			*(uint32_t*)(rel_sec.data + rel.rela->r_offset - rel_sec.shdr->sh_addr) &= ~0x3ffc00;
-			*(uint32_t*)(rel_sec.data + rel.rela->r_offset - rel_sec.shdr->sh_addr) |= ((sa & 0xFFC) << 8);
-		}
-		else if (type == R_AARCH64_LDST64_ABS_LO12_NC)
-		{
-			*(uint32_t*)(rel_sec.data + rel.rela->r_offset - rel_sec.shdr->sh_addr) &= ~0x3ffc00;
-			*(uint32_t*)(rel_sec.data + rel.rela->r_offset - rel_sec.shdr->sh_addr) |= ((sa & 0xFF8) << 7);
+			if (type == R_AARCH64_ABS64)
+			{
+				*(uint64_t*)target = sa;
+			}
+			else if (type == R_AARCH64_ABS32)
+			{
+				*(uint32_t*)target = (uint32_t)sa;
+			}
+			else if (type == R_AARCH64_ABS16)
+			{
+				*(uint16_t*)target = (uint16_t)sa;
+			}
+			else if (type == R_AARCH64_PREL64)
+			{
+				*(uint64_t*)target = sap;
+			}
+			else if (type == R_AARCH64_PREL32)
+			{
+				*(uint32_t*)target = (uint32_t)sap;
+			}
+			else if (type == R_AARCH64_PREL16)
+			{
+				*(uint16_t*)target = (uint16_t)sap;
+			}
+			else if (type == R_AARCH64_ADR_PREL_PG_HI21)
+			{
+				uint32_t pages = ((PG(sa) - PG(p)) >> 12);
+				uint32_t page_lowerpart = pages >> 2;
+				uint32_t page_upperpart = pages & 3;
+				
+				//printf("%x %x\n", page_lowerpart, page_upperpart);
+
+				*(uint32_t*)target &= ~0x607FFFE0;
+				*(uint32_t*)target |= (page_lowerpart << 5) & 0x7FFFE0;
+				*(uint32_t*)target |= (page_upperpart << 29);
+			}
+			else if (type == R_AARCH64_ADD_ABS_LO12_NC)
+			{
+				*(uint32_t*)target &= ~0x3ffc00;
+				*(uint32_t*)target |= ((sa & 0xFFF) << 10) & 0x3ffc00;
+			}
+			else if (type == R_AARCH64_LDST32_ABS_LO12_NC)
+			{
+				*(uint32_t*)target &= ~0x3ffc00;
+				*(uint32_t*)target |= ((sa & 0xFFC) << 8);
+			}
+			else if (type == R_AARCH64_LDST64_ABS_LO12_NC)
+			{
+				*(uint32_t*)target &= ~0x3ffc00;
+				*(uint32_t*)target |= ((sa & 0xFF8) << 7);
+			}
 		}
 	}
 }

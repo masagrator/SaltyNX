@@ -26,22 +26,14 @@ extern "C" {
 #include "switch_min/kernel/shmem.h"
 #include "switch_min/kernel/mutex.h"
 #include "switch_min/kernel/event.h"
-#include "switch_min/kernel/uevent.h"
-#include "switch_min/kernel/utimer.h"
-#include "switch_min/kernel/rwlock.h"
 #include "switch_min/kernel/condvar.h"
 #include "switch_min/kernel/thread.h"
-#include "switch_min/kernel/semaphore.h"
 #include "switch_min/kernel/virtmem.h"
 #include "switch_min/kernel/detect.h"
-#include "switch_min/kernel/random.h"
-#include "switch_min/kernel/jit.h"
 #include "switch_min/kernel/ipc.h"
-#include "switch_min/kernel/barrier.h"
 
 //#include "switch_min/services/sm.h"
 //#include "switch_min/services/smm.h"
-//#include "switch_min/services/fs.h"
 //#include "switch_min/services/fspr.h"
 //#include "switch_min/services/apm.h"
 #include "switch_min/services/applet.h"
@@ -76,11 +68,8 @@ extern "C" {
 #include "switch_min/runtime/env.h"
 #include "switch_min/runtime/hosversion.h"
 
-#include "switch_min/runtime/util/utf.h"
 
 //#include "switch_min/runtime/devices/console.h"
-#include "switch_min/runtime/devices/fs_dev.h"
-//#include "switch_min/runtime/devices/romfs_dev.h"
 //#include "switch_min/runtime/devices/socket.h"
 
 /*

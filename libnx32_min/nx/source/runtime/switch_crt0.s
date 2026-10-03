@@ -9,67 +9,78 @@ entrypoint:
 	b startup
     .ascii "SALTYNX"
 
+// Position independent: every address is taken PC-relative (directly or through the MOD0 offsets),
+// so this code needs no relocation itself. Nothing may use a relocated pointer before __nx_dynamic.
 .org _start+0x80
 startup:
-    // save lr
-    mov  r7, lr
+    mov  r7, lr            // loader return address
+    mov  r5, r0            // context ptr
+    mov  r4, r1            // main thread handle
 
-    // get aslr base
-    bl   0x88
-    sub  r6, lr, #0x88
-
-    // context ptr and main thread handle
-    mov  r5, r0
-    mov  r4, r1
-
-    b bssclr_start
-
-bssclr_start:
-    mov  r12, r7
-    mov  r11, r5
-    mov  r10, r4
+    // relocate ourselves: __nx_dynamic(base, _DYNAMIC)
+    adr  r0, _start
+    adr  r8, __nx_mod0
+    ldr  r1, [r8, #4]      // MOD0: _DYNAMIC - __nx_mod0
+    add  r1, r8, r1
+    bl   __nx_dynamic
 
     // clear .bss
-    ldr  r0, =__bss_start__
-    ldr  r1, =__bss_end__
-    sub  r1, r1, r0  // calculate size
-    add  r1, r1, #7  // round up to 8
-    bic  r1, r1, #7
-
+    ldr  r0, [r8, #8]      // MOD0: __bss_start__ - __nx_mod0
+    add  r0, r8, r0
+    ldr  r1, [r8, #12]     // MOD0: __bss_end__ - __nx_mod0
+    add  r1, r8, r1
+    mov  r2, #0
 bss_loop:
-	mov  r2, #0
-    str  r2, [r0]!
-    subs r1, r1, #4
-    bne  bss_loop
+    cmp  r0, r1
+    strlo r2, [r0], #4
+    blo  bss_loop
 
     // store stack pointer
-    ldr  r0, =__stack_top
-	str  sp, [r0]
+    ldr  r0, .Lstack_top
+.Lstack_top_pc:
+    add  r0, pc, r0
+    str  sp, [r0]
 
-    // initialize system
-    mov  r0, r10
-    mov  r1, r11
-    mov  r2, r12
-    blx   __libnx_init
+    // initialize system (same argument order as before)
+    mov  r0, r4
+    mov  r1, r5
+    mov  r2, r7
+    bl   __libnx_init
 
     // call entrypoint
-	ldr  r0, =__system_argc // argc
-    ldr  r0, [r0]
-    ldr  r1, =__system_argv // argv
-    ldr  r1, [r1]
-    ldr  lr, =exit
+    ldr  r0, .Lsystem_argc
+.Lsystem_argc_pc:
+    add  r0, pc, r0
+    ldr  r0, [r0]          // argc
+    ldr  r1, .Lsystem_argv
+.Lsystem_argv_pc:
+    add  r1, pc, r1
+    ldr  r1, [r1]          // argv
+    adr  lr, .Lexit_thunk
     b    main
+
+.Lexit_thunk:
+    b    exit
 
 .global __nx_exit
 .type   __nx_exit, %function
 __nx_exit:
     // restore stack pointer
-    ldr  r8, =__stack_top
-	ldr  sp, [r8]
+    ldr  r8, .Lstack_top_exit
+.Lstack_top_exit_pc:
+    add  r8, pc, r8
+    ldr  sp, [r8]
 
     // jump back to loader
     bx   r1
 
+// PC-relative offsets (pc reads as the instruction address + 8), resolved by the linker, not at runtime.
+.Lstack_top:      .word __stack_top   - (.Lstack_top_pc + 8)
+.Lsystem_argc:    .word __system_argc - (.Lsystem_argc_pc + 8)
+.Lsystem_argv:    .word __system_argv - (.Lsystem_argv_pc + 8)
+.Lstack_top_exit: .word __stack_top   - (.Lstack_top_exit_pc + 8)
+
+.align 2
 .global __nx_mod0
 __nx_mod0:
     .ascii "MOD0"

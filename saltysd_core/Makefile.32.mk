@@ -37,7 +37,7 @@ include $(TOPDIR)/../version.mk
 MODULE_NAME :=  "SaltyNX Core32"
 TARGET		:=	saltynx_core32
 BUILD		:=	build32
-SOURCES		:=	source source/tinyexpr
+SOURCES		:=	source source/tinyexpr source/api
 DATA		:=	data
 INCLUDES	:=	include
 EXEFS_SRC	:=	exefs_src
@@ -56,9 +56,9 @@ CFLAGS			+=	$(INCLUDE) -DSWITCH32 -DAPP_VERSION=\"$(VERSION)\" -DMODULE_NAME=\"$
 CXXFLAGS		:=	$(CFLAGS) -fno-exceptions -fno-rtti -std=gnu++26
 
 ASFLAGS			:=	-g $(ARCH)
-LDFLAGS			=	-specs=$(CURDIR)/../libnx32_min/nx/switch.specs -g $(ARCH) -Wl,-Map,$(notdir $*.map) -B$(ARMV6K_LIBDIR) -L$(ARMV6K_SYSLIB) -Wl,-wrap,__syscall_getreent
+LDFLAGS			=	-specs=$(CURDIR)/../libnx32_min/nx/switch.specs -g $(ARCH) -nostdlib -Wl,-Map,$(notdir $*.map) -B$(ARMV6K_LIBDIR)
 
-LIBS			:=	-lnx_min
+LIBS			:=	-lnx_min -lgcc
 
 #---------------------------------Wpointer-to-int-cast-------------------------------------------------
 # list of directories containing libraries, this must be the top level containing
@@ -146,6 +146,10 @@ all: $(BUILD)
 
 $(BUILD):
 	@[ -d $@ ] || mkdir -p $@
+	@python3 $(CURDIR)/logo/pack_shader.py --glsl $(CURDIR)/logo/saltynx.vert $(CURDIR)/logo/vert.glsl.lz4
+	@python3 $(CURDIR)/logo/pack_shader.py --glsl $(CURDIR)/logo/saltynx.frag $(CURDIR)/logo/frag.glsl.lz4
+	@python3 $(CURDIR)/logo/pack_shader.py $(CURDIR)/logo/vert.spv $(CURDIR)/logo/vert.spv.lz4
+	@python3 $(CURDIR)/logo/pack_shader.py $(CURDIR)/logo/frag.spv $(CURDIR)/logo/frag.spv.lz4
 	@$(MAKE) --no-print-directory -C $(BUILD) -f $(CURDIR)/Makefile.32.mk
 	@echo linking $(notdir $@)
 	@$(LD) $(LDFLAGS) $(OFILES2) $(LIBPATHS) $(LIBS) -o $(TARGET).elf
@@ -155,7 +159,7 @@ $(BUILD):
 #---------------------------------------------------------------------------------
 clean:
 	@echo clean ...
-	@rm -fr $(BUILD) $(TARGET).pfs0 $(TARGET).nso $(TARGET).nro $(TARGET).nsp $(TARGET).nacp $(TARGET).elf $(TARGET).dbg .lst .map
+	@rm -fr logo/*.lz4 $(BUILD) $(TARGET).pfs0 $(TARGET).nso $(TARGET).nro $(TARGET).nsp $(TARGET).nacp $(TARGET).elf $(TARGET).dbg .lst .map
 
 
 #---------------------------------------------------------------------------------

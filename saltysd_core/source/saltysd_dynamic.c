@@ -149,6 +149,17 @@ void SaltySDCore_RegisterBuiltinModule(uintptr_t base)
 	builtin_elfs[num_builtin_elfs-1] = (void*)base;
 }
 
+// Writes a GOT slot. Directly when its page is writable, otherwise through the proc: a module loaded by nn::ro
+// with BindFlag_Now can have a read-only GOT.
+static void writeSlot(void** slot, void* value)
+{
+	MemoryInfo info = {0};
+	u32 pageinfo = 0;
+	if (R_SUCCEEDED(svcQueryMemory(&info, &pageinfo, (uintptr_t)slot)) && (info.perm & Perm_W))
+		*slot = value;
+	else SaltySD_Memcpy((uintptr_t)slot, (uintptr_t)&value, sizeof(value));
+}
+
 void SaltySDCore_ReplaceModuleImport(void* base, const char* name, void* newfunc, bool update)
 {
 	
@@ -268,7 +279,7 @@ void SaltySDCore_ReplaceModuleImport(void* base, const char* name, void* newfunc
 		replacement.r_info = 0x17;
 
 		SaltySD_Memcpy((u32)rela, (u32)&replacement, sizeof(Elf32_Rel));
-		*(void**)(base + rela->r_offset) = newfunc;
+		writeSlot((void**)(base + rela->r_offset), newfunc);
 
 		#else
 		SaltySDCore_printf(MODULE_NAME ": %x %s to 0x%lx, %lx 0x%lx\n", rela_idx, rel_name, newfunc, rela->r_offset, base + rela->r_offset);
@@ -280,7 +291,7 @@ void SaltySDCore_ReplaceModuleImport(void* base, const char* name, void* newfunc
 			SaltySD_Memcpy((u64)rela, (u64)&replacement, sizeof(Elf64_Rela));
 		}
 		else {
-			*(void**)(base + rela->r_offset) = newfunc;
+			writeSlot((void**)(base + rela->r_offset), newfunc);
 		}
 		#endif
 	}
@@ -475,8 +486,8 @@ void SaltySDCore_getDataForUpdate(uint32_t* num_builtin_elfs_ptr, int32_t* num_r
 
 typedef Result (*_ZN2nn2ro10LoadModuleEPNS0_6ModuleEPKvPvmi)(struct Module* pOutModule, const void* pImage, void* buffer, size_t bufferSize, int flag);
 Result LoadModule(struct Module* pOutModule, const void* pImage, void* buffer, size_t bufferSize, int flag) {
-	if (flag)
-		flag = 0;
+	// The caller's bind mode is kept: forcing lazy binding breaks NROs with weak imports (a weak import that
+	// doesn't resolve must stay 0 so the NRO skips it; lazily bound, its slot points to the resolver instead).
 	Result ret = ((_ZN2nn2ro10LoadModuleEPNS0_6ModuleEPKvPvmi)(roLoadModule))(pOutModule, pImage, buffer, bufferSize, flag);
 	if (R_SUCCEEDED(ret)) {
 		for (int x = 0; x < num_replaced_symbols; x++) {

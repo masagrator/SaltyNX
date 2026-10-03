@@ -3,7 +3,9 @@
 __nx_exit_clear:
     // restore stack pointer
 #if defined(__arm__)
-    ldr  r8, =__stack_top
+    ldr  r8, .Lstack_top           // PC-relative: no relocation in code
+.Lstack_top_pc:
+    add  r8, pc, r8
     ldr  sp, [r8]
     
     mov lr, r2
@@ -22,6 +24,8 @@ __nx_exit_clear:
 
     // jump back to loader
     bx lr
+
+.Lstack_top: .word __stack_top - (.Lstack_top_pc + 8)
 #elif defined(__aarch64__)
     adrp x8, __stack_top
     ldr  x8, [x8, #:lo12:__stack_top]

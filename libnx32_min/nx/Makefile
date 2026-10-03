@@ -24,7 +24,7 @@ VERSION	:=	$(LIBNX_MAJOR).$(LIBNX_MINOR).$(LIBNX_PATCH)
 #---------------------------------------------------------------------------------
 TARGET		:=	nx_min
 #BUILD		:=	build
-SOURCES		:=  source/kernel source/services source/runtime source/runtime/devices source/runtime/util/utf
+SOURCES		:=  source/kernel source/services source/runtime source/libc source/libc/math
 DATA		:=	data
 INCLUDES	:=	include external/bsd/include
 
