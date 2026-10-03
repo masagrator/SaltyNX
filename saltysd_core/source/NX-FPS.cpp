@@ -103,19 +103,6 @@ extern "C" {
 			svcGetInfo(&titleid, InfoType_ProgramId, CUR_PROCESS_HANDLE, 0);
 			char path[128];
 
-			#if defined(SWITCH32) || defined(OUNCE32)
-			npf_snprintf(path, sizeof(path), "sdmc:/SaltySD/triple_buffer/%016llX.flag", titleid);
-			#else
-			npf_snprintf(path, sizeof(path), "sdmc:/SaltySD/triple_buffer/%016lX.flag", titleid);
-			#endif
-			FILE* tb_file = SaltySDCore_fopen(path, "rb");
-			if (tb_file) {
-				SaltySDCore_fclose(tb_file);
-				// Must be done before game starts, otherwise game can take whole available heap.
-				NVN::TripleBuffer::requested = SaltySDCore_ReserveMemory(NVN::TripleBuffer::RESERVED_MEMORY_SIZE);
-				SaltySDCore_printf("NX-FPS: TripleBuffer: memory reservation requested: %d\n", NVN::TripleBuffer::requested);
-			}
-
 			FILE* nvn_file = SaltySDCore_fopen("sdmc:/SaltySD/flags/nvncounters.flag", "rb");
 			if  (nvn_file) {
 				SaltySDCore_fclose(nvn_file);
@@ -151,8 +138,13 @@ extern "C" {
 				}
 				SaltySDCore_fread(&temp, 1, 1, file_dat);
 				(Shared -> ZeroSync) = temp;
-				if (SaltySDCore_fread(&temp, 1, 1, file_dat))
+				if (SaltySDCore_fread(&temp, 1, 1, file_dat)) {
+					if (temp == 5) {
+						NVN::TripleBuffer::requested = SaltySDCore_ReserveMemory(NVN::TripleBuffer::RESERVED_MEMORY_SIZE);
+						SaltySDCore_printf("NX-FPS: TripleBuffer memory reservation requested: %d\n", NVN::TripleBuffer::requested);
+					}
 					(Shared -> SetBuffers) = temp;
+				}
 				if (SaltySDCore_fread(&temp, 1, 1, file_dat))
 					(Shared -> forceSuspend) = (bool)temp;
 				if (SaltySDCore_fread(&temp, 1, 1, file_dat))
