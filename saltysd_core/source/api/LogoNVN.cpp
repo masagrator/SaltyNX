@@ -328,7 +328,7 @@ namespace LogoNVN {
 			if (QueueBuilderGetQueueMemorySize && QueueBuilderSetQueueMemory) {
 				const size_t size = (QueueBuilderGetQueueMemorySize(&qb) + 0xFFF) & ~(size_t)0xFFF;
 				if (!size || size > QUEUE_MEMORY_SIZE) {
-					SaltySDCore_printf("NX-FPS: Logo: NVN queue needs 0x%lX bytes, have 0x%lX\n", (unsigned long)size, (unsigned long)QUEUE_MEMORY_SIZE);
+					//SaltySDCore_printf("NX-FPS: Logo: NVN queue needs 0x%lX bytes, have 0x%lX\n", (unsigned long)size, (unsigned long)QUEUE_MEMORY_SIZE);
 					return false;
 				}
 				QueueBuilderSetQueueMemory(&qb, queueMemory, size);
@@ -374,7 +374,7 @@ namespace LogoNVN {
 		// Present runs on the game's thread, and some games give it a tiny stack (f.e. 8 KiB "Presentation Thread"
 		// in a 32-bit game). NVN calls made by the logo (queue/program init on first frame) overflowed it.
 		// Logo is drawn from one thread only, so one static stack is enough.
-		alignas(16) char drawStack[0x10000];
+		alignas(0x10) char drawStack[0x10000];
 	}
 
 	bool Draw(Device* device, const Queue* queue, const Texture* target, int width, int height,
@@ -401,7 +401,7 @@ namespace LogoNVN {
 		// Logo queue starts after everything the game submitted so far (the frame is complete).
 		const Queue* drawQueue = queue;
 		if (ownQueue) {
-			nvn.QueueFenceSync(queue, &gameDone[slot], 0 /*ALL_GPU_COMMANDS_COMPLETE*/, 0);
+			nvn.QueueFenceSync(queue, &gameDone[slot], 0, 0);
 			nvn.QueueFlush(queue);
 			nvn.QueueWaitSync(&logoQueue, &gameDone[slot]);
 			drawQueue = &logoQueue;
@@ -452,7 +452,7 @@ namespace LogoNVN {
 		nvn.QueueSubmitCommands(drawQueue, 1, &handle);
 		// Game's queue (present comes next) waits until the logo is drawn.
 		if (ownQueue) {
-			nvn.QueueFenceSync(&logoQueue, &logoDone[slot], 0 /*ALL_GPU_COMMANDS_COMPLETE*/, 0);
+			nvn.QueueFenceSync(&logoQueue, &logoDone[slot], 0, 0);
 			nvn.QueueFlush(&logoQueue);
 			nvn.QueueWaitSync(queue, &logoDone[slot]);
 		}
