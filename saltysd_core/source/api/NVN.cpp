@@ -75,10 +75,13 @@ namespace NVN {
 	static void (*nvnCommandBufferCopyTextureToTexture_0)(const CommandBuffer* nvnCmdBuf, const Texture* src, const TextureView* srcView, const CopyRegion* srcRegion, const Texture* dst, const TextureView* dstView, const CopyRegion* dstRegion, int flags);
 
 	static void (*nvnWindowGetCrop_0)(const Window* window, Rectangle* crop);
+	static void (*nvnWindowSetCrop_0)(const Window* window, int x, int y, int width, int height);
 	static void (*nvnCommandBufferSetTexturePool_0)(const CommandBuffer* cmdBuf, const TexturePool* pool);
 	static void (*nvnCommandBufferSetSamplerPool_0)(const CommandBuffer* cmdBuf, const SamplerPool* pool);
 	static const TexturePool* volatile gameTexturePool = nullptr;
 	static const SamplerPool* volatile gameSamplerPool = nullptr;
+	static const Window* lastCropWindow = nullptr;
+	static Rectangle lastCrop{};
 
 	constexpr size_t COMMAND_MEMORY_PER_BUF = 0x1000; 
 	constexpr size_t CONTROL_MEMORY_PER_BUF = 0x1000;
@@ -572,6 +575,12 @@ namespace NVN {
 		return;
 	}
 
+	void WindowSetCrop(const Window* nvnWindow, int x, int y, int width, int height) {
+		lastCropWindow = nvnWindow;
+		lastCrop = {x, y, width, height};
+		nvnWindowSetCrop_0(nvnWindow, x, y, width, height);
+	}
+
 	void CommandBufferSetTexturePool(const CommandBuffer* cmdBuf, const TexturePool* pool) {
 		gameTexturePool = pool;
 		nvnCommandBufferSetTexturePool_0(cmdBuf, pool);
@@ -652,7 +661,8 @@ namespace NVN {
 		NX_FPS_Math::PreFrame();
 
 		Rectangle crop{};
-		nvnWindowGetCrop_0(nvnWindow, &crop);
+		if (nvnWindowGetCrop_0) nvnWindowGetCrop_0(nvnWindow, &crop);
+		else if (nvnWindow == lastCropWindow) crop = lastCrop;
 
 		if (TripleBuffer::activeWindow && nvnWindow == TripleBuffer::activeWindow && TripleBuffer::acquired && (index == 0 || index == 1)) [[unlikely]] {
 			nvnQueueSubmitCommands_0(queue, 1, &TripleBuffer::copyHandles[index][TripleBuffer::windowIndex]);
@@ -952,6 +962,7 @@ namespace NVN {
 			runtime_replace{"nvnCommandBufferBarrier", (uintptr_t*)&nvnCommandBufferBarrier_0},
 			runtime_replace{"nvnCommandBufferCopyTextureToTexture", (uintptr_t*)&nvnCommandBufferCopyTextureToTexture_0},
 			runtime_replace{"nvnWindowGetCrop", (uintptr_t*)&nvnWindowGetCrop_0},
+			runtime_replace{"nvnWindowSetCrop", (uintptr_t*)&nvnWindowSetCrop_0, (void*)WindowSetCrop},
 			runtime_replace{"nvnCommandBufferSetTexturePool", (uintptr_t*)&nvnCommandBufferSetTexturePool_0, (void*)CommandBufferSetTexturePool},
 			runtime_replace{"nvnCommandBufferSetSamplerPool", (uintptr_t*)&nvnCommandBufferSetSamplerPool_0, (void*)CommandBufferSetSamplerPool}
 		};
