@@ -64,6 +64,11 @@ namespace EGL {
 		}
 	}
 
+	EGLBoolean DestroyContext(EGLDisplay display, EGLContext context) {
+		LogoGL::ContextDestroyed(context);
+		return eglDestroyContext_0(display, context);
+	}
+
 	EGLBoolean Swap(EGLDisplay display, EGLSurface surface) {
 
 		if (NX_FPS_Math::starttick == 0) [[unlikely]] {
