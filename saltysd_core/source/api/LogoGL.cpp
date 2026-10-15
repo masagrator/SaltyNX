@@ -328,6 +328,14 @@ namespace LogoGL {
 		return ok;
 	}
 
+	void ContextDestroyed(const void* context) {
+		if (!context || context != ownerContext) return;
+		ownerContext = nullptr;
+		ready = failed = false;
+		program = vao = ubo = texture = fbo = 0;
+		textureWidth = textureHeight = 0;
+	}
+
 	void Release(const void* context) {
 		if (context != ownerContext || !functionsLoaded) return;
 		deleteObjects();
