@@ -12,6 +12,7 @@ namespace EGL {
 	inline PFNEGLSWAPBUFFERSPROC eglSwapBuffers_0;
 	inline PFNEGLSWAPINTERVALPROC eglSwapInterval_0;
 	inline PFNEGLGETPROCADDRESSPROC eglGetProcAddress_0;
+	inline PFNEGLDESTROYCONTEXTPROC eglDestroyContext_0;
 	inline PFNGLVIEWPORTPROC glViewport_0;
 	inline PFNGLVIEWPORTARRAYVPROC glViewportArrayv_0;
 	inline PFNGLVIEWPORTARRAYVNVPROC glViewportArrayvNV_0;
@@ -25,6 +26,7 @@ namespace EGL {
 
 	EGLBoolean Interval(EGLDisplay display, EGLint interval);
 	EGLBoolean Swap(EGLDisplay display, EGLSurface surface);
+	EGLBoolean DestroyContext(EGLDisplay display, EGLContext context);
 	void Viewport(GLint x, GLint y, GLsizei width, GLsizei height);
 	void ViewportArrayv(GLuint first, GLsizei count, const GLfloat* v);
 	void ViewportArrayvNV(GLuint first, GLsizei count, const GLfloat* v);
