@@ -8,4 +8,8 @@ namespace LogoGL {
 
 	// Deletes every GL object. The context that created them must be current.
 	void Release(const void* context);
+
+	// The context is being destroyed and its objects with it: they are only forgotten (no GL calls).
+	// A context created afterwards can get the same handle, so ownerContext alone can't tell them apart.
+	void ContextDestroyed(const void* context);
 }
