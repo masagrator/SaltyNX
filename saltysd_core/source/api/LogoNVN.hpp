@@ -15,4 +15,8 @@ namespace LogoNVN {
 	bool Draw(NVN::Device* device, const NVN::Queue* queue, const NVN::Texture* target, int width, int height,
 	          const NVN::Rectangle& crop, float time,
 	          const NVN::TexturePool* gameTexturePool, const NVN::SamplerPool* gameSamplerPool, Resolver resolve);
+
+	// Call right after the game's nvnDeviceInitialize, before the game creates its own memory pools: creates the
+	// logo's shader pool while the low part of the device's shader region is still free (see LogoNVN.cpp).
+	void PrepareEarly(NVN::Device* device, Resolver resolve);
 }
