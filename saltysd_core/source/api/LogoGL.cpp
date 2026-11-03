@@ -3,6 +3,9 @@
 #include <cstring>
 #include <glad/gl.h>
 
+// Defined in LogoNVN.cpp: calls fn(arg) with the stack pointer moved to stackTop and returns fn's result.
+extern "C" uintptr_t logo_nvn_call_on_stack(uintptr_t (*fn)(void*), void* arg, void* stackTop);
+
 namespace LogoGL {
 	namespace {
 		// Capabilities that change how our draw (or the copy) comes out. The last three are desktop GL only.
@@ -95,6 +98,17 @@ namespace LogoGL {
 			"#version 320 es\n"
 			"precision highp float;\nprecision highp int;\nprecision highp sampler2D;\n"
 			"#define FB_Y_DOWN false\n";
+
+		// GL_NV_uniform_buffer_unified_memory: while GL_UNIFORM_BUFFER_UNIFIED_NV is enabled, uniform blocks are read from
+		// the GPU address ranges set with glBufferAddressRangeNV and glBindBufferBase is ignored. DQ1 enables it, so the
+		// logo's Params block read the game's data (version shown as "0.0.0"). The driver rejects glIsEnabled for it
+		// (GL_INVALID_ENUM), so the EGL hooks track the game's own enable/disable calls (SetUniformBufferUnified) and the
+		// logo turns it off around its draw with the same kind of call, then back on.
+		constexpr GLenum GL_UNIFORM_BUFFER_UNIFIED_NV_ = 0x936E;
+		typedef void (GLAD_API_PTR *CapProc)(GLenum cap);
+		int uniformBufferUnified = 0;   // 0 = off, 1 = on via glEnableClientState, 2 = on via glEnable
+		CapProc EnableClientState = nullptr;
+		CapProc DisableClientState = nullptr;
 
 		const void* ownerContext = nullptr;  // context the objects below belong to
 		bool functionsLoaded = false;
@@ -189,6 +203,7 @@ namespace LogoGL {
 			GLboolean colorMask[4];
 			GLint polygonMode[2];
 			GLboolean caps[kCapCount];
+			int unifiedUniformBuffers;
 		};
 
 		void save(SavedState& s) {
@@ -210,6 +225,7 @@ namespace LogoGL {
 			if (!isES && gl.PolygonMode) gl.GetIntegerv(GL_POLYGON_MODE, s.polygonMode);
 			const int caps = isES ? kCapCount - kDesktopOnlyCaps : kCapCount;
 			for (int i = 0; i < caps; i++) s.caps[i] = gl.IsEnabled(kCaps[i]);
+			s.unifiedUniformBuffers = uniformBufferUnified;
 		}
 
 		void restore(const SavedState& s) {
@@ -218,6 +234,8 @@ namespace LogoGL {
 				if (s.caps[i]) gl.Enable(kCaps[i]);
 				else gl.Disable(kCaps[i]);
 			}
+			if (s.unifiedUniformBuffers == 1 && EnableClientState) EnableClientState(GL_UNIFORM_BUFFER_UNIFIED_NV_);
+			else if (s.unifiedUniformBuffers == 2) gl.Enable(GL_UNIFORM_BUFFER_UNIFIED_NV_);
 			if (!isES && gl.PolygonMode) gl.PolygonMode(GL_FRONT_AND_BACK, (GLenum)s.polygonMode[0]);
 			gl.ColorMask(s.colorMask[0], s.colorMask[1], s.colorMask[2], s.colorMask[3]);
 			gl.Viewport(s.viewport[0], s.viewport[1], s.viewport[2], s.viewport[3]);
@@ -255,7 +273,29 @@ namespace LogoGL {
 		}
 	}
 
+	namespace {
+		bool DrawOnOwnStack(const void* context, int width, int height, float time, Resolver resolve);
+
+		struct DrawArgs {
+			const void* context; int width; int height; float time; Resolver resolve;
+		};
+		uintptr_t DrawTrampoline(void* p) {
+			const DrawArgs& a = *(const DrawArgs*)p;
+			return DrawOnOwnStack(a.context, a.width, a.height, a.time, a.resolve);
+		}
+		// eglSwapBuffers runs on the game's thread, and its stack can be small (DQ1: 64 KiB). The GL driver compiles
+		// the logo's GLSL on the first frame, and its compiler recurses once per element of the 250-entry FONT_QUADS
+		// constructor at ~0x110 bytes per level, which alone overflows such a stack. Logo is drawn from one thread only.
+		alignas(0x10) char drawStack[0x40000];
+	}
+
 	bool Draw(const void* context, int width, int height, float time, Resolver resolve) {
+		DrawArgs args{context, width, height, time, resolve};
+		return logo_nvn_call_on_stack(DrawTrampoline, &args, drawStack + sizeof(drawStack)) != 0;
+	}
+
+	namespace {
+	bool DrawOnOwnStack(const void* context, int width, int height, float time, Resolver resolve) {
 		if (width <= 0 || height <= 0) return false;
 		if (context != ownerContext) {
 			ownerContext = context;
@@ -316,6 +356,15 @@ namespace LogoGL {
 			gl.BindVertexArray(vao);
 			gl.BindTexture(GL_TEXTURE_2D, texture); // unit 0
 			gl.BindSampler(0, 0);                    // a game sampler could make the texture incomplete
+			// Uniform blocks from our glBindBufferBase, not from the game's address ranges.
+			if (saved.unifiedUniformBuffers == 1) {
+				if (!DisableClientState) {
+					EnableClientState = (CapProc)resolve("glEnableClientState");
+					DisableClientState = (CapProc)resolve("glDisableClientState");
+				}
+				if (DisableClientState) DisableClientState(GL_UNIFORM_BUFFER_UNIFIED_NV_);
+			}
+			else if (saved.unifiedUniformBuffers == 2) gl.Disable(GL_UNIFORM_BUFFER_UNIFIED_NV_);
 			gl.DrawArrays(GL_TRIANGLES, 0, Logo::VERTEX_COUNT);
 		}
 
@@ -326,6 +375,11 @@ namespace LogoGL {
 		}
 		restore(saved);
 		return ok;
+	}
+	}
+
+	void SetUniformBufferUnified(int mode) {
+		uniformBufferUnified = mode;
 	}
 
 	void ContextDestroyed(const void* context) {
