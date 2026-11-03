@@ -145,25 +145,24 @@ namespace EGL {
 	}
 
 	// Tracks GL_UNIFORM_BUFFER_UNIFIED_NV for the logo (see LogoGL.cpp), everything else passes straight through.
-	constexpr GLenum UNIFORM_BUFFER_UNIFIED_NV = 0x936E;
 
 	void Enable(GLenum cap) {
-		if (cap == UNIFORM_BUFFER_UNIFIED_NV) LogoGL::SetUniformBufferUnified(2);
+		if (cap == GL_UNIFORM_BUFFER_UNIFIED_NV) LogoGL::SetUniformBufferUnified(2);
 		if (glEnable_0) glEnable_0(cap);
 	}
 
 	void Disable(GLenum cap) {
-		if (cap == UNIFORM_BUFFER_UNIFIED_NV) LogoGL::SetUniformBufferUnified(0);
+		if (cap == GL_UNIFORM_BUFFER_UNIFIED_NV) LogoGL::SetUniformBufferUnified(0);
 		if (glDisable_0) glDisable_0(cap);
 	}
 
 	void EnableClientState(GLenum cap) {
-		if (cap == UNIFORM_BUFFER_UNIFIED_NV) LogoGL::SetUniformBufferUnified(1);
+		if (cap == GL_UNIFORM_BUFFER_UNIFIED_NV) LogoGL::SetUniformBufferUnified(1);
 		if (glEnableClientState_0) glEnableClientState_0(cap);
 	}
 
 	void DisableClientState(GLenum cap) {
-		if (cap == UNIFORM_BUFFER_UNIFIED_NV) LogoGL::SetUniformBufferUnified(0);
+		if (cap == GL_UNIFORM_BUFFER_UNIFIED_NV) LogoGL::SetUniformBufferUnified(0);
 		if (glDisableClientState_0) glDisableClientState_0(cap);
 	}
 
