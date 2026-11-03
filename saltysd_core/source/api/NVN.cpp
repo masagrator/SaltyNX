@@ -613,6 +613,8 @@ namespace NVN {
 	bool DeviceInitialize(Device* nvnDevice, const DeviceBuilder* nvnDeviceBuilder) {
 		bool ret = nvnDeviceInitialize_0(nvnDevice, nvnDeviceBuilder);
 		if (mainDevice == 0) mainDevice = nvnDevice;
+		// Logo's shader pool before the game creates any pool of its own (see LogoNVN::PrepareEarly).
+		if (ret && nvnDevice == mainDevice && !Logo::done) LogoNVN::PrepareEarly(nvnDevice, Logo::Resolve);
 		return ret;
 	}
 
