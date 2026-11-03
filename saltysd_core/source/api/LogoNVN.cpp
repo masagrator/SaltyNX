@@ -291,9 +291,22 @@ namespace LogoNVN {
 			return nvn.TexturePoolInitialize(&texturePool, &resPool, (ptrdiff_t)TEX_POOL_OFFSET, reservedTextureDescriptors + SLOTS);
 		}
 
+		// Shader code is addressed relative to the device's shader region base, and on older drivers (seen on SDK 7.3)
+		// the GPU sign-extends that 32-bit offset: a shader pool more than 2 GiB above the base faults on the first
+		// instruction fetch (MMU fault on the logo's queue, the game dies later). Games like Lego Jurassic World fill the lower 2 GiB
+		// with their own shader pools, so the logo's pool is created right after nvnDeviceInitialize (PrepareEarly),
+		// before any pool of the game. If that didn't happen, it's created here on first use as before.
+		bool shaderPoolReady = false;
+
+		bool createShaderPool(Device* device) {
+			if (!shaderPoolReady)
+				shaderPoolReady = initPool(&shaderPool, device, MEMORY_POOL_FLAGS_CPU_UNCACHED | MEMORY_POOL_FLAGS_GPU_CACHED | MEMORY_POOL_FLAGS_SHADER_CODE,
+				                           &shaderDataStorage, sizeof(shaderDataStorage));
+			return shaderPoolReady;
+		}
+
 		bool buildProgram(Device* device) {
-			if (!initPool(&shaderPool, device, MEMORY_POOL_FLAGS_CPU_UNCACHED | MEMORY_POOL_FLAGS_GPU_CACHED | MEMORY_POOL_FLAGS_SHADER_CODE,
-			              &shaderDataStorage, sizeof(shaderDataStorage))) return false;
+			if (!createShaderPool(device)) return false;
 
 			const BufferAddress base = nvn.MemoryPoolGetBufferAddress(&shaderPool);
 			if (!nvn.ProgramInitialize(&program, device)) return false;
@@ -382,6 +395,11 @@ namespace LogoNVN {
 	          const TexturePool* gameTexturePool, const SamplerPool* gameSamplerPool, Resolver resolve) {
 		DrawArgs args{device, queue, target, width, height, &crop, time, gameTexturePool, gameSamplerPool, resolve};
 		return logo_nvn_call_on_stack(DrawTrampoline, &args, drawStack + sizeof(drawStack)) != 0;
+	}
+
+	void PrepareEarly(Device* device, Resolver resolve) {
+		if (initAttempted || shaderPoolReady || !device) return;
+		if (loadFunctions(resolve)) createShaderPool(device);
 	}
 
 	namespace {
