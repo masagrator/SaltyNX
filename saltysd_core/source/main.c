@@ -479,6 +479,48 @@ double strtod(const char* str, char** endptr) {
 	return ((strtod_0)(strtod_ptr))(str, endptr);
 }
 
+#if defined(SWITCH32) || defined(OUNCE32)
+#define RO_GET_MODULE_ADDRESS_RANGE "_ZN2nn2ro21GetModuleAddressRangeEPjS1_j"
+#else
+#define RO_GET_MODULE_ADDRESS_RANGE "_ZN2nn2ro21GetModuleAddressRangeEPmS1_m"
+#endif
+
+typedef bool (*GetModuleAddressRange_t)(uintptr_t* out_address, size_t* out_size, uintptr_t address);
+static uintptr_t roGetModuleAddressRange = 0;
+
+static inline bool IsModuleCodeMemory(const MemoryInfo* info) {
+	const u32 type = info->type & 0xFF;
+	return type == MemType_ModuleCodeStatic || type == MemType_ModuleCodeMutable;
+}
+
+static bool GetModuleAddressRange(uintptr_t* out_address, size_t* out_size, uintptr_t address) {
+	if (((GetModuleAddressRange_t)roGetModuleAddressRange)(out_address, out_size, address))
+		return true;
+
+	MemoryInfo info;
+	u32 pageinfo;
+	if (R_FAILED(svcQueryMemory(&info, &pageinfo, address)) || !IsModuleCodeMemory(&info))
+		return false;
+
+	uintptr_t start = (uintptr_t)info.addr;
+	uintptr_t end = (uintptr_t)(info.addr + info.size);
+
+	while (info.perm != Perm_Rx) {
+		if (!start || R_FAILED(svcQueryMemory(&info, &pageinfo, start - 1)) || !IsModuleCodeMemory(&info))
+			return false;
+		start = (uintptr_t)info.addr;
+	}
+
+	while (R_SUCCEEDED(svcQueryMemory(&info, &pageinfo, end)) && (uintptr_t)info.addr == end && info.size &&
+	       IsModuleCodeMemory(&info) && info.perm != Perm_Rx) {
+		end = (uintptr_t)(info.addr + info.size);
+	}
+
+	*out_address = start;
+	*out_size = end - start;
+	return true;
+}
+
 int main(int argc, char *argv[])
 {
 	Result ret;
@@ -500,6 +542,10 @@ int main(int argc, char *argv[])
 
 	SaltySDCore_fillRoLoadModule();
 	SaltySDCore_ReplaceImport("_ZN2nn2ro10LoadModuleEPNS0_6ModuleEPKvPvmi", (void*)LoadModule);
+
+	roGetModuleAddressRange = SaltySDCore_FindSymbolBuiltin(RO_GET_MODULE_ADDRESS_RANGE);
+	if (roGetModuleAddressRange)
+		SaltySDCore_ReplaceImport(RO_GET_MODULE_ADDRESS_RANGE, (void*)GetModuleAddressRange);
 	
 	#if defined(SWITCH32) || defined(OUNCE32)
 	SaltySDCore_printf(MODULE_NAME ": Plugins are not supported...\n");
