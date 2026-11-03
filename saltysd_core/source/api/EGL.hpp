@@ -23,6 +23,11 @@ namespace EGL {
 	inline PFNGLVIEWPORTINDEXEDFVPROC glViewportIndexedfv_0;
 	inline PFNGLVIEWPORTINDEXEDFVNVPROC glViewportIndexedfvNV_0;
 	inline PFNGLVIEWPORTINDEXEDFVOESPROC glViewportIndexedfvOES_0;
+	typedef void (*GLCapProc)(GLenum cap);
+	inline GLCapProc glEnable_0;
+	inline GLCapProc glDisable_0;
+	inline GLCapProc glEnableClientState_0;
+	inline GLCapProc glDisableClientState_0;
 
 	EGLBoolean Interval(EGLDisplay display, EGLint interval);
 	EGLBoolean Swap(EGLDisplay display, EGLSurface surface);
@@ -37,6 +42,10 @@ namespace EGL {
 	void ViewportIndexedfv(GLuint index, const GLfloat* v);
 	void ViewportIndexedfvNV(GLuint index, const GLfloat* v);
 	void ViewportIndexedfvOES(GLuint index, const GLfloat* v);
+	void Enable(GLenum cap);
+	void Disable(GLenum cap);
+	void EnableClientState(GLenum cap);
+	void DisableClientState(GLenum cap);
 	__eglMustCastToProperFunctionPointerType GetProc(const char* procname);
 
 	namespace Logo {

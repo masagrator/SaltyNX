@@ -144,6 +144,28 @@ namespace EGL {
 		}
 	}
 
+	// Tracks GL_UNIFORM_BUFFER_UNIFIED_NV for the logo (see LogoGL.cpp), everything else passes straight through.
+
+	void Enable(GLenum cap) {
+		if (cap == GL_UNIFORM_BUFFER_UNIFIED_NV) LogoGL::SetUniformBufferUnified(2);
+		if (glEnable_0) glEnable_0(cap);
+	}
+
+	void Disable(GLenum cap) {
+		if (cap == GL_UNIFORM_BUFFER_UNIFIED_NV) LogoGL::SetUniformBufferUnified(0);
+		if (glDisable_0) glDisable_0(cap);
+	}
+
+	void EnableClientState(GLenum cap) {
+		if (cap == GL_UNIFORM_BUFFER_UNIFIED_NV) LogoGL::SetUniformBufferUnified(1);
+		if (glEnableClientState_0) glEnableClientState_0(cap);
+	}
+
+	void DisableClientState(GLenum cap) {
+		if (cap == GL_UNIFORM_BUFFER_UNIFIED_NV) LogoGL::SetUniformBufferUnified(0);
+		if (glDisableClientState_0) glDisableClientState_0(cap);
+	}
+
 	void Viewport(GLint x, GLint y, GLsizei width, GLsizei height) {
 		if (resolutionLookup && height > 1 && width > 1 && !x && !y) {
 			NX_FPS_Math::addResToViewports((uint32_t)width, (uint32_t)height);
@@ -203,7 +225,11 @@ namespace EGL {
 			runtime_replace{"glViewportIndexedfOES", (uintptr_t*)&glViewportIndexedfOES_0, (void*)ViewportIndexedfOES},
 			runtime_replace{"glViewportIndexedfv", (uintptr_t*)&glViewportIndexedfv_0, (void*)ViewportIndexedfv},
 			runtime_replace{"glViewportIndexedfvNV", (uintptr_t*)&glViewportIndexedfvNV_0, (void*)ViewportIndexedfvNV},
-			runtime_replace{"glViewportIndexedfvOES", (uintptr_t*)&glViewportIndexedfvOES_0, (void*)ViewportIndexedfvOES}
+			runtime_replace{"glViewportIndexedfvOES", (uintptr_t*)&glViewportIndexedfvOES_0, (void*)ViewportIndexedfvOES},
+			runtime_replace{"glEnable", (uintptr_t*)&glEnable_0, (void*)Enable},
+			runtime_replace{"glDisable", (uintptr_t*)&glDisable_0, (void*)Disable},
+			runtime_replace{"glEnableClientState", (uintptr_t*)&glEnableClientState_0, (void*)EnableClientState},
+			runtime_replace{"glDisableClientState", (uintptr_t*)&glDisableClientState_0, (void*)DisableClientState}
 		};
 
 		for (const auto& replacement : egl_replacements) {
