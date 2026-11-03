@@ -12,4 +12,8 @@ namespace LogoGL {
 	// The context is being destroyed and its objects with it: they are only forgotten (no GL calls).
 	// A context created afterwards can get the same handle, so ownerContext alone can't tell them apart.
 	void ContextDestroyed(const void* context);
+
+	// Game can turn GL_UNIFORM_BUFFER_UNIFIED_NV on (1 = glEnableClientState, 2 = glEnable) or off (0).
+	// Reported by the EGL hooks, the driver doesn't answer glIsEnabled for it.
+	void SetUniformBufferUnified(int mode);
 }
