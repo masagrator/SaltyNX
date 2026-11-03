@@ -71,7 +71,6 @@ namespace NVN {
 	struct SamplerPool {
 		char reserved[0x20];
 	};
-	//Old NVN expects 0x60
 	struct SamplerBuilder {
 		char reserved[0x60];
 	};
