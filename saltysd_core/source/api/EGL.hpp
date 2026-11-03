@@ -3,6 +3,7 @@
 #define EGL_NO_PLATFORM_SPECIFIC_TYPES
 #include <glad/egl.h>
 #include <glad/gles2.h> // OpenGL ES 3.2 + GL_NV_viewport_array + GL_OES_viewport_array
+#define GL_UNIFORM_BUFFER_UNIFIED_NV 0x936E
 
 namespace EGL {
 	typedef PFNGLVIEWPORTARRAYVOESPROC PFNGLVIEWPORTARRAYVPROC;
