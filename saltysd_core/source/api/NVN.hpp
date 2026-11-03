@@ -71,11 +71,12 @@ namespace NVN {
 	struct SamplerPool {
 		char reserved[0x20];
 	};
+	//Old NVN expects 0x60
 	struct SamplerBuilder {
 		char reserved[0x60];
 	};
 	struct Sampler {
-		char reserved[0x30];
+		char reserved[0x60]; // nvnSamplerInitialize writes 0x40 bytes (SDK 22) and 0x60 bytes (SDK 7.3)
 	};
 
 	struct Viewport {
